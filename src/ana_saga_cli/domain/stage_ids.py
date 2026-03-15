@@ -1,0 +1,18 @@
+STAGE_ORDER = [
+    "etapa_01_abertura",
+    "etapa_02_conexao_inicial",
+    "etapa_03_contextualizacao_permissao",
+    "etapa_04_diagnostico_situacional",
+    "etapa_05_diagnostico_impacto",
+    "etapa_06_qualificacao_fit",
+    "etapa_07_transicao_solucao",
+    "etapa_08_mapeamento_solucao",
+    "etapa_09_ancoragem_valor",
+    "etapa_10_checagem_aderencia",
+    "etapa_11_oferta",
+    "etapa_12_negociacao_condicoes",
+    "etapa_13_objecoes",
+    "etapa_14_fechamento",
+    "etapa_15_onboarding_confirmacao",
+    "etapa_16_pos_venda_expansao",
+]

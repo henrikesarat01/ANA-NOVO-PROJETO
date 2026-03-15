@@ -1,0 +1,74 @@
+from __future__ import annotations
+
+from dataclasses import dataclass, field
+from typing import Any
+
+
+@dataclass(slots=True)
+class MessageTurn:
+    role: str
+    content: str
+
+
+@dataclass(slots=True)
+class DiagnosticEntry:
+    turn_index: int
+    problem: str
+    cause: str
+    root: str
+    characteristic: str
+    product: str
+    status: str = "identified"
+
+
+@dataclass(slots=True)
+class StageDefinition:
+    stage_id: str
+    title: str
+    goal: str
+    global_tone: list[str]
+    dos: list[str]
+    donts: list[str]
+    response_contract: dict[str, Any]
+    example_good: str
+
+
+@dataclass(slots=True)
+class ArsenalEntry:
+    category: str
+    function_name: str
+    saga_features: list[str]
+    problem: str
+    cause: str
+    root: str
+    characteristic: str
+    product: str
+
+
+@dataclass(slots=True)
+class ProductFact:
+    section: str
+    name: str
+    description: str
+
+
+@dataclass(slots=True)
+class ConversationState:
+    stage_id: str
+    turns: list[MessageTurn] = field(default_factory=list)
+    diagnostics: list[DiagnosticEntry] = field(default_factory=list)
+    lead_summary: dict[str, Any] = field(default_factory=dict)
+    diagnostic_hypotheses: dict[str, Any] = field(default_factory=dict)
+    response_policy: dict[str, Any] = field(default_factory=dict)
+    discussed_features: list[str] = field(default_factory=list)
+    asked_questions: list[str] = field(default_factory=list)
+    last_assistant_message: str = ""
+    turn_count: int = 0
+
+    def add_user_turn(self, content: str) -> None:
+        self.turns.append(MessageTurn(role="user", content=content))
+        self.turn_count += 1
+
+    def add_assistant_turn(self, content: str) -> None:
+        self.turns.append(MessageTurn(role="assistant", content=content))
+        self.last_assistant_message = content

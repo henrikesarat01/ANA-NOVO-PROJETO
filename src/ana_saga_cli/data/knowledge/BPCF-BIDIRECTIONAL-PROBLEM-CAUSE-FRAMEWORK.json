@@ -1,0 +1,248 @@
+{
+  "framework_id": "BPCF-BIDIRECTIONAL-PROBLEM-CAUSE-FRAMEWORK",
+  "framework_name": "Bidirectional Problem-Cause Framework",
+  "framework_acronym": "BPCF",
+  "framework_category": "meta-framework",
+  "framework_stage": "CROSS-ETAPA (ativo em todas as etapas)",
+  "framework_type": "continuous_diagnostic",
+
+  "primary_objective": "Motor diagnóstico bidirecional contínuo que, a cada problema, objeção ou preocupação verbalizada pelo lead, escava internamente a CAUSA e a RAIZ DO PROBLEMA (← esquerda) e mapeia a CARACTERÍSTICA DO PRODUTO que resolve e o PRODUTO final (→ direita), acumulando um mapa diagnóstico que se atualiza ao longo de toda a negociação.",
+
+  "secondary_objectives": [
+    "Construir progressivamente um mapa completo: RAIZ ← CAUSA ← [PROBLEMA] → CARACTERÍSTICA → PRODUTO",
+    "Operar silenciosamente — a escavação da raiz é INTERNA, nunca verbalizada ao lead",
+    "Gerar autoridade implícita ao fazer perguntas precisas que só quem entende a raiz consegue fazer",
+    "Conectar cada novo problema detectado ao mapa existente, revelando padrões",
+    "Fazer as técnicas psicológicas (aversão à perda, custo de oportunidade, etc.) emergirem NATURALMENTE da conexão, sem aplicá-las conscientemente",
+    "Permitir que o lead chegue às próprias conclusões guiado pelas perguntas certas",
+    "Acumular diagnósticos ao longo da conversa inteira, não apenas em uma etapa"
+  ],
+
+  "core_mechanism": {
+    "description": "Framework bidirecional que parte do PROBLEMA como centro e trabalha em duas direções simultaneamente",
+    "flow": "RAIZ DO PROBLEMA ← CAUSA DO PROBLEMA ← [PROBLEMA] → CARACTERÍSTICA QUE RESOLVE → MEU PRODUTO",
+    "directions": {
+      "left_excavation": {
+        "direction": "← (escavação interna)",
+        "path": "[PROBLEMA] → CAUSA → RAIZ",
+        "visibility": "INTERNA — o vendedor entende, mas NÃO verbaliza ao lead",
+        "purpose": "Compreender a origem estrutural do problema para guiar perguntas e respostas com precisão cirúrgica"
+      },
+      "right_mapping": {
+        "direction": "→ (mapeamento externo)",
+        "path": "[PROBLEMA] → CARACTERÍSTICA → PRODUTO",
+        "visibility": "EXTERNA — é o que o lead percebe e ouve",
+        "purpose": "Conectar o problema do lead a uma característica específica do produto que endereça aquele problema"
+      }
+    },
+    "continuous_update": "Cada novo problema, objeção ou preocupação do lead dispara uma nova execução do ciclo bidirecional, adicionando ao mapa diagnóstico acumulado"
+  },
+
+  "psychological_principles": [
+    "Emergência natural — técnicas psicológicas (aversão à perda, custo de oportunidade, dissonância cognitiva) emergem AUTOMATICAMENTE da conexão correta causa-característica, sem aplicação deliberada",
+    "Autoridade implícita — quem faz perguntas precisas derivadas da raiz é percebido como especialista sem precisar se declarar",
+    "Autoconclusão guiada — o lead chega às próprias conclusões quando as perguntas certas são feitas na sequência certa",
+    "Consistência progressiva — cada conexão validada torna mais difícil rejeitar as próximas",
+    "Mapa mental cumulativo — quanto mais conexões problema→produto o lead aceita, mais inevitável a compra se torna"
+  ],
+
+  "when_to_use": "SEMPRE. Este meta-framework opera continuamente em TODAS as etapas da negociação. Ele é ativado automaticamente sempre que o lead verbaliza um problema, objeção, dúvida ou preocupação. O mapa diagnóstico se acumula e enriquece a cada turno.",
+
+  "when_not_to_use": "Nunca desativar. Este framework é o motor diagnóstico central. Ele complementa (não substitui) os frameworks específicos de cada ETAPA.",
+
+  "activation_triggers": [
+    "Lead verbaliza um problema ou dor ('meu X não funciona', 'estou tendo dificuldade com Y')",
+    "Lead levanta uma objeção ('tá caro', 'não sei se funciona', 'já tentei algo parecido')",
+    "Lead expressa dúvida ('será que resolve?', 'como funciona?')",
+    "Lead menciona comparação com concorrente ('achei mais barato em outro lugar')",
+    "Lead revela frustração com situação atual ('estou cansado de...', 'não aguento mais...')",
+    "Lead descreve necessidade ('preciso de...', 'quero...', 'estou procurando...')"
+  ],
+
+  "structure": {
+    "steps": [
+      {
+        "step": 1,
+        "name": "Captura do Problema",
+        "description": "Identificar o problema, objeção ou preocupação que o lead acabou de verbalizar. Este é o ponto central do framework — tudo parte daqui.",
+        "action": "Registrar exatamente o que o lead disse como [PROBLEMA] no mapa diagnóstico."
+      },
+      {
+        "step": 2,
+        "name": "Escavação Interna ← (Causa)",
+        "description": "Internamente, sem verbalizar, identificar a CAUSA imediata do problema. Por que esse problema está acontecendo?",
+        "action": "Mapear causa. Exemplo: 'O motor fundiu' → Causa: desgaste interno por falta de lubrificação",
+        "visibility": "INTERNA — NÃO dizer ao lead"
+      },
+      {
+        "step": 3,
+        "name": "Escavação Interna ← (Raiz)",
+        "description": "Ir um nível mais profundo: qual a RAIZ ESTRUTURAL por trás da causa? O que permitiu que a causa existisse?",
+        "action": "Mapear raiz. Exemplo: Causa 'falta de lubrificação' → Raiz: ausência de manutenção preventiva",
+        "visibility": "INTERNA — NÃO dizer ao lead"
+      },
+      {
+        "step": 4,
+        "name": "Mapeamento Externo → (Característica)",
+        "description": "Identificar qual característica específica do produto endereça o problema verbalizado pelo lead. Esta é a parte que o lead VAI ouvir.",
+        "action": "Conectar. Exemplo: [Problema: preciso de motor] → Característica: motor retificado com peças novas e garantia de 1 ano",
+        "visibility": "EXTERNA — comunicar ao lead"
+      },
+      {
+        "step": 5,
+        "name": "Conexão ao Produto →",
+        "description": "Apresentar o produto como consequência natural da característica que resolve o problema.",
+        "action": "Fechar o loop. Exemplo: Característica 'motor retificado com garantia' → Produto: Motor completo retificado para o modelo do cliente",
+        "visibility": "EXTERNA — comunicar ao lead"
+      },
+      {
+        "step": 6,
+        "name": "Perguntas Guiadas pela Raiz",
+        "description": "Usar o conhecimento da raiz (interno) para fazer perguntas que guiem o lead a perceber sozinho a profundidade do problema.",
+        "action": "Fazer perguntas que SÓ quem conhece a raiz conseguiria fazer. Exemplo: sabendo que a raiz é 'falta de manutenção', perguntar 'esse motor aí veio com garantia? foi testado?'",
+        "visibility": "EXTERNA — as perguntas são ouvidas, mas a razão delas é interna"
+      },
+      {
+        "step": 7,
+        "name": "Atualização do Mapa Diagnóstico",
+        "description": "Adicionar esta nova conexão ao mapa acumulado. Verificar se conecta com problemas anteriores, revelando padrões.",
+        "action": "Registrar no mapa: {problema: X, causa: Y, raiz: Z, caracteristica: W, produto: P}. Verificar conexões com entradas anteriores."
+      }
+    ]
+  },
+
+  "diagnostic_map_schema": {
+    "description": "Estrutura do mapa diagnóstico que se acumula ao longo da negociação",
+    "format": {
+      "entries": [
+        {
+          "turno": "número do turno em que foi detectado",
+          "problema": "o que o lead verbalizou",
+          "causa": "por que está acontecendo (INTERNO)",
+          "raiz": "origem estrutural (INTERNO)",
+          "caracteristica": "feature do produto que resolve",
+          "produto": "produto/serviço final",
+          "status": "identificado | endereçado | validado_pelo_lead"
+        }
+      ],
+      "patterns": "conexões entre entradas que revelam padrão (ex: todos os problemas têm mesma raiz)"
+    }
+  },
+
+  "execution_rules": [
+    "REGRA 1: NUNCA verbalizar a raiz ou a causa ao lead — isso é conhecimento INTERNO para guiar a conversa",
+    "REGRA 2: A cada novo problema/objeção, executar o ciclo completo (← esquerda + → direita)",
+    "REGRA 3: Usar a raiz para formular PERGUNTAS que levem o lead a concluir sozinho",
+    "REGRA 4: Não aplicar técnicas psicológicas conscientemente — elas devem EMERGIR da conexão correta",
+    "REGRA 5: Acumular diagnósticos — cada novo ciclo adiciona ao mapa, não substitui",
+    "REGRA 6: Quando múltiplos problemas compartilham a mesma raiz, usar esse padrão para fortalecer a argumentação",
+    "REGRA 7: A resposta ao lead só contém a parte DIREITA (→ característica → produto), nunca a ESQUERDA (← causa ← raiz)"
+  ],
+
+  "example_full_cycles": [
+    {
+      "context": "Auto peças — cliente quer motor",
+      "trigger": "Preciso de um motor pro meu Corolla 2018",
+      "left_excavation": {
+        "causa": "Motor atual fundiu por desgaste interno (biela, perda de compressão)",
+        "raiz": "Ausência de manutenção preventiva ao longo do tempo"
+      },
+      "right_mapping": {
+        "caracteristica": "Motor retificado com peças internas novas (bronzinas, anéis, pistões), testado em bancada, com 1 ano de garantia",
+        "produto": "Motor retificado completo para Corolla 2018"
+      },
+      "guided_questions": [
+        "O que aconteceu com o motor atual? Fundiu?",
+        "Você sabe se ele tinha as revisões em dia?"
+      ],
+      "response_to_lead": "A gente tem o motor retificado pro Corolla 2018 — todas as peças internas novas, passou por teste de bancada e vem com 1 ano de garantia."
+    },
+    {
+      "context": "Objeção de preço no mesmo cenário",
+      "trigger": "Tá muito caro esse motor",
+      "left_excavation": {
+        "causa": "Comparando com motor usado de desmanche ou retífica sem garantia",
+        "raiz": "Percepção de motor como commodity — não diferencia qualidade/garantia"
+      },
+      "right_mapping": {
+        "caracteristica": "Garantia de 1 ano + peças novas + teste em bancada = proteção contra recompra",
+        "produto": "Motor retificado completo com garantia"
+      },
+      "guided_questions": [
+        "Qual valor você tava encontrando por aí?",
+        "Esse outro motor vem com garantia? Foi testado em bancada? As peças internas são novas?"
+      ],
+      "response_to_lead": "O nosso vem com todas as peças internas novas, passou por teste de bancada e tem 1 ano de garantia. Se der qualquer coisa nesse período, a gente resolve."
+    },
+    {
+      "context": "Capinhas de celular — cliente quer uma capinha",
+      "trigger": "Quero uma capinha pro meu iPhone 15",
+      "left_excavation": {
+        "causa": "Celular sem proteção — medo de quebrar a tela/traseira",
+        "raiz": "Alto custo de reparo do iPhone (tela custa quase o valor do aparelho)"
+      },
+      "right_mapping": {
+        "caracteristica": "Capinha com proteção militar (drop test 2m), bordas elevadas que protegem câmera e tela",
+        "produto": "Capinha com proteção reforçada para iPhone 15"
+      },
+      "guided_questions": [
+        "Você usa sem capinha hoje? Já deixou cair alguma vez?",
+        "Sabe quanto tá o conserto da tela do 15 hoje?"
+      ],
+      "response_to_lead": "Essa aqui tem proteção militar — testada em queda de 2 metros. E as bordas são elevadas pra proteger a câmera e a tela. Seu iPhone fica blindado."
+    }
+  ],
+
+  "cross_etapa_behavior": {
+    "ETAPA_1_Rapport": "Se o lead já menciona problema na abertura, ativar ciclo passivamente (registrar, não agir ainda)",
+    "ETAPA_2_Contextualizacao": "Começar a acumular problemas mencionados no mapa diagnóstico",
+    "ETAPA_3_Diagnostico": "Execução intensa — cada revelação do lead dispara um ciclo completo. Acumular mapa rico.",
+    "ETAPA_4_Amplificacao": "Usar a RAIZ (interna) para amplificar a dor sem revelá-la. A raiz dá profundidade à amplificação.",
+    "ETAPA_5_Transicao": "Mapa diagnóstico guia a transição — a raiz fundamenta por que a solução é necessária",
+    "ETAPA_6_Mapeamento": "Parte DIREITA (→) do mapa é apresentada. Cada característica conecta ao problema específico do lead.",
+    "ETAPA_7_Ancoragem": "Padrões no mapa (múltiplos problemas com mesma raiz) reforçam inevitabilidade do produto",
+    "ETAPA_8_Checagem": "Validar com lead se as conexões problema→característica fazem sentido",
+    "ETAPA_9_Oferta": "Mapa completo justifica o valor — cada problema resolvido é um item de valor",
+    "ETAPA_10_Objecoes": "Cada objeção dispara novo ciclo. A raiz da objeção guia a resposta sem ser verbalizada.",
+    "ETAPA_11_Fechamento": "Mapa acumulado serve como síntese: 'Vamos resolver X, Y e Z com [PRODUTO]'",
+    "ETAPA_12_PosVenda": "Mapa é referência para acompanhamento: validar se os problemas foram realmente resolvidos"
+  },
+
+  "success_indicators": [
+    "Lead faz perguntas detalhadas sobre a característica que foi mapeada (→ direita)",
+    "Lead conecta sozinho: 'então se tem garantia, é melhor do que aquele mais barato'",
+    "Lead valida a conexão sem que a raiz precise ser revelada",
+    "Mapa diagnóstico acumula 3+ entradas que convergem para o mesmo produto",
+    "Lead para de comparar com alternativas baratas após entender as características"
+  ],
+
+  "failure_indicators": [
+    "Vendedor verbaliza a raiz diretamente ao lead (quebrando a regra)",
+    "Lead não conecta a característica ao seu problema específico",
+    "Mapa diagnóstico fica vazio (vendedor não está executando os ciclos)",
+    "Perguntas guiadas são genéricas e não derivam da raiz escavada"
+  ],
+
+  "common_mistakes": [
+    "Revelar a raiz ao lead — 'o problema é que você não faz manutenção' (ERRADO)",
+    "Pular a escavação esquerda e ir direto para a característica sem entender o porquê",
+    "Não acumular o mapa — tratar cada problema isoladamente sem buscar padrões",
+    "Aplicar técnicas psicológicas conscientemente em vez de deixá-las emergir",
+    "Fazer perguntas genéricas que não derivam do conhecimento da raiz"
+  ],
+
+  "metrics": {
+    "diagnostic_entries": "Quantidade de entradas no mapa diagnóstico ao final da negociação",
+    "pattern_detection": "Percentual de problemas que compartilham a mesma raiz",
+    "characteristic_acceptance": "Percentual de conexões característica→produto validadas pelo lead",
+    "root_leakage": "Quantas vezes a raiz foi acidentalmente verbalizada (deve ser 0)",
+    "natural_emergence": "Quantas técnicas psicológicas emergiram naturalmente sem aplicação deliberada"
+  },
+
+  "ai_execution_instructions": {
+    "tone": "Natural e consultivo — como um especialista que faz as perguntas certas porque ENTENDE, não porque segue um script",
+    "internal_process": "Antes de responder, executar mentalmente: 1) Qual o problema? 2) ← Causa? 3) ← Raiz? 4) → Característica? 5) → Produto? 6) Que pergunta a RAIZ me permite fazer?",
+    "output_filter": "Na resposta ao lead, incluir APENAS a parte direita (→ característica → produto) e perguntas guiadas. NUNCA incluir causa ou raiz.",
+    "accumulation": "Manter mapa diagnóstico em memória e adicionar nova entrada a cada problema/objeção detectado. Citar conexões com entradas anteriores quando relevante."
+  }
+}
