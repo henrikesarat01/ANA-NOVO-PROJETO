@@ -17,6 +17,7 @@ class PromptBuilder:
         lead_summary = state.lead_summary or {}
         diagnostic_hypotheses = state.diagnostic_hypotheses or {}
         diagnostic_clusters = diagnostic_hypotheses.get("diagnostic_clusters", [])
+        surface_guidance = state.surface_guidance or {}
         response_policy = state.response_policy or {}
         diagnostics_preview = "\n".join(
             f"- Problema percebido: {entry.problem}\n  Característica útil: {entry.characteristic}\n  Produto/solução: {entry.product}"
@@ -80,6 +81,23 @@ class PromptBuilder:
             )
         hypothesis_preview = "\n".join(cluster_preview_lines)
 
+        surface_guidance_preview = "\n".join(
+            [
+                f"- cluster ativo: {surface_guidance.get('active_cluster_name', 'não definido')}",
+                f"- motivo da escolha: {surface_guidance.get('selection_reason', 'sem justificativa consolidada')}",
+                f"- foco de superfície: {surface_guidance.get('surface_focus', 'sem foco definido')}",
+                f"- tensão principal: {surface_guidance.get('surface_tension', 'sem tensão definida')}",
+                f"- cena operacional: {' | '.join(surface_guidance.get('operational_scene', [])[:4]) or 'sem cena operacional priorizada'}",
+                f"- pistas de especificidade: {' | '.join(surface_guidance.get('specificity_cues', [])[:4]) or 'sem pistas adicionais'}",
+                f"- função do SAGA para citar: {surface_guidance.get('suggested_saga_function', 'nenhuma função priorizada')}",
+                f"- por que essa função encaixa: {surface_guidance.get('saga_fit_reason', 'sem justificativa adicional')}",
+                f"- âncora de pergunta: {surface_guidance.get('question_anchor', 'não perguntar se não destravar algo relevante')}",
+                f"- evitar na fala: {' | '.join(surface_guidance.get('avoid_topics', [])[:4]) or 'sem alertas extras'}",
+                f"- modo de brevidade: {surface_guidance.get('brevity_mode', 'medium')}",
+                f"- abertura preferida: {surface_guidance.get('response_opening', 'validate_first')}",
+            ]
+        )
+
         saga_connection_preview = "\n".join(
             [
                 f"- função prioritária 1: {arsenal_hits[0].function_name if len(arsenal_hits) > 0 else 'sem prioridade definida'}",
@@ -131,6 +149,27 @@ class PromptBuilder:
                 )
                 conduction_rules.append(
                     "Transforme esse cluster em narrativa curta, justificativa de pergunta e conexão com função do SAGA, sem tratar o mapa como texto pronto."
+                )
+            if surface_guidance.get("active_cluster_name"):
+                conduction_rules.append(
+                    "Use o plano interno de superfície abaixo como orientação: ele já aponta a leitura operacional mais aderente deste turno."
+                )
+                conduction_rules.append(
+                    "Não copie o mapa nem o plano. Reescreva do zero em linguagem humana, usando no máximo 2 elementos concretos da cena operacional."
+                )
+                conduction_rules.append(
+                    "Evite frases que serviriam igual para vários nichos. Mostre o mundo operacional do cliente com 1 tensão concreta e 1 leitura curta."
+                )
+                conduction_rules.append(
+                    "Se citar SAGA, cite só 1 função e encaixe isso como continuação natural do cenário, não como catálogo."
+                )
+            if surface_guidance.get("brevity_mode") == "short":
+                conduction_rules.append(
+                    "Neste turno, seja curto: 2 a 4 linhas úteis antes de encerrar ou perguntar."
+                )
+            if surface_guidance.get("response_opening") == "answer_first":
+                conduction_rules.append(
+                    "Abra respondendo ou situando o pedido principal do cliente antes de ampliar leitura ou perguntar."
                 )
             if bool(lead_summary.get("minimum_context_ready", False)):
                 conduction_rules.append(
@@ -237,6 +276,9 @@ ESTADO ESTRUTURADO DO LEAD
 
 MAPA DE HIPÓTESES DIAGNÓSTICAS DO NEGÓCIO
 {hypothesis_preview}
+
+PLANO INTERNO DE SUPERFÍCIE
+{surface_guidance_preview}
 
 POLÍTICA CONVERSACIONAL DESTE TURNO
 {response_policy_preview}

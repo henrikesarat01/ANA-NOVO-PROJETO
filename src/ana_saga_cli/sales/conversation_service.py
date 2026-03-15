@@ -18,6 +18,7 @@ from ana_saga_cli.sales.conversation_policy_engine import ConversationPolicyEngi
 from ana_saga_cli.sales.diagnostic_cluster_mapper import DiagnosticClusterMapper
 from ana_saga_cli.sales.lead_analyzer import LeadAnalyzer
 from ana_saga_cli.sales.stage_router import StageRouter
+from ana_saga_cli.sales.surface_response_planner import SurfaceResponsePlanner
 from ana_saga_cli.llm.mock_client import MockLLMClient
 
 
@@ -45,6 +46,7 @@ class ConversationService:
         self.conversation_policy_engine = ConversationPolicyEngine(llm=self.llm)
         self.stage_router = StageRouter(llm=self.llm, stages=self.stages)
         self.bpcf_engine = BPCFEngine(llm=self.llm)
+        self.surface_response_planner = SurfaceResponsePlanner(llm=self.llm)
         self.state = ConversationState(stage_id=STAGE_ORDER[0])
 
     def _build_llm(self):
@@ -64,11 +66,17 @@ class ConversationService:
         stage = self.stages[next_stage_id]
 
         direct_hits = self.arsenal_retriever.top_hits(user_message, limit=self.config.max_arsenal_hits)
+        direct_hits = self.diagnostic_cluster_mapper.filter_direct_hits(
+            state=self.state,
+            direct_hits=direct_hits,
+            limit=self.config.max_arsenal_hits,
+        )
         arsenal_hits = self.diagnostic_cluster_mapper.merge_hits(direct_hits=direct_hits, mapped_hits=mapped_hits, limit=self.config.max_arsenal_hits)
         inventory_query = self.diagnostic_cluster_mapper.build_inventory_query(self.state, user_message)
         inventory_hits = self.inventory_retriever.top_facts(inventory_query or user_message, limit=8)
 
         self.bpcf_engine.update_map(self.state, user_message, arsenal_hits)
+        self.surface_response_planner.update_state(self.state, user_message, arsenal_hits)
 
         instructions, prompt_input = self.prompt_builder.build(
             state=self.state,

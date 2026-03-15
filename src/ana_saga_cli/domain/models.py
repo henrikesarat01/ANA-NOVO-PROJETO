@@ -59,6 +59,7 @@ class ConversationState:
     diagnostics: list[DiagnosticEntry] = field(default_factory=list)
     lead_summary: dict[str, Any] = field(default_factory=dict)
     diagnostic_hypotheses: dict[str, Any] = field(default_factory=dict)
+    surface_guidance: dict[str, Any] = field(default_factory=dict)
     response_policy: dict[str, Any] = field(default_factory=dict)
     discussed_features: list[str] = field(default_factory=list)
     asked_questions: list[str] = field(default_factory=list)

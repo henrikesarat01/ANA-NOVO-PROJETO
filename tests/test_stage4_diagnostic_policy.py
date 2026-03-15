@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 
 from ana_saga_cli.config import AppConfig
+from ana_saga_cli.domain.models import ArsenalEntry
 from ana_saga_cli.sales.conversation_service import ConversationService
 
 
@@ -14,10 +15,11 @@ ETAPA_11 = "etapa_11_oferta"
 
 
 class ScriptedLLM:
-    def __init__(self, lead_snapshots: list[dict[str, object]], cluster_maps: list[dict[str, object]] | None = None, policy_snapshots: list[dict[str, object]] | None = None) -> None:
+    def __init__(self, lead_snapshots: list[dict[str, object]], cluster_maps: list[dict[str, object]] | None = None, policy_snapshots: list[dict[str, object]] | None = None, surface_plans: list[dict[str, object]] | None = None) -> None:
         self.lead_snapshots = list(lead_snapshots)
         self.cluster_maps = list(cluster_maps or [])
         self.policy_snapshots = list(policy_snapshots or [])
+        self.surface_plans = list(surface_plans or [])
         self.last_stage_instructions = ""
         self.last_stage_input = ""
 
@@ -52,6 +54,11 @@ class ScriptedLLM:
                 ensure_ascii=False,
             )
 
+        if '"active_cluster_name"' in instructions and '"operational_scene"' in instructions:
+            if self.surface_plans:
+                return json.dumps(self.surface_plans.pop(0), ensure_ascii=False)
+            return json.dumps({}, ensure_ascii=False)
+
         if '"next_stage_id"' in instructions:
             return json.dumps(
                 {
@@ -70,15 +77,16 @@ class ScriptedLLM:
         return "resposta de teste"
 
 
-def _build_service(lead_snapshots: list[dict[str, object]], cluster_maps: list[dict[str, object]] | None = None, policy_snapshots: list[dict[str, object]] | None = None, initial_stage: str = ETAPA_04) -> tuple[ConversationService, ScriptedLLM]:
+def _build_service(lead_snapshots: list[dict[str, object]], cluster_maps: list[dict[str, object]] | None = None, policy_snapshots: list[dict[str, object]] | None = None, surface_plans: list[dict[str, object]] | None = None, initial_stage: str = ETAPA_04) -> tuple[ConversationService, ScriptedLLM]:
     service = ConversationService(AppConfig(provider="mock"))
-    llm = ScriptedLLM(lead_snapshots, cluster_maps=cluster_maps, policy_snapshots=policy_snapshots)
+    llm = ScriptedLLM(lead_snapshots, cluster_maps=cluster_maps, policy_snapshots=policy_snapshots, surface_plans=surface_plans)
     service.llm = llm
     service.lead_analyzer.llm = llm
     service.diagnostic_cluster_mapper.llm = llm
     service.conversation_policy_engine.llm = llm
     service.stage_router.llm = llm
     service.bpcf_engine.llm = llm
+    service.surface_response_planner.llm = llm
     service.state.stage_id = initial_stage
     return service, llm
 
@@ -286,6 +294,23 @@ def test_stage4_uses_construction_cluster_map() -> None:
                 ],
             }
         ],
+        surface_plans=[
+            {
+                "active_cluster_index": 1,
+                "active_cluster_name": "orçamento e visita",
+                "selection_reason": "o turno abre um cenário em que a construtora ainda não delimitou qual frente pesa mais no WhatsApp",
+                "operational_scene": ["lead pedindo orçamento", "cliente aguardando visita", "retorno comercial misturado no mesmo chat"],
+                "surface_focus": "mostrar que o problema não é só responder, mas entender rápido o caminho certo do contato",
+                "surface_tension": "orçamento, visita e retorno comercial competindo no mesmo fluxo",
+                "specificity_cues": ["orçamento", "visita", "retorno comercial"],
+                "suggested_saga_function": "Agendamento de Visita",
+                "saga_fit_reason": "essa função ajuda a tirar a combinação manual do meio quando a conversa já está madura para avançar",
+                "question_anchor": "descobrir qual frente mais concentra o atendimento hoje",
+                "avoid_topics": ["explicação genérica de automação", "lista longa de módulos"],
+                "brevity_mode": "short",
+                "response_opening": "context_first",
+            }
+        ],
     )
 
     result = service.respond("eu tenho uma construtora")
@@ -295,6 +320,9 @@ def test_stage4_uses_construction_cluster_map() -> None:
     assert "cliente some entre orçamento e visita" in llm.last_stage_instructions
     assert "Use o mapa interno de clusters diagnósticos" in llm.last_stage_instructions
     assert "Agendamento de Visita" in llm.last_stage_instructions or "Acompanhamento de Obra" in llm.last_stage_instructions
+    assert "PLANO INTERNO DE SUPERFÍCIE" in llm.last_stage_instructions
+    assert "lead pedindo orçamento | cliente aguardando visita | retorno comercial misturado no mesmo chat" in llm.last_stage_instructions
+    assert "Não copie o mapa nem o plano" in llm.last_stage_instructions
 
 
 def test_stage4_uses_sofa_store_cluster_map() -> None:
@@ -338,6 +366,23 @@ def test_stage4_uses_sofa_store_cluster_map() -> None:
                 "known_context_gaps": ["peso entre pronta entrega e sob medida"],
             }
         ],
+        surface_plans=[
+            {
+                "active_cluster_index": 1,
+                "active_cluster_name": "envio manual de catálogo",
+                "selection_reason": "o nicho aponta para uma conversa que costuma misturar escolha, medida e preço no mesmo fio",
+                "operational_scene": ["cliente pedindo foto", "cliente comparando tecido", "preço e medida indo em mensagens separadas"],
+                "surface_focus": "mostrar o atrito de catálogo manual sem soar como discurso genérico de atendimento",
+                "surface_tension": "catálogo, medida e orçamento quebrados em várias mensagens",
+                "specificity_cues": ["foto", "tecido", "medida"],
+                "suggested_saga_function": "Carrossel de Produtos",
+                "saga_fit_reason": "essa função organiza a apresentação sem transformar o WhatsApp em catálogo manual",
+                "question_anchor": "entender se o maior peso está em catálogo, orçamento ou sob medida",
+                "avoid_topics": ["fala ampla sobre vendas", "catálogo de funcionalidades"],
+                "brevity_mode": "short",
+                "response_opening": "context_first",
+            }
+        ],
     )
 
     result = service.respond("tenho uma loja de sofá")
@@ -346,6 +391,7 @@ def test_stage4_uses_sofa_store_cluster_map() -> None:
     assert "Loja de sofá que mistura catálogo, medida, pronta entrega, sob medida, preço e negociação no WhatsApp." in llm.last_stage_instructions
     assert "cliente pede foto, preço e medida e some no meio" in llm.last_stage_instructions
     assert "Carrossel de Produtos" in llm.last_stage_instructions or "Detalhes do Produto" in llm.last_stage_instructions
+    assert "cliente pedindo foto | cliente comparando tecido | preço e medida indo em mensagens separadas" in llm.last_stage_instructions
 
 
 def test_stage4_uses_clinic_service_cluster_map() -> None:
@@ -387,6 +433,23 @@ def test_stage4_uses_clinic_service_cluster_map() -> None:
                 "known_context_gaps": ["volume de avaliação x retorno"],
             }
         ],
+        surface_plans=[
+            {
+                "active_cluster_index": 1,
+                "active_cluster_name": "agendamento e confirmação",
+                "selection_reason": "a operação mistura agenda e retorno no mesmo canal, então a superfície precisa mostrar esse mundo rapidamente",
+                "operational_scene": ["pedido de encaixe", "confirmação manual", "retorno no mesmo WhatsApp"],
+                "surface_focus": "trazer leitura de agenda sobrecarregada em vez de uma fala genérica de atendimento",
+                "surface_tension": "agendamento e confirmação consumindo conversa demais",
+                "specificity_cues": ["encaixe", "confirmação", "retorno"],
+                "suggested_saga_function": "Formulários Interativos",
+                "saga_fit_reason": "ajuda a capturar contexto e reduzir vai e volta antes do time assumir",
+                "question_anchor": "entender se o maior volume está em marcação nova ou retorno",
+                "avoid_topics": ["discurso amplo de produtividade"],
+                "brevity_mode": "short",
+                "response_opening": "context_first",
+            }
+        ],
     )
 
     result = service.respond("tenho uma clínica")
@@ -395,6 +458,183 @@ def test_stage4_uses_clinic_service_cluster_map() -> None:
     assert "Clínica/serviço em que o WhatsApp mistura agendamento, confirmação, dúvida, retorno e paciente pedindo encaixe." in llm.last_stage_instructions
     assert "agendamento e confirmação consomem muita conversa" in llm.last_stage_instructions
     assert "Agendamento de Visita" in llm.last_stage_instructions or "Formulários Interativos" in llm.last_stage_instructions
+    assert "pedido de encaixe | confirmação manual | retorno no mesmo WhatsApp" in llm.last_stage_instructions
+
+
+def test_surface_guidance_changes_with_niche_without_fixed_phrase() -> None:
+    service_construction, llm_construction = _build_service(
+        [
+            {
+                "niche_known": True,
+                "niche_specificity": "specific",
+                "offer_known": True,
+                "operation_model_known": False,
+                "channel_usage_known": True,
+                "customer_type_known": False,
+                "pain_known": False,
+                "narrative_summary": "Construtora usando WhatsApp como frente comercial.",
+                "evidence_summary": "Há nicho útil e canal claro.",
+            }
+        ],
+        cluster_maps=[
+            {
+                "business_context": "Construtora com orçamento, visita e retorno comercial no mesmo WhatsApp.",
+                "niche": "construtora",
+                "segment": "comercial imobiliário",
+                "offer_type": "empreendimento e visita",
+                "operation_model": "entrada e avanço comercial no mesmo canal",
+                "diagnostic_clusters": [
+                    {
+                        "cluster_name": "orçamento e visita",
+                        "operational_front": "avanço comercial",
+                        "problem": "orçamento e visita se atropelam no fluxo",
+                        "cause": "o canal concentra frentes diferentes",
+                        "root_cause": "falta separação operacional",
+                        "operational_effects": ["lead esfria"],
+                        "observable_signs": ["retorno comercial espalhado"],
+                        "saga_functions": ["Agendamento de Visita"],
+                        "resolution_logic": "organizar o avanço reduz atrito",
+                    }
+                ],
+                "priority_hypotheses": ["avanço comercial travado"],
+                "known_context_gaps": ["frente mais crítica"],
+            }
+        ],
+        surface_plans=[
+            {
+                "active_cluster_index": 1,
+                "active_cluster_name": "orçamento e visita",
+                "selection_reason": "a conversa aponta para mistura de avanço comercial e retorno no mesmo canal",
+                "operational_scene": ["orçamento", "visita", "retorno comercial"],
+                "surface_focus": "mostrar mistura de frentes comerciais",
+                "surface_tension": "orçamento e visita no mesmo fluxo",
+                "specificity_cues": ["orçamento", "visita"],
+                "suggested_saga_function": "Agendamento de Visita",
+                "saga_fit_reason": "reduz ida e volta manual",
+                "question_anchor": "qual frente mais pesa",
+                "avoid_topics": ["fala genérica"],
+                "brevity_mode": "short",
+                "response_opening": "context_first",
+            }
+        ],
+    )
+    service_imobiliary, llm_imobiliary = _build_service(
+        [
+            {
+                "niche_known": True,
+                "niche_specificity": "specific",
+                "offer_known": True,
+                "operation_model_known": True,
+                "channel_usage_known": True,
+                "customer_type_known": True,
+                "pain_known": False,
+                "narrative_summary": "Imobiliária com venda e locação pelo WhatsApp.",
+                "evidence_summary": "Há nicho e operação comercial definidos.",
+            }
+        ],
+        cluster_maps=[
+            {
+                "business_context": "Imobiliária misturando venda, locação, filtro de imóvel e visita no mesmo WhatsApp.",
+                "niche": "imobiliária",
+                "segment": "venda e locação",
+                "offer_type": "imóveis e intermediação",
+                "operation_model": "triagem e visita no mesmo canal",
+                "diagnostic_clusters": [
+                    {
+                        "cluster_name": "triagem de intenção",
+                        "operational_front": "entrada do lead",
+                        "problem": "compra e locação entram juntas no mesmo fluxo",
+                        "cause": "não há separação de intenção logo na entrada",
+                        "root_cause": "o mesmo canal trata demandas diferentes como iguais",
+                        "operational_effects": ["priorização ruim"],
+                        "observable_signs": ["lead de locação e compra no mesmo número"],
+                        "saga_functions": ["Qualificação de Lead"],
+                        "resolution_logic": "separar intenção melhora encaminhamento",
+                    }
+                ],
+                "priority_hypotheses": ["locação e venda misturadas"],
+                "known_context_gaps": ["origem do lead"],
+            }
+        ],
+        surface_plans=[
+            {
+                "active_cluster_index": 1,
+                "active_cluster_name": "triagem de intenção",
+                "selection_reason": "o nicho sugere mistura de venda e locação já na entrada",
+                "operational_scene": ["lead de locação", "lead de compra", "pedido de visita"],
+                "surface_focus": "mostrar filtro inicial de intenção e imóvel",
+                "surface_tension": "compra e locação no mesmo inbox",
+                "specificity_cues": ["locação", "compra", "visita"],
+                "suggested_saga_function": "Qualificação de Lead",
+                "saga_fit_reason": "separa intenção antes do corretor assumir",
+                "question_anchor": "se o maior volume é venda ou locação",
+                "avoid_topics": ["fala genérica"],
+                "brevity_mode": "short",
+                "response_opening": "context_first",
+            }
+        ],
+    )
+
+    service_construction.respond("temos uma construtora")
+    service_imobiliary.respond("tenho uma imobiliária, usamos pra locação e venda")
+
+    assert "orçamento | visita | retorno comercial" in llm_construction.last_stage_instructions
+    assert "lead de locação | lead de compra | pedido de visita" in llm_imobiliary.last_stage_instructions
+    assert llm_construction.last_stage_instructions != llm_imobiliary.last_stage_instructions
+
+
+def test_filter_direct_hits_uses_cluster_functions_to_reduce_noise() -> None:
+    service, _ = _build_service(
+        [
+            {
+                "niche_known": True,
+                "niche_specificity": "specific",
+                "offer_known": True,
+                "operation_model_known": True,
+                "channel_usage_known": True,
+                "customer_type_known": True,
+                "pain_known": False,
+                "narrative_summary": "Imobiliária com venda e locação no WhatsApp.",
+                "evidence_summary": "Há contexto suficiente para clusterização.",
+            }
+        ]
+    )
+    service.state.diagnostic_hypotheses = {
+        "diagnostic_clusters": [
+            {
+                "cluster_name": "triagem",
+                "saga_functions": ["Qualificação de Lead", "Agendamento de Visita"],
+            }
+        ]
+    }
+    aligned_hit = ArsenalEntry(
+        category="comercial",
+        function_name="Qualificação de Lead",
+        saga_features=["roteamento"],
+        problem="lead entra sem triagem",
+        cause="entrada sem filtro",
+        root="mistura de intenções",
+        characteristic="classifica a intenção do lead",
+        product="triagem comercial",
+    )
+    noise_hit = ArsenalEntry(
+        category="financeiro",
+        function_name="Analytics de Pagamentos",
+        saga_features=["dashboard"],
+        problem="baixa visibilidade financeira",
+        cause="relatório disperso",
+        root="dados fragmentados",
+        characteristic="acompanha pagamentos",
+        product="analytics",
+    )
+
+    filtered = service.diagnostic_cluster_mapper.filter_direct_hits(
+        state=service.state,
+        direct_hits=[aligned_hit, noise_hit],
+        limit=6,
+    )
+
+    assert [hit.function_name for hit in filtered] == ["Qualificação de Lead"]
 
 
 def test_cluster_map_schema_has_no_client_facing_fields() -> None:

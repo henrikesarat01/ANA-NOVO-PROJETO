@@ -158,6 +158,21 @@ CANDIDATOS DO ARSENAL SAGA/BPCF
                 break
         return merged
 
+    def filter_direct_hits(self, state: ConversationState, direct_hits: list[ArsenalEntry], limit: int = 6) -> list[ArsenalEntry]:
+        mapped = state.diagnostic_hypotheses or {}
+        clusters = mapped.get("diagnostic_clusters", [])
+        allowed_functions = {
+            function_name.strip()
+            for cluster in clusters[:3]
+            for function_name in cluster.get("saga_functions", [])[:4]
+            if str(function_name).strip()
+        }
+        if not allowed_functions:
+            return direct_hits[:limit]
+
+        filtered = [hit for hit in direct_hits if hit.function_name in allowed_functions]
+        return filtered[:limit]
+
     def build_inventory_query(self, state: ConversationState, user_message: str) -> str:
         mapped = state.diagnostic_hypotheses or {}
         clusters = mapped.get("diagnostic_clusters", [])
