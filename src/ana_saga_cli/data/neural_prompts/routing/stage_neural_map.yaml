@@ -1,0 +1,171 @@
+# Mapeamento de neurais por etapa
+#
+# base: neurais que rodam sempre nesta etapa
+# contextual_candidates: neurais que podem ser ativados por sinal
+# forbidden: neurais que nunca devem rodar nesta etapa
+#
+# Etapas não listadas usam apenas o neural base psicometria.
+
+etapa_01_abertura:
+  base:
+    - psicometria
+  contextual_candidates: []
+  forbidden:
+    - psicanalise
+    - neurociencia
+    - arqueologia_mental
+
+etapa_02_conexao_inicial:
+  base:
+    - psicometria
+  contextual_candidates:
+    - desconstrucao
+  contextual_intensity:
+    desconstrucao: light
+  forbidden:
+    - psicanalise
+    - neurociencia
+
+etapa_03_contextualizacao_permissao:
+  base:
+    - psicometria
+  contextual_candidates:
+    - desconstrucao
+  contextual_intensity:
+    desconstrucao: light
+  forbidden:
+    - psicanalise
+    - neurociencia
+
+etapa_04_diagnostico_situacional:
+  base:
+    - psicometria
+  contextual_candidates:
+    - desconstrucao
+  contextual_intensity:
+    desconstrucao: light
+  forbidden:
+    - psicanalise
+    - neurociencia
+
+etapa_05_diagnostico_impacto:
+  base:
+    - psicometria
+  contextual_candidates:
+    - desconstrucao
+  contextual_intensity:
+    desconstrucao: light
+  forbidden:
+    - psicanalise
+    - neurociencia
+
+etapa_06_qualificacao_fit:
+  base:
+    - psicometria
+  contextual_candidates:
+    - desconstrucao
+  contextual_intensity:
+    desconstrucao: medium
+  forbidden:
+    - psicanalise
+    - neurociencia
+
+etapa_07_transicao_solucao:
+  base:
+    - psicometria
+  contextual_candidates:
+    - feynman
+  forbidden:
+    - psicanalise
+    - neurociencia
+
+etapa_08_mapeamento_solucao:
+  base:
+    - psicometria
+  contextual_candidates:
+    - feynman
+  forbidden:
+    - psicanalise
+    - neurociencia
+
+etapa_09_ancoragem_valor:
+  base:
+    - psicometria
+  contextual_candidates:
+    - desconstrucao
+  contextual_intensity:
+    desconstrucao: medium
+  forbidden:
+    - psicanalise
+    - neurociencia
+
+etapa_10_checagem_aderencia:
+  base:
+    - psicometria
+  contextual_candidates:
+    - desconstrucao
+  contextual_intensity:
+    desconstrucao: strong
+  forbidden:
+    - psicanalise
+    - neurociencia
+
+etapa_11_oferta:
+  base:
+    - psicometria
+  contextual_candidates:
+    - desconstrucao
+  contextual_intensity:
+    desconstrucao: strong
+  forbidden:
+    - psicanalise
+    - neurociencia
+
+etapa_12_negociacao_condicoes:
+  base:
+    - psicometria
+  contextual_candidates:
+    - desconstrucao
+  contextual_intensity:
+    desconstrucao: strong
+  forbidden:
+    - psicanalise
+    - neurociencia
+
+etapa_13_objecoes:
+  base:
+    - psicometria
+  contextual_candidates:
+    - desconstrucao
+  contextual_intensity:
+    desconstrucao: strong
+  forbidden:
+    - psicanalise
+    - neurociencia
+
+etapa_14_fechamento:
+  base:
+    - psicometria
+  contextual_candidates:
+    - desconstrucao
+  contextual_intensity:
+    desconstrucao: strong
+  forbidden:
+    - psicanalise
+    - neurociencia
+
+etapa_15_onboarding_confirmacao:
+  base:
+    - psicometria
+  contextual_candidates: []
+  forbidden:
+    - psicanalise
+    - neurociencia
+
+etapa_16_pos_venda_expansao:
+  base:
+    - psicometria
+  contextual_candidates: []
+  forbidden:
+    - psicanalise
+    - neurociencia

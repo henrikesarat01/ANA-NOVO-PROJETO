@@ -28,8 +28,10 @@ class AppConfig:
     provider: str = os.getenv("ANA_PROVIDER", "mock").strip().lower()
     model: str = os.getenv("ANA_MODEL", "gpt-5.4").strip()
     openai_api_key: str | None = os.getenv("OPENAI_API_KEY")
+    cerebras_api_key: str | None = os.getenv("CEREBRAS_API_KEY")
     verbose: bool = os.getenv("ANA_VERBOSE", "false").strip().lower() == "true"
     stage_debug: bool = os.getenv("ANA_STAGE_DEBUG", "false").strip().lower() == "true"
+    stage_debug_scope: str = os.getenv("ANA_STAGE_DEBUG_SCOPE", "neural").strip().lower()
     naturality_debug: bool = os.getenv("ANA_NATURALITY_DEBUG", "false").strip().lower() == "true"
     max_arsenal_hits: int = 6
     product_name: str = "SAGA"

@@ -36,6 +36,5 @@
     "avoid_corporate_language": true,
     "never_surface_bpcf_root": true,
     "require_variation_in_checking": true
-  },
-  "example_good": "Você enxerga isso funcionando bem no teu cenário hoje?"
+  }
 }

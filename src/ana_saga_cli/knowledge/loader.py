@@ -1,15 +1,39 @@
 from __future__ import annotations
 
 import json
+from functools import lru_cache
 from pathlib import Path
 from typing import Any
+
+import yaml
 
 from ana_saga_cli.config import DATA_DIR
 from ana_saga_cli.domain.models import ArsenalEntry, ProductFact, StageDefinition
 
 
+_STAGE_DEFINITION_KEYS = {
+    "stage_id",
+    "title",
+    "goal",
+    "global_tone",
+    "dos",
+    "donts",
+    "response_contract",
+}
+
+
 def load_json(path: Path) -> dict[str, Any]:
     return json.loads(path.read_text(encoding="utf-8"))
+
+
+@lru_cache(maxsize=None)
+def load_yaml(path: Path) -> dict[str, Any]:
+    payload = yaml.safe_load(path.read_text(encoding="utf-8"))
+    if payload is None:
+        return {}
+    if not isinstance(payload, dict):
+        raise ValueError(f"YAML invalido em {path}: esperado objeto no topo.")
+    return payload
 
 
 def load_stage_definitions() -> dict[str, StageDefinition]:
@@ -19,7 +43,8 @@ def load_stage_definitions() -> dict[str, StageDefinition]:
         if not stage_dir.is_dir():
             continue
         payload = load_json(stage_dir / "personalidade.json")
-        definitions[payload["stage_id"]] = StageDefinition(**payload)
+        filtered_payload = {key: value for key, value in payload.items() if key in _STAGE_DEFINITION_KEYS}
+        definitions[payload["stage_id"]] = StageDefinition(**filtered_payload)
     return definitions
 
 

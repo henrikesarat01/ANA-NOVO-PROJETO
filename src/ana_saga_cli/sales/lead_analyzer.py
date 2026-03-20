@@ -117,8 +117,21 @@ HISTÓRICO RECENTE
 MENSAGEM NOVA DO CLIENTE
 {user_message}
 """
-        payload = self._parse_json(self.llm.generate(instructions=instructions, user_input=user_input))
-        return self._coerce_snapshot(payload)
+        with self.llm.trace_context(
+            "lead_analyzer",
+            stage_id=state.stage_id,
+            turn_count=state.turn_count,
+            component="lead_summary_extraction",
+        ):
+            raw_response = self.llm.generate(instructions=instructions, user_input=user_input)
+        payload = self._parse_json(raw_response)
+        snapshot = self._coerce_snapshot(payload)
+        self.llm.annotate_last_call(
+            parsed_output=payload,
+            output_used=snapshot,
+            consumed_by=["state.lead_summary"],
+        )
+        return snapshot
 
     def _coerce_niche_specificity(self, value: object) -> str:
         specificity = str(value or "unknown").strip().lower()
@@ -135,6 +148,15 @@ MENSAGEM NOVA DO CLIENTE
         )
         operation_anchor = bool(summary.get("operation_model_known", False)) or bool(summary.get("customer_type_known", False))
         return (core_tripod and operation_anchor) or known_count >= 4
+
+    def _business_context_ready_for_sizing(self, summary: dict[str, Any], niche_specificity: str) -> bool:
+        business_model_known = bool(summary.get("operation_model_known", False)) or bool(summary.get("customer_type_known", False))
+        return (
+            niche_specificity in {"generic", "specific"}
+            and bool(summary.get("offer_known", False))
+            and bool(summary.get("channel_usage_known", False))
+            and business_model_known
+        )
 
     def update_state(self, state: ConversationState, user_message: str) -> dict[str, Any]:
         summary = dict(state.lead_summary)
@@ -177,9 +199,20 @@ MENSAGEM NOVA DO CLIENTE
         )
         impact_context_ready = minimum_context_ready and merged_flags["pain_known"] and merged_flags["impact_known"]
         commercial_scope_ready = niche_specificity == "specific"
+        business_context_ready_for_sizing = self._business_context_ready_for_sizing(merged_flags, niche_specificity)
         force_stop_impact = impact_context_ready or (
             state.stage_id == _IMPACT_STAGE_ID and merged_flags["pain_known"] and stage5_turns >= 2
         )
+
+        business_context_gaps: list[str] = []
+        if niche_specificity == "unknown" or not merged_flags["niche_known"]:
+            business_context_gaps.append("tipo de negócio")
+        if not merged_flags["offer_known"]:
+            business_context_gaps.append("tipo de oferta")
+        if not merged_flags["channel_usage_known"]:
+            business_context_gaps.append("papel do WhatsApp")
+        if not (merged_flags["operation_model_known"] or merged_flags["customer_type_known"]):
+            business_context_gaps.append("natureza básica do uso")
 
         if merged_flags["impact_known"]:
             next_question_focus = "advance"
@@ -200,6 +233,8 @@ MENSAGEM NOVA DO CLIENTE
                 "force_stop_base_context": force_stop_base_context,
                 "impact_context_ready": impact_context_ready,
                 "commercial_scope_ready": commercial_scope_ready,
+                "business_context_ready_for_sizing": business_context_ready_for_sizing,
+                "business_context_gaps": business_context_gaps,
                 "force_stop_impact": force_stop_impact,
                 "next_question_focus": next_question_focus,
                 "stage_turn_counts": stage_turn_counts,

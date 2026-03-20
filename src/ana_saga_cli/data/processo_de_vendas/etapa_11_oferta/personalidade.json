@@ -31,6 +31,5 @@
     "avoid_forced_cta": true,
     "avoid_corporate_language": true,
     "never_surface_bpcf_root": true
-  },
-  "example_good": "Pra tua operação, eu montaria uma estrutura focada em venda + suporte, com entrada organizada, triagem e acompanhamento. A faixa plausível ficaria nessa linha..."
+  }
 }

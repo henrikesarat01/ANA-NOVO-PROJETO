@@ -41,6 +41,5 @@
     "prefer_short_messages": true,
     "business_context_before_operational_pain": true,
     "allow_light_refinement_if_answer_is_generic": true
-  },
-  "example_good": "Antes de eu entrar nessa parte, me situa rapidinho: vocês trabalham com qual tipo de produto ou serviço?"
+  }
 }

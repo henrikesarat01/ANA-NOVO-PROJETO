@@ -30,7 +30,6 @@ class StageDefinition:
     dos: list[str]
     donts: list[str]
     response_contract: dict[str, Any]
-    example_good: str
 
 
 @dataclass(slots=True)
@@ -58,9 +57,17 @@ class ConversationState:
     turns: list[MessageTurn] = field(default_factory=list)
     diagnostics: list[DiagnosticEntry] = field(default_factory=list)
     lead_summary: dict[str, Any] = field(default_factory=dict)
+    counterparty_model: dict[str, Any] = field(default_factory=dict)
+    offer_sales_architecture: dict[str, Any] = field(default_factory=dict)
     diagnostic_hypotheses: dict[str, Any] = field(default_factory=dict)
+    neural_state: dict[str, Any] = field(default_factory=dict)
+    neurobehavior_state: dict[str, Any] = field(default_factory=dict)
+    response_strategy: dict[str, Any] = field(default_factory=dict)
     surface_guidance: dict[str, Any] = field(default_factory=dict)
     response_policy: dict[str, Any] = field(default_factory=dict)
+    pricing_policy: dict[str, Any] = field(default_factory=dict)
+    offer_context: dict[str, Any] = field(default_factory=dict)
+    channel_context: dict[str, Any] = field(default_factory=dict)
     discussed_features: list[str] = field(default_factory=list)
     asked_questions: list[str] = field(default_factory=list)
     last_assistant_message: str = ""

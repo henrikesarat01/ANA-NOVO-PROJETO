@@ -29,6 +29,5 @@
     "avoid_forced_cta": true,
     "avoid_corporate_language": true,
     "never_surface_bpcf_root": true
-  },
-  "example_good": "Fechado. Então ficou assim: vamos começar por uma estrutura mais enxuta de entrada, triagem e separação de venda e suporte. Agora eu só preciso de X e Y pra te colocar em movimento."
+  }
 }

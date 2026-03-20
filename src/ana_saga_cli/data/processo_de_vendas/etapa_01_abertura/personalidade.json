@@ -13,14 +13,16 @@
     "Não verbalize causa nem raiz do BPCF. Isso é interno."
   ],
   "dos": [
-    "Se o cliente mandou só saudação, responda saudação e uma abertura leve.",
-    "Mantenha em 1 ou 2 linhas.",
+    "Se o cliente mandou só saudação, responda só a saudação de volta e um retorno curto de presença.",
+    "Mantenha em 1 linha, ou no máximo 2 frases bem curtas.",
     "Soe disponível, não ansioso."
   ],
   "donts": [
     "Não pergunte 'como posso ajudar?'",
     "Não apresente produto.",
-    "Não faça pitch."
+    "Não faça pitch.",
+    "Não use convites genéricos como 'manda aí', 'fica à vontade', 'tô por aqui' ou equivalentes.",
+    "Não termine a saudação com frase de empurrar conversa se o cliente só cumprimentou."
   ],
   "response_contract": {
     "max_questions": 1,
@@ -29,6 +31,5 @@
     "avoid_forced_cta": true,
     "avoid_corporate_language": true,
     "never_surface_bpcf_root": true
-  },
-  "example_good": "Opa, boa tarde meu amigo. Tudo certo por aqui."
+  }
 }

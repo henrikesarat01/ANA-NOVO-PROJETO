@@ -1,0 +1,168 @@
+offer_name: SAGA
+offer_type: software_whatsapp_automation
+offer_summary: software que organiza atendimento, triagem, jornada comercial e operação no WhatsApp
+primary_sale_motion: consultiva
+conversation_entry_strategy: contextual_then_dor
+first_question_goal: entender_tipo_de_operacao_e_uso_atual
+early_allowed_moves:
+  - explicacao_curta_do_que_e
+  - pergunta_de_contexto_do_negocio
+  - pergunta_de_uso_atual
+  - pergunta_de_dor_operacional
+early_forbidden_moves:
+  - clareza_abstrata_sem_contexto
+  - pitch_tecnico_longo
+  - detalhe_de_implantacao_cedo
+  - preco_completo_cedo
+explanation_strategy:
+  explain_what_it_is_early: true
+  technical_pitch_early: curto
+  implementation_details_only_after_fit: true
+  prefer_practical_examples: true
+trust_strategy: mostrar aplicacao no caso real antes de tecnicismo ou promessa ampla
+proof_strategy: exemplo_pratico_curto
+price_strategy:
+  floor_allowed_early: true
+  full_range_allowed_only_after_context: true
+  implantation_details_only_after_fit: true
+  precise_quote_only_after_scope: true
+  proof_before_price: false
+pricing_validation:
+  require_minimum_validation_before_price: true
+  allow_price_before_minimum_validation: false
+  prefer_smallest_missing_variable: true
+  max_questions_before_price_per_turn: 1
+  explain_why_question_matters: true
+  explanation_style_before_question: breve_contextual
+  avoid_dry_questioning: true
+  avoid_question_stack: true
+  minimum_required_variables:
+    - tipo_de_operacao
+    - uso_atual_do_whatsapp
+  optional_but_relevant_variables:
+    - principal_trava_operacional
+    - quantidade_de_fluxos
+    - necessidade_de_integracao
+    - fechamento_no_whatsapp_ou_triagem
+  variables_that_change_price:
+    - tipo_de_operacao
+    - uso_atual_do_whatsapp
+    - complexidade_do_fluxo
+    - integracao
+    - quantidade_de_jornadas
+  preferred_question_sequence:
+    - tipo_de_operacao
+    - uso_atual_do_whatsapp
+    - principal_trava_operacional
+    - fator_estrutural_de_complexidade
+  price_release_modes:
+    floor_only_after_minimum_validation: true
+    range_only_after_context: true
+    precise_only_after_scope: true
+questioning_strategy:
+  every_question_must_have_visible_reason: true
+  reason_must_be_customer_facing: true
+  prefer_context_then_question: true
+  prefer_single_question: true
+  avoid_interrogatory_flow: true
+  avoid_generic_qualification: true
+  prefer_smallest_useful_question: true
+conversation_progression:
+  - situar rapidamente o que e
+  - entender o negocio
+  - entender como o contato entra hoje
+  - entender uso atual do WhatsApp
+  - abrir dor ou trava operacional
+  - conectar valor pratico
+  - aprofundar escopo
+  - abrir faixa mais completa so depois de contexto
+success_signals:
+  - cliente entende aplicacao no proprio caso
+  - cliente consegue visualizar uso real
+  - cliente verbaliza dor ou gargalo
+  - cliente aceita aprofundar contexto
+  - cliente pede proximo passo com base no proprio processo
+objection_signals:
+  - pedido de preco completo cedo demais
+  - falta de clareza sobre aplicacao no caso real
+  - dificuldade de visualizar uso pratico
+  - tentativa de empurrar a conversa para detalhe tecnico cedo
+moment_guidance:
+  opening:
+    objective: situar rapidamente o que e e abrir contexto real
+    preferred_move: explicacao_curta_e_contextualizacao
+    question_style: pergunta_de_contexto_do_negocio
+    avoid:
+      - pitch_tecnico_longo
+      - preco_completo_cedo
+  context:
+    objective: entender tipo de operação e uso atual
+    preferred_move: pergunta_de_uso_atual
+    question_style: pergunta_de_uso_atual
+    avoid:
+      - clareza_abstrata_sem_contexto
+      - detalhe_de_implantacao_cedo
+  pain:
+    objective: abrir trava operacional e peso do problema
+    preferred_move: pergunta_de_dor_operacional
+    question_style: pergunta_de_dor_operacional
+    avoid: []
+  value:
+    objective: conectar valor ao caso real antes de ampliar escopo
+    preferred_move: explicacao_curta_conectando_valor
+    question_style: pergunta_de_aprofundamento
+    avoid:
+      - preco_completo_cedo
+  pricing:
+    objective: abrir piso ou faixa conservadora sem detalhar tudo cedo
+    preferred_move: ancora_de_piso_ou_faixa_conservadora
+    question_style: pergunta_de_escopo_se_precisar
+    avoid:
+      - detalhe_de_implantacao_cedo
+      - pitch_tecnico_longo
+discovery_goals:
+  # Descoberta inicial
+  niche_and_channel: "identificar segmento e como o canal digital entra na operação"
+  niche_only: "identificar segmento e atividade principal"
+  offer_type: "entender se vendem produto, serviço ou mix"
+  channel_usage: "descobrir se o contato chega mais como pedido ou atendimento"
+  operation_fit: "entender onde na rotina do cliente a solução se encaixa"
+  customer_type: "identificar o perfil de quem mais procura"
+  general_fit: "entender onde a solução ajudaria mais na operação"
+  # Escopo e dimensionamento
+  closing_process: "esclarecer se o fechamento acontece no canal digital ou é só triagem"
+  catalog_existence: "saber se existe catálogo de produtos ou se é montado manualmente"
+  payment_in_channel: "entender se o pagamento acontece no canal digital ou para antes"
+  order_confirmation: "verificar se o pedido precisa de confirmação antes de concluir"
+  scheduling_automation: "descobrir se o agendamento pode ser automatizado ou depende de retorno manual"
+  handoff_point: "identificar onde o caso precisa de um humano e o que pode seguir automatizado"
+  integration_need: "saber se existe necessidade real de integração ou a primeira versão roda sem"
+  team_size: "quantas pessoas atendem hoje e se todas entram no mesmo fluxo"
+  flow_count: "quantos fluxos principais existem hoje"
+  service_next_step: "qual próximo passo precisa acontecer depois da triagem"
+  customer_help_point: "em que ponto o cliente ainda precisa de ajuda humana"
+  customer_autonomy: "se o cliente já consegue avançar sozinho ou ainda depende de atendimento"
+  handoff_readiness: "o que precisa ficar pronto antes de passar o caso para o time"
+  # Dor e impacto
+  pain_general: "onde a operação mais trava hoje"
+  pain_service: "onde o tempo mais escapa: triagem ou agendamento"
+  pain_catalog: "onde o cliente mais trava: na escolha ou no pedido"
+  pain_handoff: "onde o caso mais trava: briefing ou proposta"
+  impact_weight: "se o impacto pesa mais em tempo perdido ou em receita perdida"
+  tension_source: "onde a operação mais embola hoje"
+  # Fit e contexto
+  daily_routine_fit: "onde a solução entraria no dia a dia do cliente"
+  service_fit: "entender onde a solução ajuda mais: triagem ou agenda"
+  compatibility_check: "o que precisa bater para a solução fazer sentido no caso"
+  trust_need: "o que daria mais segurança ao cliente para avaliar"
+  comparison_axis: "se está comparando mais preço ou modo de usar"
+  clarity_priority: "o que o cliente quer entender primeiro"
+  proof_preference: "se prefere um exemplo rápido ou demonstração"
+  value_priority: "o que pesa mais para valer a pena"
+  pricing_context: "se quer uma base agora ou prefere entender o contexto antes"
+runtime_hints:
+  planner_style_bias: consultivo_objetivo
+  mapper_activation_mode: hold_until_pain_or_impact
+  preferred_question_style: usage_question
+  response_opening_bias: anchor_then_invite
+  confidence: 0.92

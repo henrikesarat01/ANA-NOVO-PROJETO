@@ -29,6 +29,5 @@
     "avoid_forced_cta": true,
     "avoid_corporate_language": true,
     "never_surface_bpcf_root": true
-  },
-  "example_good": "Queria te ouvir rápido: na prática, o que já melhorou aí dentro e onde você ainda sente gargalo?"
+  }
 }

@@ -1,0 +1,43 @@
+# Registro dos neurais ativos
+#
+# tier: base (roda sempre) | contextual (roda sob condição)
+# hot_path: se é crítico para latência
+# overlays_allowed: lista de saga_modes que ativam overlay
+# parser: nome do schema/parser no código Python
+# active: se está habilitado nesta versão
+
+psicometria:
+  slug: psicometria
+  base_prompt: base/psicometria.md
+  tier: base
+  hot_path: true
+  overlays_allowed:
+    - product_led_self_service
+    - service_led_self_service
+    - consultative_handoff
+  parser: psicometria
+  active: true
+
+desconstrucao:
+  slug: desconstrucao
+  base_prompt: base/desconstrucao.md
+  tier: contextual
+  hot_path: false
+  overlays_allowed:
+    - product_led_self_service
+    - service_led_self_service
+    - consultative_handoff
+  parser: desconstrucao
+  active: true
+
+feynman:
+  slug: feynman
+  base_prompt: base/feynman.md
+  tier: contextual
+  hot_path: false
+  overlays_allowed:
+    - product_led_self_service
+    - service_led_self_service
+    - consultative_handoff
+  parser: feynman
+  active: true

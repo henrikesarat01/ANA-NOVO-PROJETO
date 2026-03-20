@@ -29,6 +29,5 @@
     "avoid_forced_cta": true,
     "avoid_corporate_language": true,
     "never_surface_bpcf_root": true
-  },
-  "example_good": "Entendo. Então o ponto talvez não seja o sistema em si, e sim começar com algo mais enxuto pro teu momento."
+  }
 }

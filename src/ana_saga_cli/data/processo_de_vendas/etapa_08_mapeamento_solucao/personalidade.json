@@ -37,6 +37,5 @@
     "avoid_corporate_language": true,
     "never_surface_bpcf_root": true,
     "scenario_before_features": true
-  },
-  "example_good": "O cliente entra, o sistema segura a abertura, separa quem quer comprar de quem precisa de suporte e entrega pra equipe a conversa mais pronta. Aí o time para de perder energia no básico e começa a pegar o atendimento já mais organizado."
+  }
 }

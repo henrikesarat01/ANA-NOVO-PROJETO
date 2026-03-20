@@ -54,12 +54,26 @@ MENSAGEM ATUAL
 CANDIDATOS BPCF
 {candidates}
 """
-        payload = self._parse_json(self.llm.generate(instructions=instructions, user_input=user_input))
+        with self.llm.trace_context(
+            "bpcf_engine",
+            stage_id=state.stage_id,
+            turn_count=state.turn_count,
+            candidate_count=min(len(hits), 8),
+            component="bpcf_selection",
+        ):
+            raw_response = self.llm.generate(instructions=instructions, user_input=user_input)
+        payload = self._parse_json(raw_response)
         activate = bool(payload.get("activate", False))
         indexes = [index for index in payload.get("selected_indexes", []) if isinstance(index, int) and 0 <= index < min(len(hits), 8)]
         if not indexes:
             activate = False
-        return BPCFSelection(activate=activate, selected_indexes=indexes)
+        selection = BPCFSelection(activate=activate, selected_indexes=indexes)
+        self.llm.annotate_last_call(
+            parsed_output=payload,
+            output_used=selection,
+            consumed_by=["state.diagnostics"],
+        )
+        return selection
 
     def update_map(self, state: ConversationState, message: str, hits: list[ArsenalEntry]) -> list[DiagnosticEntry]:
         selection = self._select_relevant_hits(state=state, message=message, hits=hits)
