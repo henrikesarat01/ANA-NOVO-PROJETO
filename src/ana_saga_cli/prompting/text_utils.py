@@ -1,7 +1,4 @@
-"""Funções utilitárias de texto usadas pela camada de prompting.
-
-Extraídas de prompt_builder.py para reuso nos módulos de seção.
-"""
+"""Funções utilitárias de texto usadas pela camada de prompting."""
 from __future__ import annotations
 
 

@@ -79,9 +79,18 @@ class MockLLMClient(LLMClient):
 
         if any(token in message for token in ("preço", "preco", "valor", "quanto custa", "faixa", "implant", "implementação", "implantação", "quero entender", "queria entender")):
             return "commercial_explicit", "allow_commercial", "mock detectou pedido comercial direto"
+        if any(token in message for token in ("ta pronto", "tá pronto", "ja da pra usar", "já dá pra usar", "ja esta pronto", "já está pronto")):
+            return "work_curiosity", "allow_context", "mock detectou pergunta autocontida de disponibilidade"
         if any(token in message for token in ("como funciona", "teu trabalho", "atua", "o que voce faz", "o que você faz")):
             return "work_curiosity", "allow_context", "mock detectou curiosidade de contexto"
         return "social_lateral", "hold", "mock detectou conversa lateral"
+
+    def _mock_answer_scope(self, message: str) -> str:
+        if any(token in message for token in ("preço", "preco", "valor", "quanto custa", "faixa", "implant", "implementação", "implantação")):
+            return "commercial_dependent"
+        if any(token in message for token in ("ta pronto", "tá pronto", "ja da pra usar", "já dá pra usar", "ja esta pronto", "já está pronto")):
+            return "self_contained"
+        return "case_dependent"
 
     def _mock_lead_analysis(self, user_input: str) -> str:
         message = self._normalize_message(self._extract_current_message(user_input))
@@ -175,6 +184,7 @@ class MockLLMClient(LLMClient):
     def _mock_psicometria(self, user_input: str) -> str:
         message = self._normalize_message(self._extract_current_message(user_input)).lower()
         topic_domain, transition_permission, transition_reason = self._mock_topic_domain(message)
+        answer_scope = self._mock_answer_scope(message)
         emotional_state = "neutral"
         if any(token in message for token in ("urgente", "agora", "logo", "quanto antes")):
             emotional_state = "urgent"
@@ -220,6 +230,7 @@ class MockLLMClient(LLMClient):
             "topic_domain": topic_domain,
             "transition_permission": transition_permission,
             "transition_reason": transition_reason,
+            "answer_scope": answer_scope,
             "confidence": 0.71,
         }
         return json.dumps(payload, ensure_ascii=False)
@@ -465,7 +476,7 @@ class MockLLMClient(LLMClient):
         return "1_pergunta_opcional"
 
     def _infer_price_response_mode(self, instructions: str) -> str:
-        if "faça só a pergunta mínima que ainda falta para situar preço com honestidade" in instructions:
+        if "se precisar perguntar antes de falar valor, peça só o recorte concreto que falta" in instructions:
             return "block_price"
         if "explique curto por que precisa saber isso" in instructions:
             return "block_price"
@@ -485,6 +496,8 @@ class MockLLMClient(LLMClient):
             return "Onde isso mais trava hoje na rotina de vocês?"
         if "exemplo mínimo do fluxo" in normalized or "exemplo minimo do fluxo" in normalized:
             return "Se eu te trouxer um exemplo bem simples do fluxo, você me diz se faz sentido?"
+        if "recorte real de como isso acontece hoje" in normalized:
+            return "Me conta um caso real de como isso acontece hoje por aí?"
         if "precisa integrar com outro sistema" in normalized:
             return "Nessa primeira versão, isso precisa integrar com algum sistema?"
         if "triagem ou já entra no fechamento" in normalized:

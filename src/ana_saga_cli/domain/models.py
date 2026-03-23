@@ -14,8 +14,11 @@ class TurnIntent:
     # O QUE fazer
     response_mode: str = "ask"                  # ask | explain | pricing_answer | social_hold
     question_intent: str = ""                   # pricing | context | fit | validation | pain | impact | ""
-    question_variable: str = ""                 # fluxo_operacional | numero_atendentes | ""
+    question_variable: str = ""                 # tipo_de_operacao | uso_atual_do_whatsapp | ""
+    question_shape: str = ""                    # open_context | open_pain | fit_check | approval_check | ""
+    question_constraints: tuple[str, ...] = ()  # ("single_question", "avoid_menu", "avoid_taxonomy")
     question_reason: str = ""                   # por que essa pergunta importa (interno)
+    question_label: str = ""                    # rótulo humano curto da variável, sem lógica no prompting
     question_budget: int = 1                    # 0 ou 1
     must_ask: bool = False
 

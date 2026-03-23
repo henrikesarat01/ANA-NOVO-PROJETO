@@ -51,7 +51,7 @@ def _seed_state(stage_id: str, pain: dict[str, object]) -> ConversationState:
     return state
 
 
-def test_stage_06_fit_question_anchors_on_hero_and_complementaries() -> None:
+def test_fit_stage_uses_semantic_contract_and_related_functions() -> None:
     engine = ConversationPolicyEngine(MockLLMClient())
     state = _seed_state(
         "etapa_06_qualificacao_fit",
@@ -76,13 +76,18 @@ def test_stage_06_fit_question_anchors_on_hero_and_complementaries() -> None:
 
     assert policy["question_goal"] == "fit"
     assert policy["question_type"] == "offer_blueprint_question"
-    assert "Carrossel de Produtos" in policy["question_anchor"]
-    assert "Pagamento Integrado" in policy["question_anchor"]
-    assert "Detalhes do Produto" in policy["question_anchor"]
-    assert policy["question_anchor"] != state.offer_sales_architecture["discovery_goals"]["daily_routine_fit"]
+    assert policy["question_variable"] == "capability_bridge"
+    assert policy["question_shape"] == "fit_check"
+    assert "single_question" in policy["question_constraints"]
+    assert "avoid_menu" in policy["question_constraints"]
+    assert "avoid_taxonomy" in policy["question_constraints"]
+    assert policy["question_anchor"] == ""
+    assert policy["complementary_saga_functions"] == ["Pagamento Integrado", "Detalhes do Produto"]
+    assert "Carrossel de Produtos" in policy["question_context_hint"]
+    assert "Confirmação de Pedido" in policy["question_context_hint"]
 
 
-def test_stage_08_fit_question_derives_complementaries_from_related_functions() -> None:
+def test_fit_stage_derives_complementaries_from_related_functions_when_needed() -> None:
     engine = ConversationPolicyEngine(MockLLMClient())
     state = _seed_state(
         "etapa_08_mapeamento_solucao",
@@ -106,13 +111,12 @@ def test_stage_08_fit_question_derives_complementaries_from_related_functions() 
     policy = engine.reconcile_state(state)
 
     assert policy["question_goal"] == "fit"
-    assert "Formulários Interativos" in policy["question_anchor"]
-    assert "Menu de Entrada (Botões Iniciais)" in policy["question_anchor"]
-    assert "Lista Interativa" in policy["question_anchor"]
+    assert policy["question_variable"] == "capability_bridge"
     assert policy["complementary_saga_functions"] == ["Menu de Entrada (Botões Iniciais)", "Lista Interativa"]
+    assert "Formulários Interativos" in policy["question_context_hint"]
 
 
-def test_stage_04_keeps_generic_offer_fit_behavior() -> None:
+def test_stage_04_keeps_context_contract_without_function_copy() -> None:
     engine = ConversationPolicyEngine(MockLLMClient())
     state = _seed_state(
         "etapa_04_diagnostico_situacional",
@@ -136,74 +140,14 @@ def test_stage_04_keeps_generic_offer_fit_behavior() -> None:
     policy = engine.reconcile_state(state)
 
     assert policy["question_goal"] == "context"
-    assert policy["question_anchor"] == state.offer_sales_architecture["discovery_goals"]["operation_fit"]
-    assert "Menu de Entrada" not in policy["question_anchor"]
+    assert policy["question_type"] == "discovery_question"
+    assert policy["question_variable"] == "nicho_ou_segmento"
+    assert policy["question_shape"] == "open_context"
+    assert policy["question_anchor"] == ""
+    assert policy["question_context_hint"] == ""
 
 
-def test_stage_09_value_question_inherits_active_functions() -> None:
-    engine = ConversationPolicyEngine(MockLLMClient())
-    state = _seed_state(
-        "etapa_09_ancoragem_valor",
-        {
-            "nome": "vitrine e fechamento de pedido",
-            "categoria_operacional": "montagem_orcamento_pedido",
-            "active_pain_type": "envio_lista_pedido",
-            "hero_function": "Carrossel de Produtos",
-            "support_function": "Confirmação de Pedido",
-            "complementary_functions": ["Pagamento Integrado", "Detalhes do Produto"],
-            "funcoes_saga_relacionadas": [
-                "Carrossel de Produtos",
-                "Confirmação de Pedido",
-                "Pagamento Integrado",
-                "Detalhes do Produto",
-            ],
-            "saga_mode": "product_led_self_service",
-        },
-    )
-
-    policy = engine.reconcile_state(state)
-
-    assert policy["question_goal"] == "fit"
-    assert "Carrossel de Produtos" in policy["question_anchor"]
-    assert "Pagamento Integrado" in policy["question_anchor"]
-    assert "Detalhes do Produto" in policy["question_anchor"]
-    assert "materializam valor" in policy["question_anchor"]
-
-
-def test_stage_10_clarity_question_inherits_active_functions() -> None:
-    engine = ConversationPolicyEngine(MockLLMClient())
-    state = _seed_state(
-        "etapa_10_checagem_aderencia",
-        {
-            "nome": "triagem e briefing jurídico",
-            "categoria_operacional": "entrada_triagem",
-            "active_pain_type": "briefing_comercial",
-            "hero_function": "Formulários Interativos",
-            "support_function": "Qualificação Inteligente",
-            "complementary_functions": ["Menu de Entrada (Botões Iniciais)", "Lista Interativa"],
-            "funcoes_saga_relacionadas": [
-                "Formulários Interativos",
-                "Qualificação Inteligente",
-                "Menu de Entrada (Botões Iniciais)",
-                "Lista Interativa",
-            ],
-            "saga_mode": "consultative_handoff",
-        },
-    )
-    state.counterparty_model = {
-        "question_priority": "clarity_question",
-    }
-
-    policy = engine.reconcile_state(state)
-
-    assert policy["question_goal"] == "fit"
-    assert "Formulários Interativos" in policy["question_anchor"]
-    assert "Menu de Entrada (Botões Iniciais)" in policy["question_anchor"]
-    assert "Lista Interativa" in policy["question_anchor"]
-    assert "desenho mais claro" in policy["question_anchor"]
-
-
-def test_counterparty_trust_question_inherits_active_functions() -> None:
+def test_counterparty_priority_switches_fit_question_type_without_literal_anchor() -> None:
     engine = ConversationPolicyEngine(MockLLMClient())
     state = _seed_state(
         "etapa_11_oferta",
@@ -232,13 +176,13 @@ def test_counterparty_trust_question_inherits_active_functions() -> None:
 
     assert policy["question_type"] == "counterparty_question"
     assert policy["question_goal"] == "fit"
-    assert "Carrossel de Produtos" in policy["question_anchor"]
-    assert "Pagamento Integrado" in policy["question_anchor"]
-    assert "Lista Interativa" in policy["question_anchor"]
-    assert "seguranca para avancar" in policy["question_anchor"]
+    assert policy["question_variable"] == "capability_bridge"
+    assert policy["question_anchor"] == ""
+    assert policy["complementary_saga_functions"] == ["Pagamento Integrado", "Lista Interativa"]
+    assert "Carrossel de Produtos" in policy["question_context_hint"]
 
 
-def test_counterparty_comparison_question_inherits_active_functions() -> None:
+def test_counterparty_comparison_priority_preserves_same_fit_contract() -> None:
     engine = ConversationPolicyEngine(MockLLMClient())
     state = _seed_state(
         "etapa_11_oferta",
@@ -267,7 +211,42 @@ def test_counterparty_comparison_question_inherits_active_functions() -> None:
 
     assert policy["question_type"] == "counterparty_question"
     assert policy["question_goal"] == "fit"
-    assert "Menu de Entrada (Botões Iniciais)" in policy["question_anchor"]
-    assert "Formulários Interativos" in policy["question_anchor"]
-    assert "Lista Interativa" in policy["question_anchor"]
-    assert "comparacao mais util" in policy["question_anchor"]
+    assert policy["question_variable"] == "capability_bridge"
+    assert policy["complementary_saga_functions"] == ["Formulários Interativos", "Lista Interativa"]
+    assert "Menu de Entrada (Botões Iniciais)" in policy["question_context_hint"]
+
+
+def test_self_contained_question_answers_without_forcing_context_qualification() -> None:
+    engine = ConversationPolicyEngine(MockLLMClient())
+    state = ConversationState(stage_id="etapa_03_contextualizacao_permissao")
+    state.offer_sales_architecture = _default_blueprint()
+    state.lead_summary = {
+        "known_context_count": 0,
+        "minimum_context_ready": False,
+        "commercial_scope_ready": False,
+        "pain_known": False,
+        "impact_known": False,
+        "next_question_focus": "context",
+    }
+    state.neural_state = {
+        "topic_domain": "work_curiosity",
+        "transition_permission": "allow_context",
+        "transition_reason": "a conversa já saiu da abertura lateral",
+        "communicative_intent": "clarify",
+        "answer_scope": "self_contained",
+    }
+    state.counterparty_model = {
+        "question_priority": "clarity_question",
+    }
+    state.pricing_policy = {
+        "price_response_mode": "not_requested",
+    }
+
+    policy = engine.reconcile_state(state)
+
+    assert policy["response_mode"] == "explain"
+    assert policy["question_goal"] == "none"
+    assert policy["question_budget"] == 0
+    assert policy["must_ask"] is False
+    assert policy["answer_now_instead_of_asking"] is True
+    assert policy["question_variable"] == ""

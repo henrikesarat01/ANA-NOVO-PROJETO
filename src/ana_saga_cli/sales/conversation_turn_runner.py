@@ -1,15 +1,13 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any
 
-from ana_saga_cli.sales.conversation_turn_snapshots import (
-    TurnAnalysisSnapshot,
-    TurnPromptSnapshot,
-    TurnResponseSnapshot,
-    TurnRetrievalSnapshot,
-    TurnStartSnapshot,
-)
+from ana_saga_cli.domain.stage_ids import STAGE_ORDER
+
+
+def _clean_text(value: object) -> str:
+    return " ".join(str(value or "").split()).strip()
 
 
 @dataclass(slots=True)
@@ -23,32 +21,126 @@ class ConversationTurnOutcome:
     markdown_debug: dict[str, Any]
 
 
+@dataclass(slots=True)
+class _TurnStart:
+    user_message: str
+    entry_stage: str
+    debug_trace: list[str] | None
+
+
+@dataclass(slots=True)
+class _StageProgressDecision:
+    next_stage_id: str
+    source: str
+    confidence: float
+    reason: str
+
+
+@dataclass(slots=True)
+class _SemanticRoute:
+    base_neurals: list[str] = field(default_factory=list)
+    contextual_neurals: list[str] = field(default_factory=list)
+    simple_turn: bool = True
+    contextual_intensities: dict[str, str] = field(default_factory=dict)
+    contextual_reasons: dict[str, list[str]] = field(default_factory=dict)
+
+    def intensity_for(self, neural_name: str) -> str:
+        return self.contextual_intensities.get(neural_name, "")
+
+    def reasons_for(self, neural_name: str) -> list[str]:
+        return list(self.contextual_reasons.get(neural_name, []))
+
+
+@dataclass(slots=True)
+class _TurnResponse:
+    response: str
+    neural_debug: dict[str, Any]
+    markdown_debug: dict[str, Any]
+    llm_calls: list[dict[str, Any]]
+
+
 class ConversationTurnRunner:
     def __init__(self, service: Any) -> None:
         self.service = service
 
+    def _repair_instructions(self) -> str:
+        return """REPAIR DE SUPERFÍCIE
+Reescreva a resposta mantendo os mesmos fatos, o mesmo sentido central e o mesmo idioma.
+Corrija apenas forma.
+Não invente contexto.
+Não explique bastidor.
+Se houver pergunta, faça no máximo uma e deixe natural.
+Se a restrição do turno proibir pergunta, remova a pergunta sem substituir por formulário.
+"""
+
+    def _repair_input(self, raw_response: str, violation_type: str) -> str:
+        policy = self.service.state.response_policy or {}
+        lines = [
+            "RESPOSTA ORIGINAL",
+            raw_response,
+            "",
+            "CONTRATO DO TURNO",
+            f"- response_mode={policy.get('response_mode', '')}",
+            f"- question_budget={policy.get('question_budget', 0)}",
+            f"- must_ask={bool(policy.get('must_ask', False))}",
+            f"- question_goal={policy.get('question_goal', '')}",
+            f"- question_variable={policy.get('question_variable', '')}",
+            f"- question_shape={policy.get('question_shape', '')}",
+            f"- question_constraints={' | '.join(policy.get('question_constraints', ()) or ())}",
+            f"- violation_type={violation_type}",
+        ]
+        return "\n".join(lines)
+
+    def _repair_response_if_needed(self, raw_response: str, decision: Any) -> Any:
+        if not decision.needs_repair:
+            return decision
+        service = self.service
+        with service.llm.trace_context(
+            "conversation_service.repair_response",
+            stage_id=service.state.stage_id,
+            turn_count=service.state.turn_count,
+            component="final_provider_repair",
+            provider=service.config.provider,
+            model=service.config.model,
+        ):
+            repaired = service.llm.generate(
+                instructions=self._repair_instructions(),
+                user_input=self._repair_input(raw_response, decision.violation_type),
+            )
+        second_decision = service._enforce_final_response_policy_with_trace(repaired)
+        if second_decision.needs_repair and _clean_text(second_decision.response) and _clean_text(second_decision.response) != _clean_text(raw_response):
+            return second_decision
+        if second_decision.needs_repair:
+            return decision
+        return second_decision
+
     def run(self, user_message: str) -> ConversationTurnOutcome:
         start = self._start_turn(user_message)
-        analysis = self._run_analysis_phase(start)
-        retrieval = self._run_retrieval_phase(start, analysis)
-        prompt = self._run_prompt_phase(start, analysis, retrieval)
-        response = self._run_response_phase(start, analysis, retrieval, prompt)
+        state_update = self._run_state_update_phase(start)
+        semantic = self._run_semantic_read_phase(start)
+        decision = self._run_turn_decision_phase(start)
+        capability = self._run_capability_pricing_phase(start)
+        prompt = self._run_prompt_phase(start, capability, decision)
+        response = self._run_response_phase(start, state_update, semantic, decision, capability, prompt)
         return ConversationTurnOutcome(
-            stage_id=analysis.next_stage_id,
+            stage_id=decision["stage"].stage_id,
             response=response.response,
             diagnostics_count=len(self.service.state.diagnostics),
-            last_hits=[hit.function_name for hit in retrieval.arsenal_hits[:4]],
+            last_hits=[hit.function_name for hit in capability["arsenal_hits"][:4]],
             debug_trace=start.debug_trace or [],
-            neural_debug=response.neural_terminal_debug,
+            neural_debug=response.neural_debug,
             markdown_debug=response.markdown_debug,
         )
 
-    def _start_turn(self, user_message: str) -> TurnStartSnapshot:
+    def _start_turn(self, user_message: str) -> _TurnStart:
         service = self.service
         debug_trace: list[str] | None = [] if service.config.stage_debug else None
         entry_stage = service.state.stage_id
         service.llm.begin_turn_debug_session()
         service.state.add_user_turn(user_message)
+        service.state.response_strategy = {}
+        service.state.neurobehavior_state = {}
+        service.state.surface_guidance = {}
         service._add_trace(
             debug_trace,
             "pipeline.turn.received",
@@ -56,404 +148,245 @@ class ConversationTurnRunner:
             turn_count=service.state.turn_count,
             user_message=user_message,
         )
+        return _TurnStart(user_message=user_message, entry_stage=entry_stage, debug_trace=debug_trace)
 
-        return TurnStartSnapshot(
-            user_message=user_message,
-            entry_stage=entry_stage,
-            debug_trace=debug_trace,
-        )
-
-    def _run_analysis_phase(self, start: TurnStartSnapshot) -> TurnAnalysisSnapshot:
+    def _run_state_update_phase(self, start: _TurnStart) -> dict[str, Any]:
         service = self.service
-        debug_trace = start.debug_trace
-        user_message = start.user_message
-        entry_stage = start.entry_stage
-
-        lead_summary = service.lead_analyzer.update_state(service.state, user_message)
+        lead_summary = service.lead_analyzer.update_state(service.state, start.user_message)
+        offer_sales_architecture = service.offer_sales_architecture_resolver.update_state(service.state, start.user_message)
         service._add_trace(
-            debug_trace,
-            "pipeline.lead_summary",
+            start.debug_trace,
+            "pipeline.state_update",
             known_context=lead_summary.get("known_context_count", 0),
             minimum_context_ready=lead_summary.get("minimum_context_ready", False),
             commercial_scope_ready=lead_summary.get("commercial_scope_ready", False),
             pain_known=lead_summary.get("pain_known", False),
             impact_known=lead_summary.get("impact_known", False),
             next_question_focus=lead_summary.get("next_question_focus", "-"),
-        )
-
-        offer_sales_architecture = service.offer_sales_architecture_resolver.update_state(service.state, user_message)
-        service._add_trace(
-            debug_trace,
-            "pipeline.offer_sales_architecture",
             offer_name=offer_sales_architecture.get("offer_name", "-"),
-            offer_type=offer_sales_architecture.get("offer_type", "-"),
-            primary_sale_motion=offer_sales_architecture.get("primary_sale_motion", "-"),
-            entry_strategy=offer_sales_architecture.get("conversation_entry_strategy", "-"),
-            first_question_goal=offer_sales_architecture.get("first_question_goal", "-"),
-            question_style=offer_sales_architecture.get("primary_question_style", "-"),
             price_strategy=offer_sales_architecture.get("early_price_strategy", "-"),
-            resolution_reason=offer_sales_architecture.get("resolution_reason", "-"),
         )
+        return {
+            "lead_summary": lead_summary,
+            "offer_sales_architecture": offer_sales_architecture,
+        }
 
-        neural_debug = service._update_neural_state(user_message)
-        route = neural_debug["route"]
-        analysis = neural_debug["analysis"]
-        guarded = neural_debug["neural_state"]
+    def _run_semantic_read_phase(self, start: _TurnStart) -> dict[str, Any]:
+        service = self.service
+        semantic_read = service.semantic_read_engine.update_state(service.state, start.user_message)
+        counterparty_model = service.counterparty_model_builder.build(service.state, start.user_message)
         service._add_trace(
-            debug_trace,
-            "pipeline.neural.route",
-            simple_turn=route.simple_turn,
-            base_neurals=route.base_neurals,
-            contextual_neurals=route.contextual_neurals,
-            contextual_intensities=route.contextual_intensities,
-            contextual_reasons=route.contextual_reasons,
+            start.debug_trace,
+            "pipeline.semantic_read",
+            topic_domain=semantic_read.get("topic_domain", "-"),
+            transition_permission=semantic_read.get("transition_permission", "-"),
+            transition_reason=semantic_read.get("transition_reason", "-"),
+            answer_scope=semantic_read.get("answer_scope", "-"),
+            emotional_state=semantic_read.get("emotional_state", "-"),
+            communicative_intent=semantic_read.get("communicative_intent", "-"),
+            resistance_level=semantic_read.get("resistance_level", "-"),
+            trust_signal=semantic_read.get("trust_signal", "-"),
+            needs_simplification=semantic_read.get("needs_simplification", False),
+            confidence=semantic_read.get("confidence", 0.0),
         )
         service._add_trace(
-            debug_trace,
-            "pipeline.neural.analysis",
-            results=service._summarize_neural_analysis(analysis),
-        )
-        service._add_trace(
-            debug_trace,
-            "pipeline.neural.state",
-            active_neurals=guarded.get("active_neurals", []),
-            emotional_state=guarded.get("emotional_state", "-"),
-            communicative_intent=guarded.get("communicative_intent", "-"),
-            topic_domain=guarded.get("topic_domain", "-"),
-            transition_permission=guarded.get("transition_permission", "-"),
-            transition_reason=guarded.get("transition_reason", "-"),
-            decision_style=guarded.get("decision_style", "-"),
-            needs_simplification=guarded.get("needs_simplification", False),
-            deconstruction_intensity=guarded.get("deconstruction_intensity", ""),
-            confidence=guarded.get("confidence", 0.0),
-            pain_reading=guarded.get("pain_reading", "-"),
-            operational_frame=guarded.get("operational_frame", "-"),
-            value_priority=guarded.get("value_priority", "-"),
-            deconstruction_summary=guarded.get("deconstruction_summary", "-"),
-            blocked_variable=guarded.get("blocked_variable", "-"),
-            literal_response_risk=guarded.get("literal_response_risk", "-"),
-        )
-        service._add_deconstruction_trace(
-            debug_trace,
-            route=route,
-            analysis=analysis,
-            guarded=guarded,
-        )
-
-        counterparty_model = service.counterparty_model_builder.build(service.state, user_message)
-        service._add_trace(
-            debug_trace,
+            start.debug_trace,
             "pipeline.counterparty",
             interaction_mode=counterparty_model.get("interaction_mode", "-"),
             decision_stage=counterparty_model.get("decision_stage", "-"),
-            neutral_mode=counterparty_model.get("neutral_mode", False),
             question_priority=counterparty_model.get("question_priority", "-"),
-            clarity_need=counterparty_model.get("clarity_need", "-"),
-            tension=counterparty_model.get("conversation_tension", "-"),
             trust_level=counterparty_model.get("trust_level", "-"),
             resistance_level=counterparty_model.get("resistance_level", "-"),
-            confidence=counterparty_model.get("confidence", 0.0),
+            tension=counterparty_model.get("conversation_tension", "-"),
+            neutral_mode=counterparty_model.get("neutral_mode", False),
+        )
+        return {
+            "semantic_read": semantic_read,
+            "counterparty_model": counterparty_model,
+            "route": _SemanticRoute(simple_turn=not bool(semantic_read.get("needs_simplification", False))),
+        }
+
+    def _stage_rank(self, stage_id: str) -> int:
+        try:
+            return STAGE_ORDER.index(stage_id)
+        except ValueError:
+            return -1
+
+    def _furthest_stage(self, current: str, target: str) -> str:
+        if self._stage_rank(target) > self._stage_rank(current):
+            return target
+        return current
+
+    def _resolve_stage_progress(self) -> _StageProgressDecision:
+        state = self.service.state
+        policy = state.response_policy or {}
+        pricing = state.pricing_policy or {}
+        lead_summary = state.lead_summary or {}
+        current_stage = state.stage_id
+
+        if bool(policy.get("social_opening_only", False)):
+            return _StageProgressDecision(
+                next_stage_id="etapa_01_abertura",
+                source="v2_contract_router",
+                confidence=0.92,
+                reason="social_hold",
+            )
+
+        response_mode = str(policy.get("response_mode", "") or "").strip()
+        question_goal = str(policy.get("question_goal", "") or "").strip()
+        target_stage = current_stage
+        reason = "keep_stage"
+
+        if response_mode == "ask":
+            mapping = {
+                "context": "etapa_03_contextualizacao_permissao",
+                "pain": "etapa_04_diagnostico_situacional",
+                "impact": "etapa_05_diagnostico_impacto",
+                "fit": "etapa_06_qualificacao_fit",
+            }
+            if question_goal == "pricing":
+                target_stage = (
+                    "etapa_09_ancoragem_valor"
+                    if not pricing.get("validation_missing", [])
+                    else "etapa_03_contextualizacao_permissao"
+                )
+            else:
+                target_stage = mapping.get(question_goal, current_stage)
+            reason = f"question_goal={question_goal or 'none'}"
+        elif response_mode == "pricing_answer":
+            target_stage = (
+                "etapa_12_negociacao_condicoes"
+                if bool(pricing.get("allow_precise_quote", False))
+                else "etapa_09_ancoragem_valor"
+            )
+            reason = "pricing_answer_ready"
+        elif bool(lead_summary.get("impact_known", False)):
+            target_stage = "etapa_07_transicao_solucao"
+            reason = "impact_known"
+        elif bool(lead_summary.get("pain_known", False)):
+            target_stage = "etapa_05_diagnostico_impacto"
+            reason = "pain_known"
+        elif bool(lead_summary.get("minimum_context_ready", False)):
+            target_stage = "etapa_04_diagnostico_situacional"
+            reason = "context_ready"
+        else:
+            target_stage = "etapa_03_contextualizacao_permissao"
+            reason = "context_building"
+
+        return _StageProgressDecision(
+            next_stage_id=self._furthest_stage(current_stage, target_stage),
+            source="v2_contract_router",
+            confidence=0.74,
+            reason=reason,
         )
 
-        neurobehavior_state = service.neurobehavior_engine.update_state(service.state)
-        service._add_trace(
-            debug_trace,
-            "pipeline.neurobehavior",
-            dominant_barrier=neurobehavior_state.get("dominant_barrier", "-"),
-            active_principles=neurobehavior_state.get("active_principles", []),
-            cognitive_load=neurobehavior_state.get("cognitive_load", "low"),
-            perceived_risk=neurobehavior_state.get("perceived_risk", "low"),
-            predictability_gap=neurobehavior_state.get("predictability_gap", "low"),
-            threat_level=neurobehavior_state.get("threat_level", "low"),
-            recommended_levers=neurobehavior_state.get("recommended_levers", []),
-            suppressed_moves=neurobehavior_state.get("suppressed_moves", []),
-            confidence=neurobehavior_state.get("confidence", 0.0),
-        )
-        initial_policy = service.conversation_policy_engine.update_state(service.state, user_message)
-        service._add_trace(
-            debug_trace,
-            "pipeline.policy.initial",
-            response_mode=initial_policy.get("response_mode", "-"),
-            main_intention=initial_policy.get("main_intention", "-"),
-            question_goal=initial_policy.get("question_goal", "-"),
-            question_type=initial_policy.get("question_type", "-"),
-            question_budget=initial_policy.get("question_budget", 0),
-            question_anchor=initial_policy.get("question_anchor", "-"),
-            must_ask=initial_policy.get("must_ask", False),
-            answer_now=initial_policy.get("answer_now_instead_of_asking", False),
-            social_opening_only=initial_policy.get("social_opening_only", False),
-        )
-
-        response_strategy = service.response_strategy_engine.update_state(service.state, user_message)
-        service._add_trace(
-            debug_trace,
-            "pipeline.response_strategy",
-            message_goal=response_strategy.get("message_goal", "-"),
-            approach_intensity=response_strategy.get("approach_intensity", "-"),
-            response_format=response_strategy.get("response_format", "-"),
-            persuasion_axis=response_strategy.get("persuasion_axis", "-"),
-            tactical_moves=response_strategy.get("tactical_moves", []),
-            avoid=response_strategy.get("avoid", []),
-            confidence=response_strategy.get("confidence", 0.0),
-        )
-
-        stage_decision = service.stage_router.decide(service.state, user_message)
-        next_stage_id = stage_decision.next_stage_id
-        service.state.stage_id = next_stage_id
-        stage = service.stages[next_stage_id]
-        service._add_trace(
-            debug_trace,
-            "pipeline.stage_router",
-            from_stage=entry_stage,
-            to_stage=next_stage_id,
-            source=stage_decision.source,
-            confidence=stage_decision.confidence,
-            reason=stage_decision.reason,
-        )
-
-        return TurnAnalysisSnapshot(
-            lead_summary=lead_summary,
-            offer_sales_architecture=offer_sales_architecture,
-            route=route,
-            analysis=analysis,
-            guarded=guarded,
-            counterparty_model=counterparty_model,
-            neurobehavior_state=neurobehavior_state,
-            initial_policy=initial_policy,
-            response_strategy=response_strategy,
-            stage_decision=stage_decision,
-            next_stage_id=next_stage_id,
-            stage=stage,
-        )
-
-    def _run_retrieval_phase(
-        self,
-        start: TurnStartSnapshot,
-        analysis: TurnAnalysisSnapshot,
-    ) -> TurnRetrievalSnapshot:
+    def _run_turn_decision_phase(self, start: _TurnStart) -> dict[str, Any]:
         service = self.service
-        debug_trace = start.debug_trace
-        user_message = start.user_message
+        pricing_policy = service.commercial_pricing_policy.update_state(service.state, start.user_message)
+        response_policy = service.conversation_policy_engine.reconcile_state(service.state)
+        stage_decision = self._resolve_stage_progress()
+        service.state.stage_id = stage_decision.next_stage_id
+        stage = service.stages[stage_decision.next_stage_id]
+        service._add_trace(
+            start.debug_trace,
+            "pipeline.turn_decision",
+            response_mode=response_policy.get("response_mode", "-"),
+            question_goal=response_policy.get("question_goal", "-"),
+            question_type=response_policy.get("question_type", "-"),
+            question_variable=response_policy.get("question_variable", "-"),
+            question_shape=response_policy.get("question_shape", "-"),
+            question_budget=response_policy.get("question_budget", 0),
+            must_ask=response_policy.get("must_ask", False),
+            price_response_mode=pricing_policy.get("price_response_mode", "-"),
+            validation_missing=pricing_policy.get("validation_missing", []),
+            readiness_stage=pricing_policy.get("pricing_readiness_stage", "-"),
+            next_stage=stage_decision.next_stage_id,
+            stage_reason=stage_decision.reason,
+        )
+        return {
+            "pricing_policy": pricing_policy,
+            "response_policy": response_policy,
+            "stage_decision": stage_decision,
+            "stage": stage,
+        }
 
-        mapped_hits = service.diagnostic_cluster_mapper.update_state(service.state, user_message)
-        service._add_trace(
-            debug_trace,
-            "pipeline.mapper",
-            active=bool(service.state.diagnostic_hypotheses),
-            saga_mode=service.state.diagnostic_hypotheses.get("saga_mode", "-"),
-            pains=service._mapped_pain_names(service.state.diagnostic_hypotheses),
-            mapped_hits=service._hit_names(mapped_hits),
-        )
+    def _build_capability_query(self, user_message: str) -> str:
+        lead_summary = self.service.state.lead_summary or {}
+        narrative = str(lead_summary.get("narrative_summary", "") or "").strip()
+        if narrative and narrative not in user_message:
+            return f"{narrative}. {user_message}"
+        return user_message
 
-        direct_hits = service.arsenal_retriever.top_hits(user_message, limit=service.config.max_arsenal_hits)
+    def _run_capability_pricing_phase(self, start: _TurnStart) -> dict[str, Any]:
+        service = self.service
+        query = self._build_capability_query(start.user_message)
+        arsenal_hits = service.arsenal_retriever.top_hits(query, limit=service.config.max_arsenal_hits)
+        surface_guidance = service.surface_response_planner.update_state(service.state, start.user_message, arsenal_hits)
         service._add_trace(
-            debug_trace,
-            "pipeline.retrieval.direct",
-            hits=service._hit_names(direct_hits),
-            count=len(direct_hits),
-        )
-        direct_hits = service.diagnostic_cluster_mapper.filter_direct_hits(
-            state=service.state,
-            direct_hits=direct_hits,
-            limit=service.config.max_arsenal_hits,
-        )
-        service._add_trace(
-            debug_trace,
-            "pipeline.retrieval.filtered",
-            hits=service._hit_names(direct_hits),
-            count=len(direct_hits),
-        )
-        arsenal_hits = service.diagnostic_cluster_mapper.merge_hits(
-            direct_hits=direct_hits,
-            mapped_hits=mapped_hits,
-            limit=service.config.max_arsenal_hits,
-        )
-        service._add_trace(
-            debug_trace,
-            "pipeline.retrieval.merged",
+            start.debug_trace,
+            "pipeline.capability_pricing",
             hits=service._hit_names(arsenal_hits),
             count=len(arsenal_hits),
-        )
-        arsenal_hits = service.diagnostic_cluster_mapper.boost_hits_for_context(
-            state=service.state,
-            hits=arsenal_hits,
-            limit=service.config.max_arsenal_hits,
-        )
-        service._add_trace(
-            debug_trace,
-            "pipeline.retrieval.boosted_pre_prompt",
-            hits=service._hit_names(arsenal_hits),
-            count=len(arsenal_hits),
-        )
-        inventory_query = service.diagnostic_cluster_mapper.build_inventory_query(service.state, user_message)
-        inventory_hits = service.inventory_retriever.top_facts(inventory_query, limit=8) if inventory_query else []
-        service._add_trace(
-            debug_trace,
-            "pipeline.inventory",
-            query=inventory_query or "-",
-            facts=service._fact_names(inventory_hits),
-            count=len(inventory_hits),
-        )
-
-        pricing_initial = service.commercial_pricing_policy.update_state(service.state, user_message)
-        service._add_trace(
-            debug_trace,
-            "pipeline.pricing.initial",
-            readiness_stage=pricing_initial.get("pricing_readiness_stage", "-"),
-            price_response_mode=pricing_initial.get("price_response_mode", "-"),
-            scope_confidence=pricing_initial.get("scope_confidence", "-"),
-            project_complexity=pricing_initial.get("project_complexity", "-"),
-            journey_mode=pricing_initial.get("journey_mode", "-"),
-            allow_range_quote=pricing_initial.get("allow_range_quote", False),
-            allow_precise_quote=pricing_initial.get("allow_precise_quote", False),
-            counterparty_ready_for_range=pricing_initial.get("counterparty_ready_for_range", False),
-            negotiation_posture=pricing_initial.get("negotiation_posture", "-"),
-            validation_source=pricing_initial.get("validation_source", "-"),
-            validation_missing=pricing_initial.get("validation_missing", []),
-            minimum_pricing_question=pricing_initial.get("minimum_pricing_question", "-"),
-            minimum_pricing_question_reason=pricing_initial.get("minimum_pricing_question_reason", "-"),
-            question_will_change_what=pricing_initial.get("question_will_change_what", "-"),
-            scope_gaps=pricing_initial.get("askable_scope_gaps", []),
-        )
-
-        new_diagnostics = service.bpcf_engine.update_map(service.state, user_message, arsenal_hits)
-        service._add_trace(
-            debug_trace,
-            "pipeline.bpcf",
-            new_diagnostics=[entry.problem for entry in new_diagnostics],
-            diagnostics_total=len(service.state.diagnostics),
-        )
-
-        surface_guidance = service.surface_response_planner.update_state(service.state, user_message, arsenal_hits)
-        service._add_trace(
-            debug_trace,
-            "pipeline.surface",
-            active_cluster=surface_guidance.get("active_cluster_name", "-"),
-            active_pain_type=surface_guidance.get("active_pain_type", "-"),
+            hero_function=surface_guidance.get("hero_saga_function", "-"),
+            support_function=surface_guidance.get("support_saga_function", "-"),
             opening=surface_guidance.get("response_opening", "-"),
             brevity=surface_guidance.get("brevity_mode", "-"),
-            question_anchor=surface_guidance.get("question_anchor", "-"),
         )
-
-        pricing_final = service.commercial_pricing_policy.update_state(service.state, user_message)
-        service._add_trace(
-            debug_trace,
-            "pipeline.pricing.final",
-            readiness_stage=pricing_final.get("pricing_readiness_stage", "-"),
-            price_response_mode=pricing_final.get("price_response_mode", "-"),
-            scope_confidence=pricing_final.get("scope_confidence", "-"),
-            allow_range_quote=pricing_final.get("allow_range_quote", False),
-            allow_precise_quote=pricing_final.get("allow_precise_quote", False),
-            negotiation_posture=pricing_final.get("negotiation_posture", "-"),
-            pricing_anchor_reason=pricing_final.get("pricing_anchor_reason", "-"),
-            validation_missing=pricing_final.get("validation_missing", []),
-            minimum_pricing_question=pricing_final.get("minimum_pricing_question", "-"),
-            question_will_change_what=pricing_final.get("question_will_change_what", "-"),
-        )
-
-        service.conversation_policy_engine.reconcile_state(service.state)
-        service._add_trace(
-            debug_trace,
-            "pipeline.policy.final",
-            response_mode=service.state.response_policy.get("response_mode", "-"),
-            main_intention=service.state.response_policy.get("main_intention", "-"),
-            price_response_mode=service.state.response_policy.get("price_response_mode", "-"),
-            question_goal=service.state.response_policy.get("question_goal", "-"),
-            question_type=service.state.response_policy.get("question_type", "-"),
-            question_budget=service.state.response_policy.get("question_budget", 0),
-            question_anchor=service.state.response_policy.get("question_anchor", "-"),
-            minimum_pricing_question=service.state.response_policy.get("minimum_pricing_question", "-"),
-            question_will_change_what=service.state.response_policy.get("question_will_change_what", "-"),
-            policy_used_pricing_gate=service.state.response_policy.get("policy_used_pricing_gate", False),
-            must_ask=service.state.response_policy.get("must_ask", False),
-            answer_now=service.state.response_policy.get("answer_now_instead_of_asking", False),
-            social_opening_only=service.state.response_policy.get("social_opening_only", False),
-        )
-        service._trace_social_opening_inconsistency(
-            debug_trace,
-            analysis.next_stage_id,
-            user_message,
-            analysis.counterparty_model,
-            service.state.response_policy,
-        )
-
-        arsenal_hits = service.diagnostic_cluster_mapper.boost_hits_for_context(
-            state=service.state,
-            hits=arsenal_hits,
-            limit=service.config.max_arsenal_hits,
-        )
-        service._add_trace(
-            debug_trace,
-            "pipeline.retrieval.boosted_final",
-            hits=service._hit_names(arsenal_hits),
-            count=len(arsenal_hits),
-        )
-
-        return TurnRetrievalSnapshot(
-            mapped_hits=mapped_hits,
-            direct_hits=direct_hits,
-            arsenal_hits=arsenal_hits,
-            inventory_query=inventory_query or user_message,
-            inventory_hits=inventory_hits,
-            pricing_initial=pricing_initial,
-            new_diagnostics=new_diagnostics,
-            surface_guidance=surface_guidance,
-            pricing_final=pricing_final,
-        )
+        return {
+            "arsenal_hits": arsenal_hits,
+            "surface_guidance": surface_guidance,
+            "inventory_hits": [],
+            "inventory_query": query,
+        }
 
     def _run_prompt_phase(
         self,
-        start: TurnStartSnapshot,
-        analysis: TurnAnalysisSnapshot,
-        retrieval: TurnRetrievalSnapshot,
-    ) -> TurnPromptSnapshot:
+        start: _TurnStart,
+        capability: dict[str, Any],
+        decision: dict[str, Any],
+    ) -> dict[str, str]:
         service = self.service
-        debug_trace = start.debug_trace
-
         intent = service.turn_director.build_intent(
             state=service.state,
-            arsenal_hits=retrieval.arsenal_hits,
+            arsenal_hits=capability["arsenal_hits"],
         )
         instructions, prompt_input = service.prompt_assembler.build(
             state=service.state,
             intent=intent,
-            stage=analysis.stage,
+            stage=decision["stage"],
             user_message=start.user_message,
-            arsenal_hits=retrieval.arsenal_hits,
+            arsenal_hits=capability["arsenal_hits"],
         )
         service._add_trace(
-            debug_trace,
+            start.debug_trace,
             "pipeline.prompt",
-            stage=analysis.stage.stage_id,
-            opening_shape=service._extract_prompt_plan_value(instructions, "abertura"),
-            question_mode=service._extract_prompt_plan_value(instructions, "pergunta"),
+            stage=decision["stage"].stage_id,
             response_mode=str((service.state.response_policy or {}).get("response_mode", "-")),
             instruction_chars=len(instructions),
             input_chars=len(prompt_input),
         )
-
-        return TurnPromptSnapshot(
-            instructions=instructions,
-            prompt_input=prompt_input,
-        )
+        return {
+            "instructions": instructions,
+            "prompt_input": prompt_input,
+        }
 
     def _run_response_phase(
         self,
-        start: TurnStartSnapshot,
-        analysis: TurnAnalysisSnapshot,
-        retrieval: TurnRetrievalSnapshot,
-        prompt: TurnPromptSnapshot,
-    ) -> TurnResponseSnapshot:
+        start: _TurnStart,
+        state_update: dict[str, Any],
+        semantic: dict[str, Any],
+        decision: dict[str, Any],
+        capability: dict[str, Any],
+        prompt: dict[str, str],
+    ) -> Any:
         service = self.service
-        debug_trace = start.debug_trace
-
         service._add_trace(
-            debug_trace,
+            start.debug_trace,
             "pipeline.llm.request",
             provider=service.config.provider,
             model=service.config.model,
-            instruction_chars=len(prompt.instructions),
-            input_chars=len(prompt.prompt_input),
+            instruction_chars=len(prompt["instructions"]),
+            input_chars=len(prompt["prompt_input"]),
         )
         with service.llm.trace_context(
             "conversation_service.final_response",
@@ -463,67 +396,76 @@ class ConversationTurnRunner:
             provider=service.config.provider,
             model=service.config.model,
         ):
-            response = service.llm.generate(instructions=prompt.instructions, user_input=prompt.prompt_input)
-        enforced_response, enforcement_applied = service._enforce_final_response_policy_with_trace(response)
+            raw_response = service.llm.generate(
+                instructions=prompt["instructions"],
+                user_input=prompt["prompt_input"],
+            )
+        enforcement_decision = service._enforce_final_response_policy_with_trace(raw_response)
+        enforcement_decision = self._repair_response_if_needed(raw_response, enforcement_decision)
+        final_response = enforcement_decision.response
         service.llm.annotate_last_call(
             output_used={
-                "raw_response": response,
-                "enforced_response": enforced_response,
-                "policy_enforced": enforced_response != response,
-                "enforcement_applied": enforcement_applied,
+                "raw_response": raw_response,
+                "enforced_response": final_response,
+                "policy_enforced": final_response != raw_response,
+                "enforcement_applied": enforcement_decision.reason,
+                "needs_repair": enforcement_decision.needs_repair,
+                "violation_type": enforcement_decision.violation_type,
             },
             consumed_by=["assistant_response", "markdown_debug"],
         )
         service._add_trace(
-            debug_trace,
+            start.debug_trace,
             "pipeline.llm.response",
-            raw_preview=response,
-            policy_enforced=enforced_response != response,
-            enforcement_applied=enforcement_applied,
-            final_preview=enforced_response,
+            raw_preview=raw_response,
+            policy_enforced=final_response != raw_response,
+            enforcement_applied=enforcement_decision.reason,
+            needs_repair=enforcement_decision.needs_repair,
+            violation_type=enforcement_decision.violation_type,
+            final_preview=final_response,
         )
-        response = enforced_response
-        service.state.add_assistant_turn(response)
+        service.state.add_assistant_turn(final_response)
         llm_calls = service.llm.consume_turn_debug_session()
 
-        neural_terminal_debug = service._build_neural_terminal_debug(
-            route=analysis.route,
-            analysis=analysis.analysis,
-            guarded=analysis.guarded,
-            neurobehavior=analysis.neurobehavior_state,
+        route = semantic["route"]
+        neural_debug = service._build_neural_terminal_debug(
+            route=route,
+            analysis={"semantic_read": semantic["semantic_read"]},
+            guarded=semantic["semantic_read"],
+            neurobehavior={},
         )
         markdown_debug = service._build_markdown_debug_bundle(
             entry_stage=start.entry_stage,
             user_message=start.user_message,
-            lead_summary=analysis.lead_summary,
-            offer_sales_architecture=analysis.offer_sales_architecture,
-            route=analysis.route,
-            analysis=analysis.analysis,
-            guarded=analysis.guarded,
-            counterparty_model=analysis.counterparty_model,
-            neurobehavior_state=analysis.neurobehavior_state,
-            initial_policy=analysis.initial_policy,
-            response_strategy=analysis.response_strategy,
-            stage_decision=analysis.stage_decision,
-            mapped_hits=retrieval.mapped_hits,
-            direct_hits=retrieval.direct_hits,
-            arsenal_hits=retrieval.arsenal_hits,
-            inventory_query=retrieval.inventory_query,
-            inventory_hits=retrieval.inventory_hits,
-            pricing_initial=retrieval.pricing_initial,
-            pricing_final=retrieval.pricing_final,
-            new_diagnostics=retrieval.new_diagnostics,
-            surface_guidance=retrieval.surface_guidance,
-            instructions=prompt.instructions,
-            prompt_input=prompt.prompt_input,
-            response=response,
-            debug_trace=debug_trace or [],
+            lead_summary=state_update["lead_summary"],
+            offer_sales_architecture=state_update["offer_sales_architecture"],
+            route=route,
+            analysis={"semantic_read": semantic["semantic_read"]},
+            guarded=semantic["semantic_read"],
+            counterparty_model=semantic["counterparty_model"],
+            neurobehavior_state={},
+            initial_policy=decision["response_policy"],
+            response_strategy={},
+            stage_decision=decision["stage_decision"],
+            mapped_hits=[],
+            direct_hits=capability["arsenal_hits"],
+            arsenal_hits=capability["arsenal_hits"],
+            inventory_query=capability["inventory_query"],
+            inventory_hits=capability["inventory_hits"],
+            pricing_initial=decision["pricing_policy"],
+            pricing_final=decision["pricing_policy"],
+            new_diagnostics=[],
+            surface_guidance=capability["surface_guidance"],
+            instructions=prompt["instructions"],
+            prompt_input=prompt["prompt_input"],
+            response=final_response,
+            debug_trace=start.debug_trace or [],
             llm_calls=llm_calls,
         )
 
-        return TurnResponseSnapshot(
-            response=response,
-            llm_calls=llm_calls,
-            neural_terminal_debug=neural_terminal_debug,
+        return _TurnResponse(
+            response=final_response,
+            neural_debug=neural_debug,
             markdown_debug=markdown_debug,
+            llm_calls=llm_calls,
         )

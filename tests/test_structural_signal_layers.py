@@ -74,6 +74,36 @@ def test_counterparty_uses_structured_clarity_signal_without_keyword_reading() -
     assert model["value_orientation"] == "simplicity"
 
 
+def test_counterparty_keeps_self_contained_question_in_answer_first_mode() -> None:
+    state = ConversationState(stage_id="etapa_03_contextualizacao_permissao")
+    state.lead_summary = {
+        "business_context_ready_for_sizing": False,
+        "pain_known": False,
+        "impact_known": False,
+    }
+    state.neural_state = {
+        "communicative_intent": "clarify",
+        "emotional_state": "neutral",
+        "topic_domain": "work_curiosity",
+        "transition_permission": "allow_context",
+        "decision_style": "pragmatic",
+        "answer_scope": "self_contained",
+        "needs_simplification": False,
+        "clarity_note": "",
+        "literal_response_risk": "responder curto demais pode travar a conversa",
+        "operational_frame": "",
+    }
+    state.response_policy = {
+        "commercial_direct_question_detected": False,
+    }
+
+    model = CounterpartyModelBuilder().build(state, "qualquer coisa")
+
+    assert model["interaction_mode"] == "exploring"
+    assert model["clarity_need"] == "none"
+    assert model["microcommitment_goal"] == "answer_simple"
+    assert model["question_priority"] != "clarity_question"
+
 
 def test_neurobehavior_uses_structured_state_without_operational_keyword_scan() -> None:
     state = ConversationState(stage_id="etapa_03_contextualizacao_permissao")
@@ -149,6 +179,7 @@ def test_sources_do_not_keep_keyword_scanners_in_structural_layers() -> None:
     saga_mode_source = (ROOT / "src/ana_saga_cli/sales/saga_mode.py").read_text(encoding="utf-8")
 
     assert "def _contains_any" not in counterparty_source
+    assert "or bool(literal_response_risk)" not in counterparty_source
     assert "def _contains_any" not in neurobehavior_source
     assert "def _contains_operational_signal" not in neurobehavior_source
     assert "def _score_text" not in saga_mode_source

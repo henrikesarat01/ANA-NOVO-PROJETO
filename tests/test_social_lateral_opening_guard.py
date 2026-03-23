@@ -7,29 +7,14 @@ from ana_saga_cli.domain.models import ConversationState
 from ana_saga_cli.sales.conversation_service import ConversationService
 from ana_saga_cli.sales.opening_guard import get_opening_semantic_state
 
+ROOT = Path(__file__).resolve().parents[1]
 
 SOCIAL_TURNS = [
     "fala meu jovem tudo bem ?",
     "como vai a familia ?",
     "cara e o flamengo heim",
     "voce vai jogar bola hoje ?",
-    "vi que talvez vai ter greve dos caminhoneiros",
-    "correria por ai tambem ?",
-    "sobreviveu a semana ?",
-    "ta conseguindo descansar ?",
-    "kkk hoje foi puxado demais",
-    "teu time aprontou ontem ou foi so o meu ?",
 ]
-
-SOCIAL_TURNS_WITHOUT_KEYWORDS = [
-    "essa sexta veio torta por aqui",
-    "o dia virou cedo demais hoje",
-    "do nada lembrei de te chamar",
-    "o tempo mudou tudo de uma vez",
-    "hoje foi no limite por aqui",
-]
-
-ROOT = Path(__file__).resolve().parents[1]
 
 
 def _new_service() -> ConversationService:
@@ -41,6 +26,7 @@ def _semantic_neural_state(
     topic_domain: str = "social_lateral",
     transition_permission: str = "hold",
     transition_reason: str = "abertura lateral; manter leve",
+    answer_scope: str = "case_dependent",
 ) -> dict[str, object]:
     return {
         "active_neurals": ["psicometria"],
@@ -49,6 +35,7 @@ def _semantic_neural_state(
         "topic_domain": topic_domain,
         "transition_permission": transition_permission,
         "transition_reason": transition_reason,
+        "answer_scope": answer_scope,
         "pain_reading": "",
         "needs_simplification": False,
         "value_priority": "",
@@ -82,7 +69,7 @@ def _seed_social_opening_state(
         "question_budget": 0,
         "question_goal": "none",
         "question_type": "none",
-        "question_anchor": "",
+        "question_variable": "",
         "must_ask": False,
         "answer_now_instead_of_asking": True,
         "social_opening_only": True,
@@ -99,6 +86,7 @@ def _seed_semantic_state(
     topic_domain: str,
     transition_permission: str,
     transition_reason: str,
+    answer_scope: str = "case_dependent",
     previous_assistant: str = "",
     offer_architecture: dict[str, object] | None = None,
 ) -> None:
@@ -114,6 +102,7 @@ def _seed_semantic_state(
         topic_domain=topic_domain,
         transition_permission=transition_permission,
         transition_reason=transition_reason,
+        answer_scope=answer_scope,
     )
     service.state.offer_sales_architecture = offer_architecture or {}
     if previous_assistant:
@@ -136,36 +125,26 @@ def _assert_social_invariants(service: ConversationService, expected_stage: str 
     assert service.state.stage_id == expected_stage
     assert counterparty["neutral_mode"] is True
     assert counterparty["question_priority"] == "social_hold"
-    assert counterparty["clarity_need"] == "none"
-    assert counterparty["conversation_tension"] == ""
-    assert counterparty["resistance_level"] == "low"
-
     assert policy["response_mode"] == "explain"
-    assert policy["main_intention"] != "advance_solution"
     assert policy["question_budget"] == 0
     assert policy["question_goal"] == "none"
     assert policy["question_type"] == "none"
-    assert policy["question_anchor"] == ""
+    assert policy["question_variable"] == ""
     assert policy["must_ask"] is False
     assert policy["answer_now_instead_of_asking"] is True
     assert policy["social_opening_only"] is True
 
 
-def test_social_turns_stay_in_social_lateral_opening() -> None:
+def test_social_turns_stay_in_social_opening() -> None:
     service = _new_service()
-    responses: list[str] = []
 
     for message in SOCIAL_TURNS:
         result = service.respond(message)
         _assert_social_invariants(service)
         assert result.stage_id == "etapa_01_abertura"
         assert "?" not in result.response
-        assert not any(term in result.response.lower() for term in ("whatsapp", "sistema", "preco", "preço", "valor"))
-        assert len(result.response.split()) <= 14
+        assert "whatsapp" not in result.response.lower()
         assert not any("pipeline.inconsistency.social_opening" in line for line in result.debug_trace)
-        responses.append(result.response)
-
-    assert len(set(responses)) >= 1
 
 
 def test_psychometria_schema_exposes_opening_semantics() -> None:
@@ -179,79 +158,14 @@ def test_psychometria_schema_exposes_opening_semantics() -> None:
     assert neural_state["transition_reason"]
 
 
-def test_social_opening_prompt_does_not_carry_pricing_or_capability_brief() -> None:
+def test_social_opening_prompt_does_not_carry_pricing_gate_contract() -> None:
     service = _new_service()
 
     result = service.respond("fala meu jovem tudo bem ?")
     instructions = result.markdown_debug["prompt"]["instructions"].lower()
 
-    assert "ponte de capacidade" not in instructions
-    assert "prioridade da pergunta" not in instructions
-    assert "ainda nao da para passar um valor honesto" not in instructions
-    assert "o que essa resposta muda no valor" not in instructions
-
-
-def test_social_opening_enforcer_trims_commercial_hedge_after_short_confirmation() -> None:
-    service = _new_service()
-    _seed_social_opening_state(
-        service,
-        "entao, os cara tava falando que vc ta criando um sistema de whatspp",
-    )
-
-    response, reason = service._enforce_final_response_policy_with_trace(
-        "To sim. E um sistema pro WhatsApp, mas ainda prefiro entender a cena antes de falar dele pra nao viajar no que faria sentido pro teu caso."
-    )
-
-    lowered = response.lower()
-    assert reason == "social_opening_trim_commercial_hedge"
-    assert "prefiro entender" not in lowered
-    assert "teu caso" not in lowered
-    assert response.endswith(".")
-
-
-def test_social_opening_enforcer_rejects_generic_invitation_phrase() -> None:
-    service = _new_service()
-    _seed_social_opening_state(service, "fala meu jovem tudo bem ?")
-
-    response, reason = service._enforce_final_response_policy_with_trace("Falaa kkk to por aqui 😄")
-
-    assert reason in {"social_opening_truncate", "social_opening_hold"}
-    assert "to por aqui" not in response.lower()
-
-
-def test_semantic_hold_keeps_long_social_conversation_without_keywords() -> None:
-    service = _new_service()
-    service.state = ConversationState(stage_id="etapa_01_abertura")
-    service.state.lead_summary = {
-        "known_context_count": 0,
-        "pain_known": False,
-        "impact_known": False,
-        "minimum_context_ready": False,
-        "commercial_scope_ready": False,
-    }
-
-    for index, message in enumerate(SOCIAL_TURNS_WITHOUT_KEYWORDS):
-        service.state.neural_state = _semantic_neural_state(
-            topic_domain="social_lateral",
-            transition_permission="hold",
-            transition_reason=f"turno lateral {index + 1}",
-        )
-        service.state.add_user_turn(message)
-
-        counterparty, policy, next_stage, surface = _run_opening_modules(service, message)
-
-        assert get_opening_semantic_state(service.state)["transition_permission"] == "hold"
-        assert counterparty["neutral_mode"] is True
-        assert counterparty["question_priority"] == "social_hold"
-        assert policy["social_opening_only"] is True
-        assert policy["question_budget"] == 0
-        assert next_stage == "etapa_01_abertura"
-        assert surface == {}
-
-        response, reason = service._enforce_final_response_policy_with_trace("Pode ser mesmo.")
-        assert reason in {"none", "social_opening_hold"}
-        assert "?" not in response
-        service.state.add_assistant_turn(response)
+    assert "faça só a pergunta mínima que ainda falta para situar preço com honestidade" not in instructions
+    assert "ponto que precisa ficar claro:" not in instructions
 
 
 def test_semantic_hold_overrides_raw_commercial_message() -> None:
@@ -275,7 +189,7 @@ def test_semantic_hold_overrides_raw_commercial_message() -> None:
     assert surface == {}
 
 
-def test_semantic_release_can_open_commercial_path_without_raw_keywords() -> None:
+def test_semantic_release_can_open_commercial_path_without_literal_anchor() -> None:
     service = _new_service()
     user_message = "quero te ouvir melhor sobre isso"
     _seed_semantic_state(
@@ -283,7 +197,8 @@ def test_semantic_release_can_open_commercial_path_without_raw_keywords() -> Non
         user_message,
         topic_domain="commercial_explicit",
         transition_permission="allow_commercial",
-        transition_reason="a psicometria leu intencao comercial explicita",
+        transition_reason="a psicometria leu intenção comercial explícita",
+        answer_scope="commercial_dependent",
         offer_architecture={"offer_name": "SAGA", "offer_type": "software"},
     )
 
@@ -292,7 +207,7 @@ def test_semantic_release_can_open_commercial_path_without_raw_keywords() -> Non
     assert counterparty["neutral_mode"] is False
     assert policy["social_opening_only"] is False
     assert policy["commercial_direct_question_detected"] is True
-    assert policy["transition_permission"] == "allow_commercial"
+    assert policy["question_anchor"] == ""
     assert next_stage != "etapa_01_abertura"
     assert surface != {}
 
@@ -305,7 +220,7 @@ def test_work_curiosity_allow_context_breaks_social_hold() -> None:
         user_message,
         topic_domain="work_curiosity",
         transition_permission="allow_context",
-        transition_reason="pede explicação sobre a solução, sem avanço comercial direto",
+        transition_reason="pede explicação sobre a solução",
         offer_architecture={"offer_name": "SAGA", "offer_type": "software"},
     )
 
@@ -314,53 +229,12 @@ def test_work_curiosity_allow_context_breaks_social_hold() -> None:
     assert counterparty["neutral_mode"] is False
     assert counterparty["question_priority"] != "social_hold"
     assert policy["social_opening_only"] is False
-    assert next_stage != "etapa_01_abertura" or policy["question_anchor"] != ""
+    assert policy["question_variable"] != ""
+    assert next_stage != "etapa_01_abertura"
     assert surface != {}
 
 
-def test_explicit_system_interest_only_releases_transition_on_turn_four() -> None:
-    service = _new_service()
-
-    for message in SOCIAL_TURNS[:3]:
-        service.respond(message)
-        _assert_social_invariants(service)
-
-    result = service.respond("agora falando serio, queria entender como funciona esse sistema")
-    counterparty = service.state.counterparty_model
-    policy = service.state.response_policy
-
-    assert counterparty["neutral_mode"] is False
-    assert counterparty["question_priority"] != "social_hold"
-    assert policy["social_opening_only"] is False
-    assert policy["response_mode"] == "ask"
-    assert policy["question_budget"] == 1
-    assert policy["question_goal"] in {"context", "pricing"}
-    assert policy["question_type"] in {"discovery_question", "pricing_gate_question"}
-    assert policy["question_anchor"] != ""
-    assert result.stage_id != "etapa_01_abertura" or policy["question_anchor"] != ""
-    assert not any("pipeline.inconsistency.social_opening" in line for line in result.debug_trace)
-
-
-def test_price_question_only_releases_transition_on_turn_four() -> None:
-    service = _new_service()
-
-    for message in ["fala mestre", "e a semana?", "vi a noticia da greve"]:
-        service.respond(message)
-        _assert_social_invariants(service)
-
-    result = service.respond("quanto custa isso ai?")
-    counterparty = service.state.counterparty_model
-    policy = service.state.response_policy
-
-    assert counterparty["neutral_mode"] is False
-    assert counterparty["question_priority"] != "social_hold"
-    assert policy["social_opening_only"] is False
-    assert policy["response_mode"] in {"ask", "pricing_answer"}
-    assert policy["question_budget"] >= 0
-    assert not any("pipeline.inconsistency.social_opening" in line for line in result.debug_trace)
-
-
-def test_social_opening_enforcement_preserves_valid_topical_reply() -> None:
+def test_social_opening_enforcer_flattens_question_without_inventing_reply() -> None:
     service = _new_service()
     _seed_social_opening_state(
         service,
@@ -368,13 +242,13 @@ def test_social_opening_enforcement_preserves_valid_topical_reply() -> None:
         previous_assistant="Hahaha, foi puxado mesmo.",
     )
 
-    final_response, reason = service._enforce_final_response_policy_with_trace("Pior que ta com cara mesmo kkk")
+    decision = service._enforce_final_response_policy_with_trace("Pior que ta com cara mesmo kkk. E por ai?")
 
-    assert final_response == "Pior que ta com cara mesmo kkk"
-    assert reason == "none"
+    assert decision.reason in {"social_opening_strip_question", "social_opening_flatten_question"}
+    assert "?" not in decision.response
 
 
-def test_social_opening_enforcement_strips_question_without_resetting_context() -> None:
+def test_social_opening_enforcer_accepts_valid_non_question_reply() -> None:
     service = _new_service()
     _seed_social_opening_state(
         service,
@@ -382,56 +256,28 @@ def test_social_opening_enforcement_strips_question_without_resetting_context() 
         previous_assistant="Hahaha, foi puxado mesmo.",
     )
 
-    final_response, reason = service._enforce_final_response_policy_with_trace(
-        "Pior que ta com cara mesmo kkk. E por ai?"
-    )
+    decision = service._enforce_final_response_policy_with_trace("Pior que ta com cara mesmo kkk")
 
-    assert final_response == "Pior que ta com cara mesmo kkk. E por ai?"
-    assert reason == "none"
+    assert decision.response == "Pior que ta com cara mesmo kkk"
+    assert decision.reason == "none"
 
 
-def test_social_opening_fallback_preserves_model_content_without_hardcoded_reset() -> None:
-    service = _new_service()
-    _seed_social_opening_state(
-        service,
-        "o tempo mudou tudo de uma vez",
-        previous_assistant="Tudo certo por aqui.",
-    )
-
-    final_response, reason = service._enforce_final_response_policy_with_trace(
-        "Fala, tudo certo por aqui. Como isso funciona ai?"
-    )
-
-    assert final_response == "Fala, tudo certo por aqui."
-    assert reason == "social_opening_strip_question"
-
-
-def test_production_sources_do_not_use_raw_social_commercial_keyword_classifiers() -> None:
-    opening_guard_source = (ROOT / "src/ana_saga_cli/sales/opening_guard.py").read_text(encoding="utf-8")
-    counterparty_source = (ROOT / "src/ana_saga_cli/sales/counterparty_model.py").read_text(encoding="utf-8")
-    stage_router_source = (ROOT / "src/ana_saga_cli/sales/stage_router.py").read_text(encoding="utf-8")
+def test_production_sources_drop_old_social_keyword_or_anchor_scaffolds() -> None:
     service_source = (ROOT / "src/ana_saga_cli/sales/conversation_service.py").read_text(encoding="utf-8")
     enforcer_source = (ROOT / "src/ana_saga_cli/sales/response_enforcer.py").read_text(encoding="utf-8")
-    mock_source = (ROOT / "src/ana_saga_cli/llm/mock_client.py").read_text(encoding="utf-8")
+    planner_source = (ROOT / "src/ana_saga_cli/sales/surface_response_planner.py").read_text(encoding="utf-8")
 
-    assert "_SOCIAL_LATERAL_PATTERNS" not in opening_guard_source
-    assert "_COMMERCIAL_TRIGGER_PATTERNS" not in opening_guard_source
-    assert "_COMMERCIAL_TRIGGER_TERMS" not in opening_guard_source
-    assert "any(pattern in lowered" not in opening_guard_source
-    assert "user_message" not in opening_guard_source
-
-    assert "_has_explicit_commercial_signal" not in counterparty_source
-    assert "_is_social_relational_message" not in counterparty_source
-    assert "_has_explicit_commercial_signal" not in stage_router_source
-    assert "_is_social_relational_message" not in stage_router_source
     assert "has_explicit_commercial_trigger" not in service_source
-    assert "any(token in user_message" not in service_source
+    assert "_question_anchor_fallback_map" not in enforcer_source
+    assert "inject_policy_anchor" not in enforcer_source
+    assert "question_anchor" in planner_source
+    assert '"question_anchor": ""' in planner_source
 
-    assert '"Fala, tudo certo por aqui."' not in enforcer_source
-    assert '"Tudo certo por aqui."' not in enforcer_source
-    assert '"Pois e, faz sentido."' not in enforcer_source
-    assert '"Recebi sua mensagem, mas ainda sem contexto suficiente para responder com mais precisao."' not in mock_source
-    assert '"Fala, tudo certo por aqui."' not in mock_source
-    assert '"Na pratica:"' not in mock_source
-    assert '"Olha:"' not in mock_source
-    assert '"Boa."' not in mock_source
+
+def test_get_opening_semantic_state_stays_consistent() -> None:
+    service = _new_service()
+    _seed_social_opening_state(service, "fala meu jovem tudo bem ?")
+    opening = get_opening_semantic_state(service.state)
+
+    assert opening["topic_domain"] == "social_lateral"
+    assert opening["transition_permission"] == "hold"

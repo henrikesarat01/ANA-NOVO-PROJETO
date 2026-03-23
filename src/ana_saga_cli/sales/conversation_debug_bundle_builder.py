@@ -79,6 +79,7 @@ class ConversationDebugBundleBuilder:
                 "emotional_state": guarded.get("emotional_state", "neutral"),
                 "communicative_intent": guarded.get("communicative_intent", "explore"),
                 "decision_style": guarded.get("decision_style", "pragmatic"),
+                "answer_scope": guarded.get("answer_scope", ""),
                 "needs_simplification": guarded.get("needs_simplification", False),
                 "confidence": guarded.get("confidence", 0.0),
                 "pain_reading": guarded.get("pain_reading", ""),

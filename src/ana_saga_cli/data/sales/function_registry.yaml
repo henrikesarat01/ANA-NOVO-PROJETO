@@ -1,0 +1,212 @@
+pain_categories:
+  entrada_triagem:
+    label: entrada e triagem
+    preferred_mode: service_led_self_service
+    prefer_visual_hero: false
+    strict_visual: false
+  escolha_navegacao_descoberta:
+    label: escolha e navegação
+    preferred_mode: product_led_self_service
+    prefer_visual_hero: true
+    strict_visual: true
+  apresentacao_produto:
+    label: apresentação de produto
+    preferred_mode: product_led_self_service
+    prefer_visual_hero: true
+    strict_visual: true
+  montagem_orcamento_pedido:
+    label: orçamento e pedido
+    preferred_mode: product_led_self_service
+    prefer_visual_hero: true
+    strict_visual: false
+  agendamento:
+    label: agendamento
+    preferred_mode: service_led_self_service
+    prefer_visual_hero: false
+    strict_visual: false
+  acompanhamento_retomada:
+    label: retomada e reengajamento
+    preferred_mode: consultative_handoff
+    prefer_visual_hero: false
+    strict_visual: false
+  confirmacao_fechamento:
+    label: confirmação e fechamento
+    preferred_mode: product_led_self_service
+    prefer_visual_hero: true
+    strict_visual: false
+  priorizacao_fila:
+    label: priorização de fila
+    preferred_mode: consultative_handoff
+    prefer_visual_hero: false
+    strict_visual: false
+  visibilidade_gestao:
+    label: visibilidade e gestão
+    preferred_mode: consultative_handoff
+    prefer_visual_hero: false
+    strict_visual: false
+  simulacao_comercial:
+    label: simulação comercial
+    preferred_mode: product_led_self_service
+    prefer_visual_hero: true
+    strict_visual: false
+  repeticao_operacional:
+    label: repetição operacional
+    preferred_mode: service_led_self_service
+    prefer_visual_hero: false
+    strict_visual: false
+
+active_pain_types:
+  triagem_intencao:
+    category: entrada_triagem
+    label: triagem de intenção
+    preferred_mode: service_led_self_service
+  roteamento_canal_misto:
+    category: entrada_triagem
+    label: roteamento de canal misto
+    preferred_mode: service_led_self_service
+  descoberta_visual_produto:
+    category: apresentacao_produto
+    label: descoberta visual de produto
+    preferred_mode: product_led_self_service
+  comparacao_opcoes:
+    category: escolha_navegacao_descoberta
+    label: comparação de opções
+    preferred_mode: product_led_self_service
+  orcamento_complexo:
+    category: montagem_orcamento_pedido
+    label: orçamento complexo
+    preferred_mode: product_led_self_service
+  envio_lista_pedido:
+    category: montagem_orcamento_pedido
+    label: envio de lista ou pedido
+    preferred_mode: product_led_self_service
+  agendamento_horario:
+    category: agendamento
+    label: agendamento de horário
+    preferred_mode: service_led_self_service
+  confirmacao_presenca:
+    category: confirmacao_fechamento
+    label: confirmação de presença
+    preferred_mode: service_led_self_service
+  followup_abandono:
+    category: acompanhamento_retomada
+    label: follow-up de abandono
+    preferred_mode: consultative_handoff
+  priorizacao_leads:
+    category: priorizacao_fila
+    label: priorização de leads
+    preferred_mode: consultative_handoff
+  briefing_comercial:
+    category: entrada_triagem
+    label: briefing comercial
+    preferred_mode: consultative_handoff
+  qualificacao_comercial:
+    category: entrada_triagem
+    label: qualificação comercial
+    preferred_mode: consultative_handoff
+  visibilidade_pipeline:
+    category: visibilidade_gestao
+    label: visibilidade de pipeline
+    preferred_mode: consultative_handoff
+  simulacao_comercial:
+    category: simulacao_comercial
+    label: simulação comercial
+    preferred_mode: product_led_self_service
+
+functions:
+  Menu de Entrada (Botões Iniciais):
+    aliases: ["Menu de Opções"]
+    mode: service_led_self_service
+    visual: false
+    roles: [hero]
+    pain_categories: [entrada_triagem]
+  Botões Clicáveis:
+    aliases: []
+    mode: service_led_self_service
+    visual: false
+    roles: [hero]
+    pain_categories: [entrada_triagem, escolha_navegacao_descoberta]
+  Lista Interativa:
+    aliases: []
+    mode: product_led_self_service
+    visual: true
+    roles: [hero, support]
+    pain_categories: [entrada_triagem, escolha_navegacao_descoberta, apresentacao_produto, montagem_orcamento_pedido]
+  Carrossel de Produtos:
+    aliases: []
+    mode: product_led_self_service
+    visual: true
+    roles: [hero]
+    pain_categories: [escolha_navegacao_descoberta, apresentacao_produto, montagem_orcamento_pedido]
+  Detalhes do Produto:
+    aliases: []
+    mode: product_led_self_service
+    visual: true
+    roles: [support]
+    pain_categories: [apresentacao_produto, montagem_orcamento_pedido]
+  Cardápio Digital:
+    aliases: []
+    mode: product_led_self_service
+    visual: true
+    roles: [hero]
+    pain_categories: [apresentacao_produto]
+  Confirmação de Pedido:
+    aliases: []
+    mode: product_led_self_service
+    visual: true
+    roles: [support, hero]
+    pain_categories: [apresentacao_produto, montagem_orcamento_pedido, confirmacao_fechamento]
+  Pagamento Integrado:
+    aliases: []
+    mode: product_led_self_service
+    visual: false
+    roles: [support]
+    pain_categories: [apresentacao_produto, montagem_orcamento_pedido, confirmacao_fechamento]
+  Simulação de Financiamento:
+    aliases: []
+    mode: product_led_self_service
+    visual: true
+    roles: [hero]
+    pain_categories: [simulacao_comercial, escolha_navegacao_descoberta]
+  Agendamento de Visita:
+    aliases: []
+    mode: service_led_self_service
+    visual: false
+    roles: [hero]
+    pain_categories: [agendamento]
+  Formulários Interativos:
+    aliases: []
+    mode: consultative_handoff
+    visual: false
+    roles: [hero, support]
+    pain_categories: [entrada_triagem, priorizacao_fila]
+  Qualificação Inteligente:
+    aliases: ["Qualificação", "Triagem Inteligente"]
+    mode: consultative_handoff
+    visual: false
+    roles: [support, hero]
+    pain_categories: [entrada_triagem, apresentacao_produto, priorizacao_fila]
+  Timeline de Conversões:
+    aliases: []
+    mode: consultative_handoff
+    visual: false
+    roles: [support]
+    pain_categories: [acompanhamento_retomada, visibilidade_gestao]
+  Funil de Conversão e Abandonos:
+    aliases: []
+    mode: consultative_handoff
+    visual: false
+    roles: [support]
+    pain_categories: [acompanhamento_retomada, visibilidade_gestao]
+  Acompanhamento de Abandono:
+    aliases: []
+    mode: consultative_handoff
+    visual: false
+    roles: [hero, support]
+    pain_categories: [acompanhamento_retomada]
+  Falar com Atendente:
+    aliases: []
+    mode: consultative_handoff
+    visual: false
+    roles: [support]
+    pain_categories: [entrada_triagem, priorizacao_fila]

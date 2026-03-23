@@ -1,8 +1,4 @@
-"""PromptAssembler — monta o prompt final a partir de TurnIntent + ConversationState.
-
-Substitui o PromptBuilder monolítico. Cada seção é construída por um módulo
-independente em ``prompting.sections``.
-"""
+"""PromptAssembler — monta o prompt final a partir de TurnIntent + ConversationState."""
 from __future__ import annotations
 
 from typing import Any
@@ -10,20 +6,24 @@ from typing import Any
 from ana_saga_cli.domain.models import (
     ArsenalEntry,
     ConversationState,
-    ProductFact,
     StageDefinition,
     TurnIntent,
+)
+from ana_saga_cli.domain.turn_context import (
+    find_active_pain,
+    is_simple_context_turn,
+    mapped_pains_from_hypotheses,
 )
 from ana_saga_cli.prompting.text_utils import clean_text, compact_text, first_nonempty, list_values
 from ana_saga_cli.prompting.sections.guardrails import build_guardrails_section
 from ana_saga_cli.prompting.sections.stage import build_stage_section
 from ana_saga_cli.prompting.sections.turn_plan import build_turn_plan_section
 from ana_saga_cli.prompting.sections.context import build_context_section
-from ana_saga_cli.prompting.sections.neural import build_neural_section, get_neural_context_lines
+from ana_saga_cli.prompting.sections.neural import get_neural_context_lines
 
 
 class PromptAssembler:
-    """Constrói o prompt final — recebe um TurnIntent já decidido."""
+    """Constrói o prompt final a partir de um TurnIntent já decidido."""
 
     # -------------------------------------------------------------- helpers
     @staticmethod
@@ -81,47 +81,6 @@ class PromptAssembler:
             return fallback
         return []
 
-    def _is_simple_context_turn(
-        self,
-        state: ConversationState,
-        lead_summary: dict[str, Any],
-        active_pain: dict[str, Any],
-    ) -> bool:
-        response_policy = state.response_policy or {}
-        if bool(response_policy.get("social_opening_only", False)):
-            return True
-        known_context = int(lead_summary.get("known_context_count", 0) or 0)
-        if state.stage_id in {"etapa_01_abertura", "etapa_02_conexao_inicial"}:
-            return True
-        if (
-            state.stage_id == "etapa_03_contextualizacao_permissao"
-            and known_context <= 2
-            and not bool(lead_summary.get("pain_known", False))
-        ):
-            return True
-        return not bool(active_pain)
-
-    @staticmethod
-    def _find_active_pain(
-        mapped_pains: list[dict[str, Any]],
-        surface_guidance: dict[str, Any],
-    ) -> dict[str, Any]:
-        active_name = clean_text(surface_guidance.get("active_cluster_name", "")).lower()
-        active_pain_type = clean_text(surface_guidance.get("active_pain_type", "")).lower()
-        for pain in mapped_pains:
-            if not isinstance(pain, dict):
-                continue
-            pain_name = clean_text(pain.get("nome", pain.get("cluster_name", ""))).lower()
-            pain_type = clean_text(pain.get("active_pain_type", pain.get("tipo_dor_ativa", ""))).lower()
-            if active_name and pain_name == active_name:
-                return pain
-            if active_pain_type and pain_type == active_pain_type:
-                return pain
-        for pain in mapped_pains:
-            if isinstance(pain, dict):
-                return pain
-        return {}
-
     # -------------------------------------------------------------- build
     def build(
         self,
@@ -133,15 +92,15 @@ class PromptAssembler:
     ) -> tuple[str, str]:
         lead_summary = state.lead_summary or {}
         diagnostic_hypotheses = state.diagnostic_hypotheses or {}
-        mapped_pains = [
-            pain
-            for pain in diagnostic_hypotheses.get("dores_reais", diagnostic_hypotheses.get("diagnostic_clusters", []))
-            if isinstance(pain, dict)
-        ]
+        mapped_pains = mapped_pains_from_hypotheses(diagnostic_hypotheses)
 
         surface_guidance = state.surface_guidance or {}
-        active_pain = self._find_active_pain(mapped_pains, surface_guidance)
-        simple_context = self._is_simple_context_turn(state, lead_summary, active_pain)
+        active_pain = find_active_pain(mapped_pains, surface_guidance)
+        simple_context = is_simple_context_turn(
+            state,
+            lead_summary=lead_summary,
+            active_pain=active_pain,
+        )
         useful_hits = self._build_useful_hits(
             lead_summary,
             diagnostic_hypotheses,

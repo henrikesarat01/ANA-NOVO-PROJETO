@@ -82,11 +82,11 @@ Regras:
 - Respostas amplas podem fechar lacunas se deixarem o quadro geral claro.
 - Não exija detalhe fino quando o contexto base já estiver suficiente para avançar.
 - niche_specificity deve ser um de: unknown, generic, specific.
-- Use generic quando o lead só disser algo amplo como loja, empresa, negócio, comércio, serviço, operação, clínica, escritório ou equivalente, sem deixar claro o segmento real.
-- Use specific apenas quando o nicho/segmento estiver identificável de forma útil para raciocínio operacional, como imobiliária, construtora, loja de sofás, clínica odontológica, agência de marketing, ótica, etc.
+- Use generic quando o lead só trouxer um enquadramento amplo demais para raciocínio operacional.
+- Use specific apenas quando o nicho/segmento já estiver identificável de forma útil para a conversa.
 - pain_known=true apenas quando o lead já trouxe gargalo, dor, fricção, peso operacional/comercial ou problema relevante.
-- impact_known=true quando já ficar claro qual é o peso principal dessa dor no dia a dia comercial/operacional.
-- Marque impact_known=true mesmo quando o lead responder de forma ampla, como "os dois", "sim", "tudo isso", desde que a conversa já deixe claro que o impacto envolve tempo, oportunidade, atraso, perda, esforço ou consequência equivalente.
+- impact_known=true quando já ficar claro qual é o peso principal dessa dor no dia a dia.
+- Marque impact_known=true mesmo quando a resposta for curta, desde que a conversa já deixe clara a consequência prática.
 - Responda apenas em JSON válido.
 
 Formato:
@@ -202,8 +202,8 @@ MENSAGEM NOVA DO CLIENTE
             state.stage_id == _DIAGNOSTIC_STAGE_ID and known_count >= 3 and (stage4_turns >= 3 or stage4_stalled_turns >= 1)
         )
         impact_context_ready = minimum_context_ready and merged_flags["pain_known"] and merged_flags["impact_known"]
-        commercial_scope_ready = niche_specificity == "specific" or (minimum_context_ready and business_context_ready_for_sizing)
         business_context_ready_for_sizing = self._business_context_ready_for_sizing(merged_flags, niche_specificity)
+        commercial_scope_ready = niche_specificity == "specific" or (minimum_context_ready and business_context_ready_for_sizing)
         force_stop_impact = impact_context_ready or (
             state.stage_id == _IMPACT_STAGE_ID and merged_flags["pain_known"] and stage5_turns >= 2
         )

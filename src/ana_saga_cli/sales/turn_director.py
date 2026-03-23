@@ -13,6 +13,12 @@ from ana_saga_cli.domain.models import (
     ConversationState,
     TurnIntent,
 )
+from ana_saga_cli.domain.turn_context import (
+    find_active_pain,
+    is_simple_context_turn,
+    mapped_pains_from_hypotheses,
+    resolve_question_label,
+)
 from ana_saga_cli.prompting.text_utils import (
     clean_text,
     compact_text,
@@ -80,6 +86,8 @@ class TurnDirector:
             return "answer_first"
         if mode == "pricing_answer":
             return "contrast_simple_vs_complete"
+        if mode == "explain" and bool(response_policy.get("answer_now_instead_of_asking", False)):
+            return "answer_first"
         if (
             bool(response_policy.get("commercial_direct_question_detected", False))
             and mode == "ask"
@@ -133,27 +141,24 @@ class TurnDirector:
             return {
                 "question_intent": "",
                 "question_variable": "",
+                "question_shape": "",
+                "question_constraints": (),
                 "question_reason": "",
                 "question_budget": 0,
                 "must_ask": False,
             }
 
-        question_focus = first_nonempty(
+        question_variable = first_nonempty(
+            response_policy.get("question_variable"),
             response_policy.get("question_focus"),
-            response_policy.get("question_anchor"),
-            response_policy.get("minimum_pricing_question"),
-            response_policy.get("ask_reason"),
+            response_policy.get("minimum_pricing_question_variable"),
+            response_policy.get("minimum_pricing_question_focus"),
         )
-        question_context = clean_text(response_policy.get("question_context_hint", ""))
-        if question_context and question_context.lower() not in question_focus.lower():
-            question_focus = (
-                f"{question_focus} | ancorar em: {question_context}"
-                if question_focus
-                else question_context
-            )
         return {
             "question_intent": clean_text(response_policy.get("question_goal", "")),
-            "question_variable": compact_text(question_focus, 180),
+            "question_variable": compact_text(question_variable, 120),
+            "question_shape": clean_text(response_policy.get("question_shape", "")),
+            "question_constraints": tuple(response_policy.get("question_constraints", ()) or ()),
             "question_reason": clean_text(response_policy.get("ask_reason", "")),
             "question_budget": budget,
             "must_ask": must_ask,
@@ -250,47 +255,6 @@ class TurnDirector:
             support = ""
         return hero, support
 
-    @staticmethod
-    def _is_simple_context(
-        state: ConversationState,
-        lead_summary: dict[str, Any],
-        active_pain: dict[str, Any],
-    ) -> bool:
-        response_policy = state.response_policy or {}
-        if bool(response_policy.get("social_opening_only", False)):
-            return True
-        known_context = int(lead_summary.get("known_context_count", 0) or 0)
-        if state.stage_id in {"etapa_01_abertura", "etapa_02_conexao_inicial"}:
-            return True
-        if (
-            state.stage_id == "etapa_03_contextualizacao_permissao"
-            and known_context <= 2
-            and not bool(lead_summary.get("pain_known", False))
-        ):
-            return True
-        return not bool(active_pain)
-
-    @staticmethod
-    def _find_active_pain(
-        mapped_pains: list[dict[str, Any]],
-        surface_guidance: dict[str, Any],
-    ) -> dict[str, Any]:
-        active_name = clean_text(surface_guidance.get("active_cluster_name", "")).lower()
-        active_pain_type = clean_text(surface_guidance.get("active_pain_type", "")).lower()
-        for pain in mapped_pains:
-            if not isinstance(pain, dict):
-                continue
-            pain_name = clean_text(pain.get("nome", pain.get("cluster_name", ""))).lower()
-            pain_type = clean_text(pain.get("active_pain_type", pain.get("tipo_dor_ativa", ""))).lower()
-            if active_name and pain_name == active_name:
-                return pain
-            if active_pain_type and pain_type == active_pain_type:
-                return pain
-        for pain in mapped_pains:
-            if isinstance(pain, dict):
-                return pain
-        return {}
-
     # ----------------------------------------------------------- main entry
     def build_intent(
         self,
@@ -303,22 +267,24 @@ class TurnDirector:
         pricing_policy = state.pricing_policy or {}
         lead_summary = state.lead_summary or {}
         diagnostic_hypotheses = state.diagnostic_hypotheses or {}
-
-        mapped_pains = [
-            p
-            for p in diagnostic_hypotheses.get(
-                "dores_reais", diagnostic_hypotheses.get("diagnostic_clusters", [])
-            )
-            if isinstance(p, dict)
-        ]
-        active_pain = self._find_active_pain(mapped_pains, surface_guidance)
-        simple_context = self._is_simple_context(state, lead_summary, active_pain)
+        mapped_pains = mapped_pains_from_hypotheses(diagnostic_hypotheses)
+        active_pain = find_active_pain(mapped_pains, surface_guidance)
+        simple_context = is_simple_context_turn(
+            state,
+            lead_summary=lead_summary,
+            active_pain=active_pain,
+        )
 
         response_mode = self._resolve_response_mode(response_policy)
         style_posture = self._resolve_style_posture(response_policy, surface_guidance, pricing_policy)
         opening_shape = self._resolve_opening_shape(response_policy, surface_guidance, pricing_policy)
         pricing_posture = self._resolve_pricing_posture(pricing_policy, response_policy)
         q_fields = self._resolve_question_fields(response_policy)
+        question_label = resolve_question_label(
+            state,
+            q_fields["question_variable"],
+            policy_label=clean_text(response_policy.get("question_label", "")),
+        )
         client_context = self._resolve_client_context(lead_summary, diagnostic_hypotheses)
         main_pain = self._resolve_main_pain(active_pain, surface_guidance)
         operational_scene = self._resolve_operational_scene(active_pain, surface_guidance)
@@ -335,7 +301,10 @@ class TurnDirector:
             response_mode=response_mode,
             question_intent=q_fields["question_intent"],
             question_variable=q_fields["question_variable"],
+            question_shape=q_fields["question_shape"],
+            question_constraints=q_fields["question_constraints"],
             question_reason=q_fields["question_reason"],
+            question_label=question_label,
             question_budget=q_fields["question_budget"],
             must_ask=q_fields["must_ask"],
             pricing_posture=pricing_posture,

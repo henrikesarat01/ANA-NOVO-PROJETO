@@ -65,14 +65,88 @@ pricing_validation:
     nicho_ou_segmento:
       known_fields:
         - niche_known
-      label: "qual é o segmento ou tipo de negócio do cliente"
-      question: "entender qual é o tipo de negócio ou o que a empresa vende"
-      reason: "sem saber o segmento, qualquer valor vai parecer genérico demais"
-      changes: "segmento do cliente, porte e tipo de solução que faz sentido"
+      focus: nicho_ou_segmento
+      label: segmento e tipo de negócio
+      shape: open_context
+      constraints:
+        - single_question
+        - avoid_menu
+        - avoid_taxonomy
+      reason: enquadrar o caso real antes de situar valor
+      changes: segmento do cliente, porte e trilho inicial de escopo
+    tipo_de_operacao:
+      known_fields:
+        - operation_model_known
+      focus: tipo_de_operacao
+      label: tipo de operação
+      shape: open_context
+      constraints:
+        - single_question
+        - avoid_menu
+        - avoid_taxonomy
+      reason: identificar como a operação acontece no dia a dia
+      changes: desenho de rotina, tamanho do caso e esforço inicial
+    uso_atual_do_whatsapp:
+      known_fields:
+        - channel_usage_known
+      focus: uso_atual_do_whatsapp
+      label: uso atual do WhatsApp
+      shape: open_context
+      constraints:
+        - single_question
+        - avoid_menu
+        - avoid_taxonomy
+      reason: entender o papel atual do canal
+      changes: profundidade do fluxo e nível de automação
+    principal_trava_operacional:
+      known_fields:
+        - pain_known
+      focus: principal_trava_operacional
+      label: principal trava operacional
+      shape: open_pain
+      constraints:
+        - single_question
+        - avoid_menu
+        - avoid_taxonomy
+      reason: identificar o gargalo dominante
+      changes: prioridade da solução e complexidade percebida
+    exemplo_minimo_de_fluxo_aprovado:
+      known_fields:
+        - operation_model_known
+        - channel_usage_known
+      focus: exemplo_minimo_de_fluxo_aprovado
+      label: exemplo mínimo de fluxo validado
+      shape: approval_check
+      constraints:
+        - single_question
+        - avoid_menu
+        - avoid_taxonomy
+      reason: validar uma cena mínima antes de abrir valor
+      changes: confiança para sair do piso e abrir faixa
   price_release_modes:
     floor_only_after_minimum_validation: true
     range_only_after_context: true
     precise_only_after_scope: true
+pricing_contract:
+  floor_implantation: 1500
+  floor_monthly: 500
+  timeline_weeks: "3-4"
+  monthly_billing_starts: após entrada em operação
+  implementation_phases:
+    - descoberta operacional
+    - desenho do fluxo
+    - implantação inicial
+  payment_terms:
+    upfront_percent: 50
+    delivery_percent: 50
+  complexity_multipliers:
+    simples: 1.0
+    media: 1.35
+    alta: 1.8
+  readiness_stage_multipliers:
+    A: 1.0
+    B: 1.2
+    C: 1.5
 questioning_strategy:
   every_question_must_have_visible_reason: true
   reason_must_be_customer_facing: true
@@ -139,49 +213,197 @@ moment_guidance:
     avoid:
       - detalhe_de_implantacao_cedo
       - pitch_tecnico_longo
-discovery_goals:
-  # Descoberta inicial
-  niche_and_channel: "identificar segmento e como o canal digital entra na operação"
-  niche_only: "identificar segmento e atividade principal"
-  offer_type: "entender se vendem produto, serviço ou mix"
-  channel_usage: "descobrir se o contato chega mais como pedido ou atendimento"
-  operation_fit: "entender onde na rotina do cliente a solução se encaixa"
-  customer_type: "identificar o perfil de quem mais procura"
-  general_fit: "entender onde a solução ajudaria mais na operação"
-  capability_bridge: "descobrir qual capacidade real da solução teria mais aderência ao caso antes de explicar produto"
-  # Escopo e dimensionamento
-  closing_process: "esclarecer se o fechamento acontece no canal digital ou é só triagem"
-  catalog_existence: "saber se existe catálogo de produtos ou se é montado manualmente"
-  payment_in_channel: "entender se o pagamento acontece no canal digital ou para antes"
-  order_confirmation: "verificar se o pedido precisa de confirmação antes de concluir"
-  scheduling_automation: "descobrir se o agendamento pode ser automatizado ou depende de retorno manual"
-  handoff_point: "identificar onde o caso precisa de um humano e o que pode seguir automatizado"
-  integration_need: "saber se existe necessidade real de integração ou a primeira versão roda sem"
-  team_size: "quantas pessoas atendem hoje e se todas entram no mesmo fluxo"
-  flow_count: "quantos fluxos principais existem hoje"
-  service_next_step: "qual próximo passo precisa acontecer depois da triagem"
-  customer_help_point: "em que ponto o cliente ainda precisa de ajuda humana"
-  customer_autonomy: "se o cliente já consegue avançar sozinho ou ainda depende de atendimento"
-  handoff_readiness: "o que precisa ficar pronto antes de passar o caso para o time"
-  # Dor e impacto
-  pain_general: "onde a operação mais trava hoje"
-  pain_service: "onde o tempo mais escapa: triagem ou agendamento"
-  pain_catalog: "onde o cliente mais trava: na escolha ou no pedido"
-  pain_handoff: "onde o caso mais trava: briefing ou proposta"
-  impact_weight: "se o impacto pesa mais em tempo perdido ou em receita perdida"
-  tension_source: "onde a operação mais embola hoje"
-  # Fit e contexto
-  daily_routine_fit: "onde a solução entraria no dia a dia do cliente"
-  service_fit: "entender onde a solução ajuda mais: triagem ou agenda"
-  compatibility_check: "o que precisa bater para a solução fazer sentido no caso"
-  capability_priority: "qual tipo de capacidade precisa resolver o gargalo principal para a solução fazer sentido"
-  trust_need: "o que daria mais segurança ao cliente para avaliar"
-  comparison_axis: "se está comparando mais preço ou modo de usar"
-  clarity_priority: "o que o cliente quer entender primeiro"
-  proof_preference: "se prefere um exemplo rápido ou demonstração"
-  proof_validation: "validar um exemplo minimo do fluxo antes de falar valor"
-  value_priority: "o que pesa mais para valer a pena"
-  pricing_context: "se quer uma base agora ou prefere entender o contexto antes"
+question_contracts:
+  niche_and_channel:
+    focus: niche_and_channel
+    label: segmento e entrada do canal
+    shape: open_context
+    constraints: [single_question, avoid_menu, avoid_taxonomy]
+  niche_only:
+    focus: nicho_ou_segmento
+    label: segmento e atividade principal
+    shape: open_context
+    constraints: [single_question, avoid_menu, avoid_taxonomy]
+  offer_type:
+    focus: tipo_de_operacao
+    label: tipo de oferta
+    shape: open_context
+    constraints: [single_question, avoid_menu, avoid_taxonomy]
+  channel_usage:
+    focus: uso_atual_do_whatsapp
+    label: uso atual do canal
+    shape: open_context
+    constraints: [single_question, avoid_menu, avoid_taxonomy]
+  operation_fit:
+    focus: operation_fit
+    label: encaixe da solução na rotina
+    shape: fit_check
+    constraints: [single_question, avoid_menu, avoid_taxonomy]
+  customer_type:
+    focus: customer_type
+    label: perfil de quem procura
+    shape: open_context
+    constraints: [single_question, avoid_menu, avoid_taxonomy]
+  general_fit:
+    focus: general_fit
+    label: ponto de maior encaixe da solução
+    shape: fit_check
+    constraints: [single_question, avoid_menu, avoid_taxonomy]
+  capability_bridge:
+    focus: capability_bridge
+    label: capacidade real que conversa com o caso
+    shape: fit_check
+    constraints: [single_question, avoid_menu, avoid_taxonomy]
+  closing_process:
+    focus: closing_process
+    label: ponto em que o fechamento acontece
+    shape: open_context
+    constraints: [single_question, avoid_menu, avoid_taxonomy]
+  catalog_existence:
+    focus: catalog_existence
+    label: existência de catálogo estruturado
+    shape: open_context
+    constraints: [single_question, avoid_menu, avoid_taxonomy]
+  payment_in_channel:
+    focus: payment_in_channel
+    label: pagamento dentro do canal
+    shape: open_context
+    constraints: [single_question, avoid_menu, avoid_taxonomy]
+  order_confirmation:
+    focus: order_confirmation
+    label: confirmação antes de concluir
+    shape: open_context
+    constraints: [single_question, avoid_menu, avoid_taxonomy]
+  scheduling_automation:
+    focus: scheduling_automation
+    label: nível de automação do agendamento
+    shape: open_context
+    constraints: [single_question, avoid_menu, avoid_taxonomy]
+  handoff_point:
+    focus: handoff_point
+    label: ponto de handoff humano
+    shape: fit_check
+    constraints: [single_question, avoid_menu, avoid_taxonomy]
+  integration_need:
+    focus: integration_need
+    label: necessidade real de integração
+    shape: open_context
+    constraints: [single_question, avoid_menu, avoid_taxonomy]
+  team_size:
+    focus: team_size
+    label: pessoas e fluxo atual de atendimento
+    shape: open_context
+    constraints: [single_question, avoid_menu, avoid_taxonomy]
+  flow_count:
+    focus: quantidade_de_fluxos
+    label: quantidade de fluxos principais
+    shape: open_context
+    constraints: [single_question, avoid_menu, avoid_taxonomy]
+  service_next_step:
+    focus: service_next_step
+    label: próximo passo após a triagem
+    shape: open_context
+    constraints: [single_question, avoid_menu, avoid_taxonomy]
+  customer_help_point:
+    focus: customer_help_point
+    label: ponto em que ainda precisa de ajuda humana
+    shape: fit_check
+    constraints: [single_question, avoid_menu, avoid_taxonomy]
+  customer_autonomy:
+    focus: customer_autonomy
+    label: autonomia do cliente na jornada
+    shape: fit_check
+    constraints: [single_question, avoid_menu, avoid_taxonomy]
+  handoff_readiness:
+    focus: handoff_readiness
+    label: o que precisa estar pronto antes do handoff
+    shape: fit_check
+    constraints: [single_question, avoid_menu, avoid_taxonomy]
+  pain_general:
+    focus: principal_trava_operacional
+    label: principal trava da operação
+    shape: open_pain
+    constraints: [single_question, avoid_menu, avoid_taxonomy]
+  pain_service:
+    focus: principal_trava_operacional
+    label: principal atrito do serviço
+    shape: open_pain
+    constraints: [single_question, avoid_menu, avoid_taxonomy]
+  pain_catalog:
+    focus: principal_trava_operacional
+    label: principal atrito da jornada de escolha
+    shape: open_pain
+    constraints: [single_question, avoid_menu, avoid_taxonomy]
+  pain_handoff:
+    focus: principal_trava_operacional
+    label: principal atrito antes do handoff
+    shape: open_pain
+    constraints: [single_question, avoid_menu, avoid_taxonomy]
+  impact_weight:
+    focus: impact_weight
+    label: peso do impacto
+    shape: open_pain
+    constraints: [single_question, avoid_menu, avoid_taxonomy]
+  tension_source:
+    focus: tension_source
+    label: origem do embolo operacional
+    shape: open_pain
+    constraints: [single_question, avoid_menu, avoid_taxonomy]
+  daily_routine_fit:
+    focus: operation_fit
+    label: entrada da solução no dia a dia
+    shape: fit_check
+    constraints: [single_question, avoid_menu, avoid_taxonomy]
+  service_fit:
+    focus: operation_fit
+    label: encaixe da solução no serviço
+    shape: fit_check
+    constraints: [single_question, avoid_menu, avoid_taxonomy]
+  compatibility_check:
+    focus: compatibility_check
+    label: o que precisa bater para fazer sentido
+    shape: fit_check
+    constraints: [single_question, avoid_menu, avoid_taxonomy]
+  capability_priority:
+    focus: capability_priority
+    label: tipo de capacidade que resolve o gargalo
+    shape: fit_check
+    constraints: [single_question, avoid_menu, avoid_taxonomy]
+  trust_need:
+    focus: trust_need
+    label: segurança necessária para avaliar
+    shape: fit_check
+    constraints: [single_question, avoid_menu, avoid_taxonomy]
+  comparison_axis:
+    focus: comparison_axis
+    label: eixo principal de comparação
+    shape: fit_check
+    constraints: [single_question, avoid_menu, avoid_taxonomy]
+  clarity_priority:
+    focus: clarity_priority
+    label: prioridade de clareza
+    shape: fit_check
+    constraints: [single_question, avoid_menu, avoid_taxonomy]
+  proof_preference:
+    focus: proof_preference
+    label: preferência de prova prática
+    shape: fit_check
+    constraints: [single_question, avoid_menu, avoid_taxonomy]
+  proof_validation:
+    focus: exemplo_minimo_de_fluxo_aprovado
+    label: validação de exemplo mínimo de fluxo
+    shape: approval_check
+    constraints: [single_question, avoid_menu, avoid_taxonomy]
+  value_priority:
+    focus: value_priority
+    label: prioridade de valor
+    shape: fit_check
+    constraints: [single_question, avoid_menu, avoid_taxonomy]
+  pricing_context:
+    focus: pricing_context
+    label: contexto mínimo para situar preço
+    shape: fit_check
+    constraints: [single_question, avoid_menu, avoid_taxonomy]
 runtime_hints:
   planner_style_bias: consultivo_objetivo
   mapper_activation_mode: hold_until_pain_or_impact

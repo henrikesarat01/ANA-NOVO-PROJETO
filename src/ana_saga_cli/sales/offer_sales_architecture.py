@@ -12,150 +12,30 @@ _BLUEPRINT_ROOT = DATA_DIR / "offer_sales_architecture"
 _BLUEPRINT_PATH = _BLUEPRINT_ROOT / "current_offer_sales_blueprint.yaml"
 
 _DEFAULT_BLUEPRINT = {
-    "offer_name": "Oferta Atual",
-    "offer_type": "oferta_atual",
-    "offer_summary": "oferta atual ainda sem resumo comercial definido",
+    "offer_name": "",
+    "offer_type": "",
+    "offer_summary": "",
     "primary_sale_motion": "consultiva",
     "conversation_entry_strategy": "contextual_then_dor",
-    "first_question_goal": "entender_tipo_de_operacao_e_uso_atual",
-    "early_allowed_moves": [
-        "explicacao_curta_do_que_e",
-        "pergunta_de_contexto_do_negocio",
-        "pergunta_de_uso_atual",
-    ],
-    "early_forbidden_moves": [
-        "pitch_tecnico_longo",
-        "detalhe_de_implantacao_cedo",
-        "preco_completo_cedo",
-    ],
-    "explanation_strategy": {
-        "explain_what_it_is_early": True,
-        "technical_pitch_early": "curto",
-        "implementation_details_only_after_fit": True,
-        "prefer_practical_examples": True,
-    },
-    "trust_strategy": "mostrar aplicacao no caso real antes de aprofundar detalhes",
-    "proof_strategy": "exemplo_pratico_curto",
-    "price_strategy": {
-        "floor_allowed_early": True,
-        "full_range_allowed_only_after_context": True,
-        "implantation_details_only_after_fit": True,
-        "precise_quote_only_after_scope": True,
-        "proof_before_price": True,
-    },
-    "pricing_validation": {
-        "require_minimum_validation_before_price": True,
-        "allow_price_before_minimum_validation": False,
-        "prefer_smallest_missing_variable": True,
-        "max_questions_before_price_per_turn": 1,
-        "explain_why_question_matters": True,
-        "explanation_style_before_question": "breve_contextual",
-        "avoid_dry_questioning": True,
-        "avoid_question_stack": True,
-        "minimum_required_variables": [
-            "tipo_de_operacao",
-            "uso_atual_do_whatsapp",
-            "exemplo_minimo_de_fluxo_aprovado",
-        ],
-        "optional_but_relevant_variables": [
-            "principal_trava_operacional",
-            "quantidade_de_fluxos",
-            "necessidade_de_integracao",
-            "fechamento_no_whatsapp_ou_triagem",
-        ],
-        "variables_that_change_price": [
-            "tipo_de_operacao",
-            "uso_atual_do_whatsapp",
-            "exemplo_minimo_de_fluxo_aprovado",
-            "complexidade_do_fluxo",
-            "integracao",
-            "quantidade_de_jornadas",
-        ],
-        "preferred_question_sequence": [
-            "tipo_de_operacao",
-            "uso_atual_do_whatsapp",
-            "exemplo_minimo_de_fluxo_aprovado",
-            "principal_trava_operacional",
-            "fator_estrutural_de_complexidade",
-        ],
-        "price_release_modes": {
-            "floor_only_after_minimum_validation": True,
-            "range_only_after_context": True,
-            "precise_only_after_scope": True,
-        },
-    },
-    "questioning_strategy": {
-        "every_question_must_have_visible_reason": True,
-        "reason_must_be_customer_facing": True,
-        "prefer_context_then_question": True,
-        "prefer_single_question": True,
-        "avoid_interrogatory_flow": True,
-        "avoid_generic_qualification": True,
-        "prefer_smallest_useful_question": True,
-    },
-    "conversation_progression": [
-        "situar rapidamente o que e",
-        "entender o negocio",
-        "entender como o contato entra hoje",
-        "abrir dor operacional",
-        "conectar valor",
-        "aprofundar escopo",
-    ],
-    "success_signals": [
-        "cliente entende aplicacao no proprio caso",
-        "cliente aceita aprofundar contexto",
-    ],
-    "objection_signals": [
-        "pedido de preco completo cedo demais",
-        "falta de clareza sobre aplicacao",
-    ],
+    "first_question_goal": "",
+    "early_allowed_moves": [],
+    "early_forbidden_moves": [],
+    "explanation_strategy": {},
+    "trust_strategy": "",
+    "proof_strategy": "",
+    "price_strategy": {},
+    "pricing_validation": {},
+    "pricing_contract": {},
+    "questioning_strategy": {},
+    "conversation_progression": [],
+    "success_signals": [],
+    "objection_signals": [],
     "moment_guidance": {},
-    "discovery_goals": {
-        "niche_and_channel": "identificar segmento e como o canal digital entra na operação",
-        "niche_only": "identificar segmento e atividade principal",
-        "offer_type": "entender se vendem produto, serviço ou mix",
-        "channel_usage": "descobrir se o contato chega mais como pedido ou atendimento",
-        "operation_fit": "entender onde na rotina do cliente a solução se encaixa",
-        "customer_type": "identificar o perfil de quem mais procura",
-        "general_fit": "entender onde a solução ajudaria mais na operação",
-        "closing_process": "esclarecer se o fechamento acontece no canal digital ou é só triagem",
-        "catalog_existence": "saber se existe catálogo de produtos ou se é montado manualmente",
-        "payment_in_channel": "entender se o pagamento acontece no canal digital ou para antes",
-        "order_confirmation": "verificar se o pedido precisa de confirmação antes de concluir",
-        "scheduling_automation": "descobrir se o agendamento pode ser automatizado ou depende de retorno manual",
-        "handoff_point": "identificar onde o caso precisa de um humano e o que pode seguir automatizado",
-        "integration_need": "saber se existe necessidade real de integração ou a primeira versão roda sem",
-        "team_size": "quantas pessoas atendem hoje e se todas entram no mesmo fluxo",
-        "flow_count": "quantos fluxos principais existem hoje",
-        "service_next_step": "qual próximo passo precisa acontecer depois da triagem",
-        "customer_help_point": "em que ponto o cliente ainda precisa de ajuda humana",
-        "customer_autonomy": "se o cliente já consegue avançar sozinho ou ainda depende de atendimento",
-        "handoff_readiness": "o que precisa ficar pronto antes de passar o caso para o time",
-        "pain_general": "onde a operação mais trava hoje",
-        "pain_service": "onde o tempo mais escapa: triagem ou agendamento",
-        "pain_catalog": "onde o cliente mais trava: na escolha ou no pedido",
-        "pain_handoff": "onde o caso mais trava: briefing ou proposta",
-        "impact_weight": "se o impacto pesa mais em tempo perdido ou em receita perdida",
-        "tension_source": "onde a operação mais embola hoje",
-        "daily_routine_fit": "onde a solução entraria no dia a dia do cliente",
-        "service_fit": "entender onde a solução ajuda mais: triagem ou agenda",
-        "compatibility_check": "o que precisa bater para a solução fazer sentido no caso",
-        "trust_need": "o que daria mais segurança ao cliente para avaliar",
-        "comparison_axis": "se está comparando mais preço ou modo de usar",
-        "clarity_priority": "o que o cliente quer entender primeiro",
-        "proof_preference": "se prefere um exemplo rápido ou demonstração",
-        "proof_validation": "validar um exemplo minimo do fluxo antes de falar valor",
-        "value_priority": "o que pesa mais para valer a pena",
-        "pricing_context": "se quer uma base agora ou prefere entender o contexto antes",
-    },
-    "runtime_hints": {
-        "planner_style_bias": "consultivo_objetivo",
-        "mapper_activation_mode": "hold_until_pain_or_impact",
-        "preferred_question_style": "usage_question",
-        "response_opening_bias": "anchor_then_invite",
-        "confidence": 0.75,
-    },
+    "question_contracts": {},
+    "runtime_hints": {},
 }
+
+_QUESTION_SHAPES = {"open_context", "open_pain", "fit_check", "approval_check"}
 
 
 def _clean_text(value: Any) -> str:
@@ -184,6 +64,66 @@ def _normalize_bool(value: Any, default: bool = False) -> bool:
     return bool(value)
 
 
+def _default_question_shape(goal: str) -> str:
+    text = _clean_text(goal)
+    if text.endswith("_approved") or text.endswith("_aprovado"):
+        return "approval_check"
+    if text.startswith("pain_") or text.startswith("impact_") or "trava" in text:
+        return "open_pain"
+    if text.startswith("compatibility") or text.startswith("operation_fit") or text.endswith("_fit") or text.startswith("proof_"):
+        return "fit_check"
+    return "open_context"
+
+
+def _normalize_question_contract(key: str, payload: Any) -> dict[str, Any]:
+    if isinstance(payload, str):
+        payload = {"focus": key, "label": payload}
+    elif not isinstance(payload, dict):
+        payload = {}
+
+    focus = _clean_text(payload.get("focus", key)) or key
+    label = _clean_text(payload.get("label", "")) or focus.replace("_", " ")
+    shape = _clean_text(payload.get("shape", "")) or _default_question_shape(focus)
+    if shape not in _QUESTION_SHAPES:
+        shape = _default_question_shape(focus)
+    constraints = _normalize_text_list(payload.get("constraints", [])) or [
+        "single_question",
+        "avoid_menu",
+        "avoid_taxonomy",
+    ]
+    return {
+        "focus": focus,
+        "label": label,
+        "shape": shape,
+        "constraints": constraints,
+        "reason": _clean_text(payload.get("reason", "")),
+    }
+
+
+def _normalize_variable_definition(key: str, payload: Any) -> dict[str, Any]:
+    if not isinstance(payload, dict):
+        payload = {}
+    focus = _clean_text(payload.get("focus", "")) or _clean_text(payload.get("question", "")) or key
+    label = _clean_text(payload.get("label", "")) or focus.replace("_", " ")
+    shape = _clean_text(payload.get("shape", "")) or _default_question_shape(focus)
+    if shape not in _QUESTION_SHAPES:
+        shape = _default_question_shape(focus)
+    constraints = _normalize_text_list(payload.get("constraints", [])) or [
+        "single_question",
+        "avoid_menu",
+        "avoid_taxonomy",
+    ]
+    return {
+        "known_fields": _normalize_text_list(payload.get("known_fields", [])),
+        "focus": focus,
+        "label": label,
+        "shape": shape,
+        "constraints": constraints,
+        "reason": _clean_text(payload.get("reason", "")),
+        "changes": _clean_text(payload.get("changes", "")),
+    }
+
+
 @dataclass(slots=True)
 class OfferSalesArchitectureDecision:
     blueprint_path: str
@@ -201,20 +141,21 @@ class OfferSalesArchitectureResolver:
         explicit = _clean_text(payload.get("runtime_hints", {}).get("preferred_question_style", ""))
         if explicit:
             return explicit
-        goal = _clean_text(payload.get("first_question_goal", ""))
-        if "dor" in goal or "trava" in goal:
-            return "tension_question"
-        if "preco" in goal:
-            return "pricing_question"
-        return "usage_question"
+        contract = payload.get("question_contracts", {}).get(payload.get("first_question_goal", ""), {})
+        shape = _clean_text(contract.get("shape", ""))
+        mapping = {
+            "open_context": "usage_question",
+            "open_pain": "tension_question",
+            "fit_check": "compatibility_question",
+            "approval_check": "approval_question",
+        }
+        return mapping.get(shape, "usage_question")
 
     def _derive_sales_motion(self, payload: dict[str, Any]) -> str:
         primary_sale_motion = _clean_text(payload.get("primary_sale_motion", "")).lower()
         entry_strategy = _clean_text(payload.get("conversation_entry_strategy", "")).lower()
         if primary_sale_motion in {"consultiva", "consultivo"}:
-            if entry_strategy == "contextual_then_dor":
-                return "diagnostic_consultative"
-            return "consultative"
+            return "diagnostic_consultative" if entry_strategy == "contextual_then_dor" else "consultative"
         if primary_sale_motion in {"autoguiada", "guiada", "direta"}:
             return "guided_self_serve"
         if primary_sale_motion in {"assistida", "assistido"}:
@@ -222,21 +163,22 @@ class OfferSalesArchitectureResolver:
         return "diagnostic_consultative"
 
     def _derive_primary_goal(self, payload: dict[str, Any]) -> str:
-        first_question_goal = _clean_text(payload.get("first_question_goal", "")).lower()
-        if "uso_atual" in first_question_goal or "operacao" in first_question_goal:
-            return "clareza de uso"
-        if "dor" in first_question_goal or "trava" in first_question_goal:
+        contract = payload.get("question_contracts", {}).get(payload.get("first_question_goal", ""), {})
+        shape = _clean_text(contract.get("shape", ""))
+        label = _clean_text(contract.get("label", ""))
+        if shape == "open_pain":
             return "abrir dor"
-        if "confianca" in first_question_goal or "seguranca" in first_question_goal:
-            return "confiança"
-        return "clareza de uso"
+        if shape == "fit_check":
+            return "compatibilidade"
+        if shape == "approval_check":
+            return "clareza de escopo"
+        return label or "clareza de uso"
 
     def _derive_early_price_strategy(self, payload: dict[str, Any]) -> str:
         price_strategy = payload.get("price_strategy", {}) if isinstance(payload.get("price_strategy", {}), dict) else {}
         floor_allowed_early = bool(price_strategy.get("floor_allowed_early", False))
         full_range_allowed_only_after_context = bool(price_strategy.get("full_range_allowed_only_after_context", True))
         precise_quote_only_after_scope = bool(price_strategy.get("precise_quote_only_after_scope", True))
-
         if not floor_allowed_early and full_range_allowed_only_after_context:
             return "no_price_until_context"
         if floor_allowed_early and full_range_allowed_only_after_context:
@@ -251,36 +193,43 @@ class OfferSalesArchitectureResolver:
         if explicit:
             return explicit
         early_forbidden_moves = {_clean_text(item) for item in payload.get("early_forbidden_moves", []) if _clean_text(item)}
-        if "detalhe_de_implantacao_cedo" in early_forbidden_moves:
-            return "hold_until_pain_or_impact"
-        return "constrained_until_fit"
+        return "hold_until_pain_or_impact" if "detalhe_de_implantacao_cedo" in early_forbidden_moves else "constrained_until_fit"
 
-    def _normalize_blueprint(
-        self,
-        blueprint: dict[str, Any],
-    ) -> dict[str, Any]:
+    def _normalize_blueprint(self, blueprint: dict[str, Any]) -> dict[str, Any]:
         payload = _merge_dicts(_DEFAULT_BLUEPRINT, blueprint)
-        payload["offer_name"] = _clean_text(payload.get("offer_name", "Oferta Atual")) or "Oferta Atual"
-        payload["offer_type"] = _clean_text(payload.get("offer_type", "oferta_atual")) or "oferta_atual"
+        payload["offer_name"] = _clean_text(payload.get("offer_name", ""))
+        payload["offer_type"] = _clean_text(payload.get("offer_type", ""))
         payload["offer_summary"] = _clean_text(payload.get("offer_summary", ""))
         payload["primary_sale_motion"] = _clean_text(payload.get("primary_sale_motion", "consultiva")) or "consultiva"
         payload["conversation_entry_strategy"] = _clean_text(payload.get("conversation_entry_strategy", "contextual_then_dor")) or "contextual_then_dor"
-        payload["first_question_goal"] = _clean_text(payload.get("first_question_goal", "entender_tipo_de_operacao_e_uso_atual")) or "entender_tipo_de_operacao_e_uso_atual"
+        payload["first_question_goal"] = _clean_text(payload.get("first_question_goal", ""))
         payload["early_allowed_moves"] = _normalize_text_list(payload.get("early_allowed_moves", []))
         payload["early_forbidden_moves"] = _normalize_text_list(payload.get("early_forbidden_moves", []))
         payload["conversation_progression"] = _normalize_text_list(payload.get("conversation_progression", []))
         payload["success_signals"] = _normalize_text_list(payload.get("success_signals", []))
         payload["objection_signals"] = _normalize_text_list(payload.get("objection_signals", []))
         payload["moment_guidance"] = payload.get("moment_guidance", {}) if isinstance(payload.get("moment_guidance", {}), dict) else {}
-        payload["discovery_goals"] = payload.get("discovery_goals", {}) if isinstance(payload.get("discovery_goals", {}), dict) else {}
         payload["explanation_strategy"] = payload.get("explanation_strategy", {}) if isinstance(payload.get("explanation_strategy", {}), dict) else {}
         payload["price_strategy"] = payload.get("price_strategy", {}) if isinstance(payload.get("price_strategy", {}), dict) else {}
-        payload["pricing_validation"] = payload.get("pricing_validation", {}) if isinstance(payload.get("pricing_validation", {}), dict) else {}
         payload["questioning_strategy"] = payload.get("questioning_strategy", {}) if isinstance(payload.get("questioning_strategy", {}), dict) else {}
         payload["runtime_hints"] = payload.get("runtime_hints", {}) if isinstance(payload.get("runtime_hints", {}), dict) else {}
 
-        pricing_validation = payload["pricing_validation"]
+        raw_question_contracts = payload.get("question_contracts", {}) if isinstance(payload.get("question_contracts", {}), dict) else {}
+        legacy_discovery_goals = payload.get("discovery_goals", {}) if isinstance(payload.get("discovery_goals", {}), dict) else {}
+        question_contract_source = raw_question_contracts or legacy_discovery_goals
+        payload["question_contracts"] = {
+            key: _normalize_question_contract(key, value)
+            for key, value in question_contract_source.items()
+            if _clean_text(key)
+        }
+        payload["discovery_goals"] = {
+            key: value.get("label", "")
+            for key, value in payload["question_contracts"].items()
+        }
+
+        pricing_validation = payload.get("pricing_validation", {}) if isinstance(payload.get("pricing_validation", {}), dict) else {}
         price_release_modes = pricing_validation.get("price_release_modes", {}) if isinstance(pricing_validation.get("price_release_modes", {}), dict) else {}
+        raw_variable_definitions = pricing_validation.get("variable_definitions", {}) if isinstance(pricing_validation.get("variable_definitions", {}), dict) else {}
         payload["pricing_validation"] = {
             "require_minimum_validation_before_price": _normalize_bool(pricing_validation.get("require_minimum_validation_before_price", True), True),
             "allow_price_before_minimum_validation": _normalize_bool(pricing_validation.get("allow_price_before_minimum_validation", False), False),
@@ -299,7 +248,23 @@ class OfferSalesArchitectureResolver:
                 "range_only_after_context": _normalize_bool(price_release_modes.get("range_only_after_context", True), True),
                 "precise_only_after_scope": _normalize_bool(price_release_modes.get("precise_only_after_scope", True), True),
             },
-            "variable_definitions": pricing_validation.get("variable_definitions", {}) if isinstance(pricing_validation.get("variable_definitions", {}), dict) else {},
+            "variable_definitions": {
+                key: _normalize_variable_definition(key, value)
+                for key, value in raw_variable_definitions.items()
+                if _clean_text(key)
+            },
+        }
+
+        pricing_contract = payload.get("pricing_contract", {}) if isinstance(payload.get("pricing_contract", {}), dict) else {}
+        payload["pricing_contract"] = {
+            "floor_implantation": int(pricing_contract.get("floor_implantation", 1500) or 1500),
+            "floor_monthly": int(pricing_contract.get("floor_monthly", 500) or 500),
+            "timeline_weeks": _clean_text(pricing_contract.get("timeline_weeks", "3-4")) or "3-4",
+            "monthly_billing_starts": _clean_text(pricing_contract.get("monthly_billing_starts", "após entrada em operação")) or "após entrada em operação",
+            "implementation_phases": _normalize_text_list(pricing_contract.get("implementation_phases", [])),
+            "payment_terms": pricing_contract.get("payment_terms", {}) if isinstance(pricing_contract.get("payment_terms", {}), dict) else {},
+            "complexity_multipliers": pricing_contract.get("complexity_multipliers", {}) if isinstance(pricing_contract.get("complexity_multipliers", {}), dict) else {},
+            "readiness_stage_multipliers": pricing_contract.get("readiness_stage_multipliers", {}) if isinstance(pricing_contract.get("readiness_stage_multipliers", {}), dict) else {},
         }
 
         questioning_strategy = payload["questioning_strategy"]
@@ -333,8 +298,8 @@ class OfferSalesArchitectureResolver:
         payload["planner_style_bias"] = _clean_text(payload["runtime_hints"].get("planner_style_bias", "consultivo_objetivo")) or "consultivo_objetivo"
         payload["mapper_activation_mode"] = self._derive_mapper_activation_mode(payload)
         payload["response_opening_bias"] = _clean_text(payload["runtime_hints"].get("response_opening_bias", "anchor_then_invite")) or "anchor_then_invite"
-        payload["capability_bridge_goal"] = _clean_text(payload["discovery_goals"].get("capability_bridge", ""))
-        payload["capability_priority_goal"] = _clean_text(payload["discovery_goals"].get("capability_priority", ""))
+        payload["capability_bridge_goal"] = payload["question_contracts"].get("capability_bridge", {}).get("label", "")
+        payload["capability_priority_goal"] = payload["question_contracts"].get("capability_priority", {}).get("label", "")
         payload["capability_questioning_enabled"] = bool(
             payload["questioning_strategy"].get("infer_capability_paths_from_context", False)
             or payload["questioning_strategy"].get("choose_questions_that_disambiguate_relevant_capabilities", False)
@@ -350,6 +315,7 @@ class OfferSalesArchitectureResolver:
         return payload
 
     def resolve(self, state: ConversationState, user_message: str) -> OfferSalesArchitectureDecision:
+        del state, user_message
         current_blueprint = self._load_current_blueprint()
         blueprint = self._normalize_blueprint(current_blueprint)
         return OfferSalesArchitectureDecision(

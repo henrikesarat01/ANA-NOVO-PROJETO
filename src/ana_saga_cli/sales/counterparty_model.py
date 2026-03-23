@@ -86,6 +86,7 @@ _QUESTION_PRIORITIES = {
     "pricing_question",
     "operational_mapping_question",
 }
+_ANSWER_SCOPES = {"self_contained", "case_dependent", "commercial_dependent"}
 
 
 def _clean_text(value: Any) -> str:
@@ -161,13 +162,17 @@ class CounterpartyModelBuilder:
         needs_simplification = bool(neural_state.get("needs_simplification", False))
         clarity_note = _clean_text(neural_state.get("clarity_note", ""))
         literal_response_risk = _clean_text(neural_state.get("literal_response_risk", ""))
+        answer_scope = _normalize_choice(neural_state.get("answer_scope", ""), _ANSWER_SCOPES, "case_dependent")
+        self_contained_answer = answer_scope == "self_contained"
 
         direct_price = bool(response_policy.get("commercial_direct_question_detected", False)) or communicative_intent == "price_check"
         compare = communicative_intent == "compare"
-        clarity = communicative_intent == "clarify" or needs_simplification or bool(clarity_note)
+        clarity = not self_contained_answer and (
+            communicative_intent == "clarify" or needs_simplification or bool(clarity_note)
+        )
         advance = communicative_intent == "advance"
         trust_seek = emotional_state in {"guarded", "skeptical"} or transition_permission == "hold"
-        resistance = emotional_state in {"skeptical", "frustrated"} or bool(literal_response_risk)
+        resistance = emotional_state in {"skeptical", "frustrated"}
         urgency = emotional_state == "urgent"
         delay = _clean_text(previous_counterparty.get("counterparty_intent", "")) == "delay" and not any((direct_price, compare, clarity, advance))
 
@@ -201,6 +206,9 @@ class CounterpartyModelBuilder:
         elif pain_known:
             interaction_mode = "validating"
             counterparty_intent = "solve_problem"
+        elif self_contained_answer:
+            interaction_mode = "exploring"
+            counterparty_intent = "understand"
 
         trust_level = "medium"
         if trust_seek:
@@ -222,17 +230,20 @@ class CounterpartyModelBuilder:
         elif advance and trust_level == "high":
             risk_sensitivity = "open"
 
-        clarity_need = "structure"
-        if clarity:
-            clarity_need = "simple_explanation"
-        elif compare:
-            clarity_need = "comparison"
-        elif trust_seek:
-            clarity_need = "safety"
-        elif bool(clarity_note) and bool(neural_state.get("operational_frame", "")):
-            clarity_need = "practical_example"
-        elif communicative_intent == "validate_fit" and business_ready:
-            clarity_need = "proof"
+        if self_contained_answer:
+            clarity_need = "none"
+        else:
+            clarity_need = "structure"
+            if clarity:
+                clarity_need = "simple_explanation"
+            elif compare:
+                clarity_need = "comparison"
+            elif trust_seek:
+                clarity_need = "safety"
+            elif bool(clarity_note) and bool(neural_state.get("operational_frame", "")):
+                clarity_need = "practical_example"
+            elif communicative_intent == "validate_fit" and business_ready:
+                clarity_need = "proof"
 
         value_orientation = "outcome"
         if direct_price:
@@ -319,6 +330,8 @@ class CounterpartyModelBuilder:
             conversation_tension = "quer entender preço sem perder segurança"
         elif trust_level == "low":
             conversation_tension = "ainda falta segurança para avançar"
+        elif self_contained_answer:
+            conversation_tension = "quer uma confirmação objetiva antes de aprofundar"
         elif clarity_need in {"simple_explanation", "practical_example", "structure"}:
             conversation_tension = "ainda falta clareza prática para avaliar"
         elif compare:

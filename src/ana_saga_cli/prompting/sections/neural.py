@@ -1,13 +1,8 @@
-"""Seção CALIBRAGEM NEURAL — neural state + response strategy + neurobehavior.
-
-Lê ConversationState e monta as linhas de inteligência relacional.
-"""
+"""Linhas neurais curtas injetadas no CONTEXTO do prompt final."""
 from __future__ import annotations
 
-from typing import Any
-
 from ana_saga_cli.domain.models import ConversationState, TurnIntent
-from ana_saga_cli.prompting.text_utils import clean_text, compact_text, list_join
+from ana_saga_cli.prompting.text_utils import clean_text, compact_text
 
 
 def _neural_lines(state: ConversationState, intent: TurnIntent) -> list[str]:
@@ -82,97 +77,7 @@ def _neural_lines(state: ConversationState, intent: TurnIntent) -> list[str]:
         lines.append(compact_text(f"reconstrução: {reconstruction_strategy}", 150))
 
     return lines[:5]
-
-
-def _counterparty_lines(state: ConversationState) -> list[str]:
-    model = state.counterparty_model or {}
-    if not model:
-        return []
-
-    lines = [
-        compact_text(
-            "contraparte: "
-            f"modo={model.get('interaction_mode', '')} | "
-            f"etapa={model.get('decision_stage', '')} | "
-            f"confiança={model.get('trust_level', '')}",
-            160,
-        )
-    ]
-    if clean_text(model.get("conversation_tension", "")):
-        lines.append(compact_text(f"tensão dominante: {model.get('conversation_tension', '')}", 150))
-    if clean_text(model.get("question_priority", "")):
-        lines.append(compact_text(f"prioridade do turno: {model.get('question_priority', '')}", 140))
-    if clean_text(model.get("microcommitment_goal", "")):
-        lines.append(compact_text(f"microcompromisso sugerido: {model.get('microcommitment_goal', '')}", 140))
-    return lines[:4]
-
-
-def _response_strategy_lines(state: ConversationState) -> list[str]:
-    strategy = state.response_strategy or {}
-    if not strategy:
-        return []
-
-    lines = [
-        compact_text(
-            "estrategia do turno: "
-            f"objetivo={strategy.get('message_goal', '')} | "
-            f"intensidade={strategy.get('approach_intensity', '')} | "
-            f"formato={strategy.get('response_format', '')} | "
-            f"eixo={strategy.get('persuasion_axis', '')}",
-            185,
-        )
-    ]
-    moves = list_join(strategy.get("tactical_moves", []), limit=3)
-    avoid = list_join(strategy.get("avoid", []), limit=4)
-    if moves:
-        line = f"movimento tatico: {moves}"
-        if avoid:
-            line = f"{line} | evitar: {avoid}"
-        lines.append(compact_text(line, 185))
-    elif avoid:
-        lines.append(compact_text(f"evitar no turno: {avoid}", 170))
-    return lines[:2]
-
-
-def _neurobehavior_lines(state: ConversationState) -> list[str]:
-    neuro = state.neurobehavior_state or {}
-    barrier = clean_text(neuro.get("dominant_barrier", ""))
-    levers = list_join(neuro.get("recommended_levers", []), limit=4)
-    suppressed = list_join(neuro.get("suppressed_moves", []), limit=4)
-    if not barrier and not levers and not suppressed:
-        return []
-
-    lines: list[str] = []
-    if barrier:
-        lines.append(f"barreira dominante: {barrier}")
-    if levers:
-        lines.append(f"alavancas: {levers}")
-    if suppressed:
-        lines.append(f"evitar: {suppressed}")
-    return lines[:3]
-
-
-def build_neural_section(state: ConversationState, intent: TurnIntent) -> str:
-    """Monta linhas neurais que NÃO vão para CONTEXTO (ex.: calibragem relacional header).
-
-    Retorna string vazia se não houver linhas. A linha de "calibragem relacional"
-    entra aqui; as demais linhas neurais (leitura, clareza, etc.) vão para CONTEXTO
-    via ``get_neural_context_lines``.
-    """
-    neural = _neural_lines(state, intent)
-    counterparty = _counterparty_lines(state)
-    strategy = _response_strategy_lines(state)
-    neurobehavior = _neurobehavior_lines(state)
-
-    all_lines = neural[:1] + counterparty + strategy + neurobehavior
-    if not all_lines:
-        return ""
-
-    from ana_saga_cli.prompting.text_utils import join_lines
-    return f"INTELIGENCIA RELACIONAL\n{join_lines(all_lines)}"
-
-
 def get_neural_context_lines(state: ConversationState, intent: TurnIntent) -> list[str]:
-    """Linhas neurais que devem ser injetadas no CONTEXTO (sem a calibragem header)."""
+    """Linhas neurais curtas que entram no CONTEXTO, sem cabeçalho adicional."""
     neural = _neural_lines(state, intent)
     return [line for line in neural if not line.startswith("calibragem relacional:")]
