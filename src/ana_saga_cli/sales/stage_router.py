@@ -98,7 +98,7 @@ class StageRouter:
                 source="rule_based",
             )
 
-        if direct_pricing and not commercial_scope_ready:
+        if direct_pricing and not commercial_scope_ready and not minimum_context_ready:
             if current_stage in {_STAGE_04, _STAGE_05}:
                 return StageDecision(
                     next_stage_id=_STAGE_04,

@@ -26,7 +26,7 @@ price_strategy:
   full_range_allowed_only_after_context: true
   implantation_details_only_after_fit: true
   precise_quote_only_after_scope: true
-  proof_before_price: false
+  proof_before_price: true
 pricing_validation:
   require_minimum_validation_before_price: true
   allow_price_before_minimum_validation: false
@@ -37,24 +37,38 @@ pricing_validation:
   avoid_dry_questioning: true
   avoid_question_stack: true
   minimum_required_variables:
+    - nicho_ou_segmento
     - tipo_de_operacao
     - uso_atual_do_whatsapp
+    - exemplo_minimo_de_fluxo_aprovado
   optional_but_relevant_variables:
     - principal_trava_operacional
     - quantidade_de_fluxos
     - necessidade_de_integracao
     - fechamento_no_whatsapp_ou_triagem
   variables_that_change_price:
+    - nicho_ou_segmento
     - tipo_de_operacao
     - uso_atual_do_whatsapp
+    - exemplo_minimo_de_fluxo_aprovado
     - complexidade_do_fluxo
     - integracao
     - quantidade_de_jornadas
   preferred_question_sequence:
+    - nicho_ou_segmento
     - tipo_de_operacao
     - uso_atual_do_whatsapp
+    - exemplo_minimo_de_fluxo_aprovado
     - principal_trava_operacional
     - fator_estrutural_de_complexidade
+  variable_definitions:
+    nicho_ou_segmento:
+      known_fields:
+        - niche_known
+      label: "qual é o segmento ou tipo de negócio do cliente"
+      question: "entender qual é o tipo de negócio ou o que a empresa vende"
+      reason: "sem saber o segmento, qualquer valor vai parecer genérico demais"
+      changes: "segmento do cliente, porte e tipo de solução que faz sentido"
   price_release_modes:
     floor_only_after_minimum_validation: true
     range_only_after_context: true
@@ -67,12 +81,17 @@ questioning_strategy:
   avoid_interrogatory_flow: true
   avoid_generic_qualification: true
   prefer_smallest_useful_question: true
+  infer_capability_paths_from_context: true
+  choose_questions_that_disambiguate_relevant_capabilities: true
+  avoid_questions_unlinked_to_real_capabilities: true
 conversation_progression:
   - situar rapidamente o que e
   - entender o negocio
   - entender como o contato entra hoje
   - entender uso atual do WhatsApp
   - abrir dor ou trava operacional
+  - confirmar qual capacidade da solucao ataca a trava principal
+  - validar um exemplo minimo de fluxo no caso real
   - conectar valor pratico
   - aprofundar escopo
   - abrir faixa mais completa so depois de contexto
@@ -129,6 +148,7 @@ discovery_goals:
   operation_fit: "entender onde na rotina do cliente a solução se encaixa"
   customer_type: "identificar o perfil de quem mais procura"
   general_fit: "entender onde a solução ajudaria mais na operação"
+  capability_bridge: "descobrir qual capacidade real da solução teria mais aderência ao caso antes de explicar produto"
   # Escopo e dimensionamento
   closing_process: "esclarecer se o fechamento acontece no canal digital ou é só triagem"
   catalog_existence: "saber se existe catálogo de produtos ou se é montado manualmente"
@@ -154,10 +174,12 @@ discovery_goals:
   daily_routine_fit: "onde a solução entraria no dia a dia do cliente"
   service_fit: "entender onde a solução ajuda mais: triagem ou agenda"
   compatibility_check: "o que precisa bater para a solução fazer sentido no caso"
+  capability_priority: "qual tipo de capacidade precisa resolver o gargalo principal para a solução fazer sentido"
   trust_need: "o que daria mais segurança ao cliente para avaliar"
   comparison_axis: "se está comparando mais preço ou modo de usar"
   clarity_priority: "o que o cliente quer entender primeiro"
   proof_preference: "se prefere um exemplo rápido ou demonstração"
+  proof_validation: "validar um exemplo minimo do fluxo antes de falar valor"
   value_priority: "o que pesa mais para valer a pena"
   pricing_context: "se quer uma base agora ou prefere entender o contexto antes"
 runtime_hints:

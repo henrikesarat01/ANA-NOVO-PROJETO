@@ -241,24 +241,6 @@
         "produto": "SAGA"
       },
       {
-        "funcao": "Coleta de Dados Estruturada",
-        "funcoes_saga": ["Coleta de Dados"],
-        "problemas": [
-          {
-            "problema": "você precisa saber endereço, preferência e orçamento do cliente, faz as perguntas espalhadas pela conversa, esquece de perguntar uma, só descobre que faltou na hora de fechar — e aí o cliente já esfriou",
-            "causa": "coleta de informação por conversa livre é caótica — depende da sua memória, do fluxo da conversa e da vontade do cliente de responder naquela ordem",
-            "raiz": "sem roteiro estruturado de coleta, TODA informação crítica depende de você lembrar de perguntar — e quando você esquece, o custo é um pedido perdido que estava pronto pra fechar"
-          },
-          {
-            "problema": "você coleta os dados no WhatsApp, anota no caderno, depois passa pro sistema — e entre o caderno e o sistema, o CEP some, o nome fica errado e o pedido vai pro endereço errado",
-            "causa": "cada transcrição manual é uma chance de erro — e os dados passam por 3 mídias diferentes (tela, papel, sistema) antes de chegar onde precisam",
-            "raiz": "você criou um processo em que a informação precisa ser copiada múltiplas vezes — e cada cópia degrada a precisão, gerando retrabalho que custa mais que o tempo que você acha que economizou"
-          }
-        ],
-        "caracteristica": "Série de perguntas automatizadas que coleta e armazena dados estruturados direto no sistema — sem caderno, sem retrabalho, sem campo esquecido",
-        "produto": "SAGA"
-      },
-      {
         "funcao": "Pagamento Integrado",
         "funcoes_saga": ["Seleção de Pagamento", "Pagamento PIX", "Verificação de Pagamento"],
         "problemas": [

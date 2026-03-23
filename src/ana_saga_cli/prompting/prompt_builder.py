@@ -7,10 +7,10 @@ from ana_saga_cli.domain.models import ArsenalEntry, ConversationState, ProductF
 
 FIXED_RESPONSE_GUARDRAILS = [
     # Identidade e personalidade
-    "Você é ANA — negociadora consultiva que fala como gente, não como sistema. Curiosa, direta, bem-humorada quando cabe, e sempre no tom de amiga que manja do assunto.",
-    "Fale como conversa de WhatsApp: mensagens curtas, tom leve, sem formalidade e sem estrutura de e-mail ou apresentação.",
-    "Reaja de verdade ao que o cliente disse antes de direcionar. Se ele fez graça, entre na vibe. Se trouxe contexto, mostre que ouviu antes de perguntar.",
-    "Se o cliente abrir com gíria pesada, apelido zoeiro ou xingamento de brincadeira, é saudação entre amigos — entre na zueira, ria, e retribua o cumprimento naturalmente.",
+    "Você é ANA — negociadora consultiva que fala como gente, não como sistema. Curiosa, direta, humana, bem-humorada quando couber e sem caricatura.",
+    "Fale como conversa de WhatsApp: mensagens curtas, coloquial neutra, sem formalidade dura e sem estrutura de e-mail ou apresentação.",
+    "Reaja de verdade ao que o cliente disse antes de direcionar. Se ele fez graça, responda com leveza sem imitar personagem. Se trouxe contexto, mostre que ouviu antes de perguntar.",
+    "Se o cliente falar de forma bem informal, responda com naturalidade sem caricatura, sem exagerar gíria e sem imitar persona.",
     "Adapte tamanho e energia ao que o cliente mandou. Mensagem curta = resposta curta. Cliente empolgado = entre na energia.",
     "Uma intenção por resposta. No máximo 1 pergunta. Nunca empilhe ideias.",
     # Naturalidade
@@ -22,7 +22,7 @@ FIXED_RESPONSE_GUARDRAILS = [
     "Não soe script, checklist, atendimento institucional ou consultor em reunião.",
     "Não use validação montada: 'faz sentido você', 'importante você trazer isso', 'ótima pergunta' ou equivalentes.",
     "Não faça pergunta em formato menu, taxonomia ou formulário disfarçado.",
-    "Não monte transição artificial tipo 'antes de te falar X preciso de Y' ou 'pra te dar uma visão melhor preciso entender Z' — vá direto.",
+    "Se precisar contextualizar por que a pergunta importa, faça isso de forma humana e curta; evite transição montada, formal ou corporativa.",
     "Não escreva frase polida/bonita demais se uma fala simples e direta resolver.",
     "Não transforme a resposta em mini-aula, mini-palestra ou discurso.",
     "Não metaexplique estratégia, análise interna ou raciocínio de bastidor.",
@@ -277,6 +277,8 @@ class PromptBuilder:
         response_opening = _clean_text(surface_guidance.get("response_opening", "validate_first"))
         if response_policy.get("response_mode") == "pricing_answer" and bool(pricing_policy.get("allow_precise_quote", False)):
             return "direct_quote_range"
+        if response_policy.get("response_mode") == "pricing_answer" and _clean_text(pricing_policy.get("price_response_mode", "")) == "floor_only":
+            return "answer_first"
         if response_policy.get("response_mode") == "pricing_answer":
             return "contrast_simple_vs_complete"
         if bool(response_policy.get("commercial_direct_question_detected", False)) and response_policy.get("response_mode") == "ask":
@@ -308,6 +310,7 @@ class PromptBuilder:
         if question_mode == "sem_pergunta":
             return ""
         anchor = _first_nonempty(
+            response_policy.get("question_focus"),
             response_policy.get("question_anchor"),
             response_policy.get("minimum_pricing_question"),
             response_policy.get("ask_reason"),
@@ -318,17 +321,29 @@ class PromptBuilder:
         return _compact_text(anchor, 180)
 
     def _build_pricing_gate_brief_lines(self, pricing_policy: dict[str, Any], response_policy: dict[str, Any]) -> list[str]:
+        if bool(response_policy.get("social_opening_only", False)):
+            return []
         price_response_mode = _clean_text(pricing_policy.get("price_response_mode", ""))
         if not price_response_mode:
             return []
 
         lines: list[str] = []
-        if _clean_text(pricing_policy.get("question_will_change_what", "")):
-            lines.append(f"o que muda com a resposta: {_clean_text(pricing_policy.get('question_will_change_what', ''))}")
-
         if price_response_mode == "block_price":
-            lines.append("explique curto por que precisa saber isso e faça só essa pergunta")
+            lines.append("segure o preço sem soar evasiva")
+            lines.append("faça só a pergunta mínima que ainda falta para situar preço com honestidade")
+            if _clean_text(pricing_policy.get("question_will_change_what", "")):
+                lines.append(
+                    _compact_text(
+                        "deixe o cliente sentir, em linguagem humana, o que essa resposta muda: "
+                        f"{_clean_text(pricing_policy.get('question_will_change_what', ''))}",
+                        170,
+                    )
+                )
+            lines.append("traduza isso sem despejar raciocínio interno cru")
+            if _clean_text(pricing_policy.get("minimum_pricing_question_variable", "")) == "exemplo_minimo_de_fluxo_aprovado":
+                lines.append("proponha mostrar um exemplo minimo de fluxo e peca a aprovacao dele antes de falar preco")
         elif price_response_mode == "floor_only":
+            lines.append("se ancorar valor, deixe claro que isso ainda nao e a faixa final do caso")
             lines.append("se ancorar valor, use base conservadora e faça no máximo 1 pergunta")
         return lines
 
@@ -467,6 +482,7 @@ class PromptBuilder:
         architecture = state.offer_sales_architecture or {}
         if not architecture:
             return []
+        questioning_strategy = architecture.get("questioning_strategy", {}) if isinstance(architecture.get("questioning_strategy", {}), dict) else {}
 
         lines = [
             _compact_text(
@@ -489,6 +505,55 @@ class PromptBuilder:
         progression = [str(item).strip() for item in architecture.get("conversation_progression", []) if str(item).strip()][:3]
         if progression:
             lines.append(_compact_text(f"progressão: {' -> '.join(progression)}", 150))
+        if bool(architecture.get("capability_questioning_enabled", False)):
+            capability_parts = []
+            if questioning_strategy.get("infer_capability_paths_from_context", False):
+                capability_parts.append("inferir capacidades pelo contexto")
+            if questioning_strategy.get("choose_questions_that_disambiguate_relevant_capabilities", False):
+                capability_parts.append("pergunta deve diferenciar capacidades reais")
+            if questioning_strategy.get("avoid_questions_unlinked_to_real_capabilities", False):
+                capability_parts.append("evitar pergunta generica sem funcao real")
+            if capability_parts:
+                lines.append(_compact_text("capacidade: " + " | ".join(capability_parts), 175))
+        return lines[:4]
+
+    def _build_capability_bridge_brief_lines(
+        self,
+        state: ConversationState,
+        active_pain: dict[str, Any],
+        hero: str,
+        support: str,
+        useful_hits: list[str],
+    ) -> list[str]:
+        if bool((state.response_policy or {}).get("social_opening_only", False)):
+            return []
+        architecture = state.offer_sales_architecture or {}
+        questioning_strategy = architecture.get("questioning_strategy", {}) if isinstance(architecture.get("questioning_strategy", {}), dict) else {}
+        if not bool(architecture.get("capability_questioning_enabled", False)):
+            return []
+
+        lines: list[str] = []
+        bridge_goal = _clean_text(architecture.get("capability_bridge_goal", ""))
+        priority_goal = _clean_text(architecture.get("capability_priority_goal", ""))
+        if hero:
+            lines.append(f"capacidade em investigacao: {hero}")
+        elif useful_hits:
+            lines.append(f"capacidade em investigacao: {_clean_text(useful_hits[0].split(':', 1)[0])}")
+        if support:
+            lines.append(f"capacidade de apoio: {support}")
+
+        if bridge_goal:
+            lines.append(_compact_text(f"ponte de capacidade: {bridge_goal}", 170))
+        if priority_goal:
+            lines.append(_compact_text(f"prioridade da pergunta: {priority_goal}", 170))
+
+        if questioning_strategy.get("avoid_questions_unlinked_to_real_capabilities", False):
+            lines.append("na pergunta, evite qualificacao generica sem ligar a cena a uma funcao real do SAGA")
+
+        if not lines and active_pain:
+            fallback = _first_nonempty(active_pain.get("hero_function"), active_pain.get("funcao_saga_que_ajuda"))
+            if fallback:
+                lines.append(f"capacidade em investigacao: {fallback}")
         return lines[:4]
 
     def _trim_offer_architecture_brief_lines(self, lines: list[str], simple_context: bool) -> list[str]:
@@ -498,7 +563,7 @@ class PromptBuilder:
 
     def _describe_style_posture(self, style_posture: str) -> str:
         mapping = {
-            "leve_disponivel": "leve, humano e envolvido; converse de verdade, com calor e presença — reaja ao que o cliente disse, comente, entre no assunto, como amigo que tá curtindo o papo",
+            "leve_disponivel": "leve, humano e presente; converse de verdade, com calor e escuta, sem intimidade forçada, sem gíria demais e sem pose",
             "honesto_sem_atalho": "franco sobre limite de contexto, sem enfeitar",
             "direto_calmo": "objetivo na faixa, mas sem parecer tabela fria",
             "objetivo_sem_pressa": "responde valor com calma e ressalva curta",
@@ -527,9 +592,9 @@ class PromptBuilder:
             return "não termine com pergunta"
         if question_mode == "1_pergunta_necessaria":
             if not question_focus:
-                return "faça só a pergunta mais decisiva do turno"
+                return "faça só a pergunta mais decisiva do turno; não repita a mensagem do cliente, não devolva a fala dele espelhada e não abra a pergunta em menu, lista ou checklist"
             return (
-                "faça 1 pergunta que descubra naturalmente: "
+                "faça 1 pergunta curta e humana que descubra naturalmente; não repita a mensagem do cliente, não devolva a fala dele espelhada e não abra a pergunta em menu, lista ou checklist: "
                 + self._humanize_question_focus(question_focus)
             )
         if not question_focus:
@@ -543,6 +608,17 @@ class PromptBuilder:
         """Convert internal goal labels into natural directive without the raw text."""
         focus = raw_focus.strip().lower()
         mapping = {
+            "entender como a operação funciona hoje": "entenda como a operação deles funciona hoje, na prática",
+            "entender como o whatsapp entra hoje na rotina": "entenda como o WhatsApp entra hoje na rotina deles",
+            "entender onde a rotina mais trava hoje": "descubra onde a rotina mais trava hoje",
+            "validar um exemplo mínimo do fluxo antes de falar preço": "valide uma cena mínima do fluxo antes de entrar em preço",
+            "entender se isso entra em uma frente principal ou em mais de uma": "descubra se isso entra numa frente principal ou em mais de uma",
+            "entender se a primeira versão precisa integrar com outro sistema": "entenda se a primeira versão precisa integrar com outro sistema",
+            "entender se o whatsapp fica mais na triagem ou já entra no fechamento": "entenda se o WhatsApp fica mais na triagem ou já entra no fechamento",
+            "entender se o fluxo é mais direto ou tem várias etapas": "entenda se o fluxo é mais direto ou tem várias etapas",
+            "entender se existe integração estrutural já na primeira fase": "entenda se já existe integração estrutural nessa primeira fase",
+            "entender quantas jornadas precisam entrar nessa primeira fase": "entenda quantas jornadas precisam entrar nessa primeira fase",
+            "entender o principal fator estrutural de complexidade": "entenda o que mais pesa na estrutura do caso hoje",
             "identificar segmento e atividade principal": "descubra o que eles fazem — qual é o negócio, o ramo, a atividade",
             "identificar segmento e como o canal digital entra na operação": "descubra o que eles fazem e como usam o digital hoje no dia a dia",
             "entender modelo de operação atual": "entenda como a operação deles funciona hoje na prática",
@@ -619,8 +695,6 @@ class PromptBuilder:
         if simple_context:
             hero = ""
             support = ""
-        pricing_posture = self._build_pricing_posture(pricing_policy, response_policy)
-        implementation_terms = self._build_implementation_terms(pricing_policy, response_policy)
         style_posture = self._build_style_posture(response_policy, surface_guidance, pricing_policy)
         opening_shape = self._build_opening_shape(response_policy, surface_guidance, pricing_policy)
         question_mode = self._build_question_mode(response_policy)
@@ -628,20 +702,34 @@ class PromptBuilder:
         pricing_gate_brief_lines = self._build_pricing_gate_brief_lines(pricing_policy, response_policy)
         useful_hits = self._build_useful_hits(lead_summary, diagnostic_hypotheses, arsenal_hits, hero, support)
         neural_brief_lines = self._build_neural_brief_lines(state, response_policy)
+        capability_brief_lines = self._build_capability_bridge_brief_lines(state, active_pain, hero, support, useful_hits)
 
         response_brief_lines = [
             f"contexto do cliente: {client_context}",
             f"dor principal: {main_pain}",
             f"cena operacional: {operational_scene}",
         ]
+        if response_policy.get("response_mode") == "ask":
+            question_focus = _clean_text(response_policy.get("question_focus", "")) or _clean_text(response_policy.get("question_anchor", ""))
+            if question_focus:
+                response_brief_lines.append(f"ponto que precisa ficar claro: {question_focus}")
+            response_brief_lines.append("não repita a fala do cliente; transforme isso em uma pergunta real e natural")
+            response_brief_lines.append("não abra a pergunta em opções, categorias, menu ou checklist")
+
+        if response_policy.get("response_mode") == "ask" and _clean_text(response_policy.get("question_goal", "")) == "pricing":
+            change_hint = _clean_text(pricing_policy.get("question_will_change_what", ""))
+            if change_hint:
+                response_brief_lines.append(f"o que essa resposta muda: {change_hint}")
+
+            if _clean_text(pricing_policy.get("minimum_pricing_question_variable", "")) == "exemplo_minimo_de_fluxo_aprovado":
+                response_brief_lines.append("na superficie, proponha um exemplo minimo de fluxo do caso dele e peca a aprovacao antes de falar valor")
         if hero:
             response_brief_lines.append(f"referência principal: {hero} (use naturalmente, sem obrigação de citar pelo nome)")
         if support:
             response_brief_lines.append(f"referência complementar: {support} (só se soar natural)")
-        response_brief_lines.append(f"postura comercial: {pricing_posture}")
-        if implementation_terms:
-            response_brief_lines.append(f"termos: {implementation_terms}")
-        response_brief_lines.extend(pricing_gate_brief_lines)
+        if not bool(response_policy.get("social_opening_only", False)):
+            response_brief_lines.extend(capability_brief_lines)
+            response_brief_lines.extend(pricing_gate_brief_lines)
         if simple_context:
             if bool((state.response_policy or {}).get("social_opening_only", False)):
                 response_brief_lines.append("sem validação bonita e sem cara de explicação montada")
@@ -669,6 +757,7 @@ class PromptBuilder:
             f"abertura: {self._describe_opening_shape(opening_shape)}",
             f"pergunta: {self._describe_question_mode(question_mode, question_focus)}",
         ]
+
         if _clean_text(response_policy.get("response_tone_hint", "")):
             turn_plan_lines.append(f"tom relacional: {_clean_text(response_policy.get('response_tone_hint', ''))}")
         strategy_avoid = _list_join((state.response_strategy or {}).get("avoid", []), limit=4)

@@ -42,7 +42,6 @@
 - **Carrossel de Produtos** - envia um carrossel deslizável com os produtos/itens disponíveis, cada card com foto, nome, preço e botão
 - **Cardápio** - exibe os itens disponíveis (pratos, bebidas, produtos) organizados por categoria com preço
 - **Detalhes do Produto** - mostra a ficha completa de um item: fotos, descrição, preço, especificações
-- **Coleta de Dados** - série de perguntas para qualificar o lead (tipo de imóvel, bairro, faixa de preço, endereço de entrega etc.)
 - **Seleção de Pagamento** - oferece as formas de pagamento disponíveis (PIX, cartão etc.)
 - **Pagamento PIX** - gera o QR Code do PIX para o cliente pagar direto pelo WhatsApp
 - **Verificação de Pagamento** - verifica automaticamente se o PIX foi pago e avisa o cliente e o vendedor quando confirmado

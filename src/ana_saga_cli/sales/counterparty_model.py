@@ -92,9 +92,27 @@ def _clean_text(value: Any) -> str:
     return " ".join(str(value or "").split()).strip()
 
 
-def _contains_any(text: str, terms: tuple[str, ...]) -> bool:
-    normalized = text.lower()
-    return any(term in normalized for term in terms)
+def _normalize_choice(value: Any, allowed: set[str], default: str) -> str:
+    text = _clean_text(value).lower()
+    return text if text in allowed else default
+
+
+def _stage_to_decision_stage(stage_id: str) -> str:
+    mapping = {
+        "etapa_01_abertura": "opening",
+        "etapa_02_conexao_inicial": "opening",
+        "etapa_03_contextualizacao_permissao": "discovery",
+        "etapa_04_diagnostico_situacional": "discovery",
+        "etapa_05_aprofundamento_dor": "evaluation",
+        "etapa_06_impacto": "evaluation",
+        "etapa_07_transicao_solucao": "understanding",
+        "etapa_08_mapeamento_solucao": "understanding",
+        "etapa_09_ancoragem_valor": "comparison",
+        "etapa_10_checagem_aderencia": "comparison",
+        "etapa_11_oferta": "negotiation",
+        "etapa_12_fechamento": "closing",
+    }
+    return mapping.get(stage_id, "discovery")
 
 
 def _opening_topic_domain(state: ConversationState) -> str:
@@ -126,22 +144,32 @@ class CounterpartyModelBuilder:
 
     def build(self, state: ConversationState, user_message: str) -> dict[str, Any]:
         lead_summary = state.lead_summary or {}
-        previous_neural = state.neural_state or {}
-        lowered = _clean_text(user_message).lower()
+        neural_state = state.neural_state or {}
+        response_policy = state.response_policy or {}
+        previous_counterparty = state.counterparty_model or {}
 
         if self._is_neutral_opening_context(state):
             model = self._build_neutral_model(user_message)
             state.counterparty_model = model
             return model
 
-        direct_price = _contains_any(lowered, ("preço", "preco", "valor", "quanto custa", "faixa", "mensalidade", "investimento", "custa"))
-        compare = _contains_any(lowered, ("compar", "diferença", "diferenca", "opção", "opcao", "versus", "melhor que"))
-        clarity = _contains_any(lowered, ("como funciona", "me explica", "na prática", "na pratica", "não entendi", "nao entendi", "mais simples"))
-        advance = _contains_any(lowered, ("próximo passo", "proximo passo", "bora", "vamos fechar", "proposta", "contrato", "como seguimos", "fechar"))
-        delay = _contains_any(lowered, ("depois", "mais pra frente", "vou pensar", "deixa eu ver", "vou avaliar"))
-        trust_seek = _contains_any(lowered, ("seguro", "segurança", "confi", "receio", "risco", "garantia", "dor de cabeça"))
-        resistance = _contains_any(lowered, ("caro", "não sei", "nao sei", "não tenho certeza", "nao tenho certeza", "difícil", "dificil", "não faz sentido", "nao faz sentido"))
-        urgency = _contains_any(lowered, ("urgente", "agora", "quanto antes", "rápido", "rapido", "hoje"))
+        communicative_intent = _clean_text(neural_state.get("communicative_intent", "explore")).lower() or "explore"
+        emotional_state = _clean_text(neural_state.get("emotional_state", "neutral")).lower() or "neutral"
+        topic_domain = _clean_text(neural_state.get("topic_domain", _opening_topic_domain(state))).lower() or _opening_topic_domain(state)
+        transition_permission = _clean_text(neural_state.get("transition_permission", "allow_context")).lower() or "allow_context"
+        decision_style = _clean_text(neural_state.get("decision_style", "pragmatic")).lower() or "pragmatic"
+        needs_simplification = bool(neural_state.get("needs_simplification", False))
+        clarity_note = _clean_text(neural_state.get("clarity_note", ""))
+        literal_response_risk = _clean_text(neural_state.get("literal_response_risk", ""))
+
+        direct_price = bool(response_policy.get("commercial_direct_question_detected", False)) or communicative_intent == "price_check"
+        compare = communicative_intent == "compare"
+        clarity = communicative_intent == "clarify" or needs_simplification or bool(clarity_note)
+        advance = communicative_intent == "advance"
+        trust_seek = emotional_state in {"guarded", "skeptical"} or transition_permission == "hold"
+        resistance = emotional_state in {"skeptical", "frustrated"} or bool(literal_response_risk)
+        urgency = emotional_state == "urgent"
+        delay = _clean_text(previous_counterparty.get("counterparty_intent", "")) == "delay" and not any((direct_price, compare, clarity, advance))
 
         pain_known = bool(lead_summary.get("pain_known", False))
         impact_known = bool(lead_summary.get("impact_known", False))
@@ -173,20 +201,17 @@ class CounterpartyModelBuilder:
         elif pain_known:
             interaction_mode = "validating"
             counterparty_intent = "solve_problem"
-        elif _clean_text(user_message):
-            interaction_mode = "exploring"
 
-        emotional_state = _clean_text(previous_neural.get("emotional_state", "neutral")).lower()
         trust_level = "medium"
-        if trust_seek or emotional_state in {"skeptical", "guarded"}:
+        if trust_seek:
             trust_level = "low"
-        elif advance or _contains_any(lowered, ("faz sentido", "curti", "gostei", "interessante")):
+        elif advance or (emotional_state == "open" and (impact_known or business_ready)):
             trust_level = "high"
 
         resistance_level = "medium"
-        if resistance or emotional_state in {"skeptical", "frustrated"}:
+        if resistance:
             resistance_level = "high"
-        elif advance or _contains_any(lowered, ("ok", "entendi", "show", "beleza")):
+        elif advance or emotional_state == "open":
             resistance_level = "low"
 
         urgency_level = "high" if urgency else "medium" if direct_price or advance else "low"
@@ -204,13 +229,13 @@ class CounterpartyModelBuilder:
             clarity_need = "comparison"
         elif trust_seek:
             clarity_need = "safety"
-        elif _contains_any(lowered, ("exemplo", "na prática", "na pratica")):
+        elif bool(clarity_note) and bool(neural_state.get("operational_frame", "")):
             clarity_need = "practical_example"
-        elif _contains_any(lowered, ("prova", "case", "resultado", "funciona mesmo")):
+        elif communicative_intent == "validate_fit" and business_ready:
             clarity_need = "proof"
 
         value_orientation = "outcome"
-        if direct_price or _contains_any(lowered, ("barato", "custo", "caber no orçamento", "orcamento")):
+        if direct_price:
             value_orientation = "economy"
         elif urgency:
             value_orientation = "speed"
@@ -218,17 +243,13 @@ class CounterpartyModelBuilder:
             value_orientation = "safety"
         elif clarity:
             value_orientation = "simplicity"
-        elif _contains_any(lowered, ("controle", "acompanhar", "organizar")):
+        elif decision_style == "analytical" and business_ready:
             value_orientation = "control"
-        elif _contains_any(lowered, ("previs", "segurança", "estável")):
+        elif risk_sensitivity == "risk_averse":
             value_orientation = "predictability"
 
-        decision_stage = "opening"
-        if state.stage_id in {"etapa_03_contextualizacao_permissao", "etapa_04_diagnostico_situacional"}:
-            decision_stage = "discovery"
-        elif clarity or state.stage_id in {"etapa_07_transicao_solucao", "etapa_08_mapeamento_solucao", "etapa_10_checagem_aderencia"}:
-            decision_stage = "understanding"
-        elif compare:
+        decision_stage = _stage_to_decision_stage(state.stage_id)
+        if compare:
             decision_stage = "comparison"
         elif resistance:
             decision_stage = "objection"
@@ -245,7 +266,6 @@ class CounterpartyModelBuilder:
         elif direct_price or compare or pain_known or impact_known:
             decision_temperature = "warm"
 
-        topic_domain = _opening_topic_domain(state)
         if topic_domain == "commercial_explicit":
             interaction_mode = "testing_price" if direct_price else "probing"
             counterparty_intent = "test_price" if direct_price else "understand"
@@ -310,24 +330,37 @@ class CounterpartyModelBuilder:
 
         signals = sum(
             1
-            for value in (direct_price, compare, clarity, advance, delay, trust_seek, resistance, urgency, pain_known, impact_known)
+            for value in (
+                direct_price,
+                compare,
+                clarity,
+                advance,
+                delay,
+                trust_seek,
+                resistance,
+                urgency,
+                pain_known,
+                impact_known,
+                business_ready,
+                bool(clarity_note),
+            )
             if value
         )
         confidence = min(0.95, round(0.45 + signals * 0.05, 2))
 
         model = {
-            "interaction_mode": interaction_mode if interaction_mode in _INTERACTION_MODES else "exploring",
-            "counterparty_intent": counterparty_intent if counterparty_intent in _COUNTERPARTY_INTENTS else "understand",
-            "decision_temperature": decision_temperature if decision_temperature in _DECISION_TEMPERATURES else "cold",
-            "resistance_level": resistance_level if resistance_level in _LEVELS else "medium",
-            "trust_level": trust_level if trust_level in _LEVELS else "medium",
-            "urgency_level": urgency_level if urgency_level in _LEVELS else "low",
-            "risk_sensitivity": risk_sensitivity if risk_sensitivity in _RISK_SENSITIVITY else "moderate",
-            "clarity_need": clarity_need if clarity_need in _CLARITY_NEEDS else "structure",
-            "value_orientation": value_orientation if value_orientation in _VALUE_ORIENTATIONS else "outcome",
-            "decision_stage": decision_stage if decision_stage in _DECISION_STAGES else "discovery",
-            "microcommitment_goal": microcommitment_goal if microcommitment_goal in _MICROCOMMITMENTS else "answer_simple",
-            "question_priority": question_priority if question_priority in _QUESTION_PRIORITIES else "tension_question",
+            "interaction_mode": _normalize_choice(interaction_mode, _INTERACTION_MODES, "exploring"),
+            "counterparty_intent": _normalize_choice(counterparty_intent, _COUNTERPARTY_INTENTS, "understand"),
+            "decision_temperature": _normalize_choice(decision_temperature, _DECISION_TEMPERATURES, "cold"),
+            "resistance_level": _normalize_choice(resistance_level, _LEVELS, "medium"),
+            "trust_level": _normalize_choice(trust_level, _LEVELS, "medium"),
+            "urgency_level": _normalize_choice(urgency_level, _LEVELS, "low"),
+            "risk_sensitivity": _normalize_choice(risk_sensitivity, _RISK_SENSITIVITY, "moderate"),
+            "clarity_need": _normalize_choice(clarity_need, _CLARITY_NEEDS, "structure"),
+            "value_orientation": _normalize_choice(value_orientation, _VALUE_ORIENTATIONS, "outcome"),
+            "decision_stage": _normalize_choice(decision_stage, _DECISION_STAGES, "discovery"),
+            "microcommitment_goal": _normalize_choice(microcommitment_goal, _MICROCOMMITMENTS, "answer_simple"),
+            "question_priority": _normalize_choice(question_priority, _QUESTION_PRIORITIES, "tension_question"),
             "conversation_tension": conversation_tension,
             "confidence": confidence,
             "neutral_mode": False,

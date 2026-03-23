@@ -135,6 +135,50 @@ class ResponseStrategyEngine:
                 break
         return "\n".join(lines)
 
+    def _build_capability_guidance(self, state: ConversationState) -> str:
+        architecture = state.offer_sales_architecture or {}
+        questioning_strategy = architecture.get("questioning_strategy", {}) if isinstance(architecture.get("questioning_strategy", {}), dict) else {}
+        if not bool(architecture.get("capability_questioning_enabled", False)):
+            return ""
+
+        hypotheses = state.diagnostic_hypotheses or {}
+        pains = [pain for pain in hypotheses.get("dores_reais", hypotheses.get("diagnostic_clusters", [])) if isinstance(pain, dict)]
+        active_pain = pains[0] if pains else {}
+        hero = _clean_text(
+            active_pain.get("hero_function", "")
+            or active_pain.get("funcao_saga_que_ajuda", "")
+        )
+        support = _clean_text(active_pain.get("support_function", ""))
+        hero_candidates = [
+            _clean_text(item)
+            for item in active_pain.get("hero_function_candidates", [])
+            if _clean_text(item)
+        ][:3]
+        support_candidates = [
+            _clean_text(item)
+            for item in active_pain.get("support_function_candidates", [])
+            if _clean_text(item)
+        ][:3]
+
+        lines = ["REGRA DE CAPACIDADE"]
+        lines.append(f"- infer_from_context={bool(questioning_strategy.get('infer_capability_paths_from_context', False))}")
+        lines.append(f"- disambiguate_capabilities={bool(questioning_strategy.get('choose_questions_that_disambiguate_relevant_capabilities', False))}")
+        lines.append(f"- avoid_unlinked_questions={bool(questioning_strategy.get('avoid_questions_unlinked_to_real_capabilities', False))}")
+        if _clean_text(architecture.get("capability_bridge_goal", "")):
+            lines.append(f"- capability_bridge_goal={architecture.get('capability_bridge_goal', '')}")
+        if _clean_text(architecture.get("capability_priority_goal", "")):
+            lines.append(f"- capability_priority_goal={architecture.get('capability_priority_goal', '')}")
+        if hero:
+            lines.append(f"- hero_candidate={hero}")
+        if support:
+            lines.append(f"- support_candidate={support}")
+        if hero_candidates:
+            lines.append(f"- hero_candidates={' | '.join(hero_candidates)}")
+        if support_candidates:
+            lines.append(f"- support_candidates={' | '.join(support_candidates)}")
+        lines.append("- strategy_rule=quando houver pergunta, ela deve ajudar a descobrir qual capacidade real resolve a trava principal")
+        return "\n".join(lines)
+
     def _build_user_input(self, state: ConversationState, user_message: str) -> str:
         lead_summary = state.lead_summary or {}
         neural_state = state.neural_state or {}
@@ -206,6 +250,10 @@ AJUSTES NEUROCOMPORTAMENTAIS
         counterparty = self._dict_lines("SINAIS DA CONTRAPARTE", state.counterparty_model or {}, limit=8)
         if counterparty:
             sections.append(counterparty)
+
+        capability_guidance = self._build_capability_guidance(state)
+        if capability_guidance:
+            sections.append(capability_guidance)
 
         return "\n\n".join(section for section in sections if section.strip())
 

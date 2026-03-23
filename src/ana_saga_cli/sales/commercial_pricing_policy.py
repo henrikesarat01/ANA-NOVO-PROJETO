@@ -33,11 +33,6 @@ def _clean_text(value: Any) -> str:
     return str(value or "").strip()
 
 
-def _contains_any(text: str, terms: tuple[str, ...]) -> bool:
-    normalized = text.lower()
-    return any(term in normalized for term in terms)
-
-
 def _unique_list(items: list[str]) -> list[str]:
     unique: list[str] = []
     seen = set()
@@ -54,7 +49,62 @@ def _status_is_known(status: str) -> bool:
     return status in {"present", "absent"}
 
 
+def _normalize_status(value: Any) -> str:
+    normalized = _clean_text(value).lower()
+    if normalized in {"present", "presente", "sim", "true", "yes"}:
+        return "present"
+    if normalized in {"absent", "ausente", "nao", "não", "false", "no"}:
+        return "absent"
+    if normalized == "unknown":
+        return "unknown"
+    return ""
+
+
+def _bool_signal(*values: Any) -> bool:
+    for value in values:
+        if isinstance(value, bool) and value:
+            return True
+    return False
+
+
 class CommercialPricingPolicyEngine:
+    def _structured_capability_statuses(self, state: ConversationState) -> dict[str, str]:
+        hypotheses = state.diagnostic_hypotheses or {}
+        surface = state.surface_guidance or {}
+        offer_context = state.offer_context or {}
+        channel_context = state.channel_context or {}
+        sources = [
+            hypotheses.get("capability_statuses", {}),
+            surface.get("capability_statuses", {}),
+            offer_context.get("capability_statuses", {}),
+            channel_context.get("capability_statuses", {}),
+        ]
+        key_aliases = {
+            "catalogo": ("catalogo", "catalogo_status"),
+            "fechamento_whatsapp": ("fechamento_whatsapp", "fechamento_whatsapp_status"),
+            "pagamento": ("pagamento", "pagamento_status"),
+            "agendamento": ("agendamento", "agendamento_status"),
+            "confirmacao": ("confirmacao", "confirmacao_status"),
+            "handoff": ("handoff", "handoff_status"),
+            "integracao": ("integracao", "integracao_status"),
+            "multi_fluxo": ("multi_fluxo", "multi_fluxo_status"),
+            "multiatendente": ("multiatendente", "multiatendente_status"),
+            "multiunidade": ("multiunidade", "multiunidade_status"),
+        }
+        statuses = {key: "untracked" for key in key_aliases}
+        for key, aliases in key_aliases.items():
+            for source in sources:
+                if not isinstance(source, dict):
+                    continue
+                for alias in aliases:
+                    normalized = _normalize_status(source.get(alias, ""))
+                    if normalized:
+                        statuses[key] = normalized
+                        break
+                if statuses[key] != "untracked":
+                    break
+        return statuses
+
     def _pricing_validation_config(self, architecture: dict[str, Any]) -> dict[str, Any]:
         config = architecture.get("pricing_validation", {}) if isinstance(architecture.get("pricing_validation", {}), dict) else {}
         release_modes = config.get("price_release_modes", {}) if isinstance(config.get("price_release_modes", {}), dict) else {}
@@ -92,6 +142,7 @@ class CommercialPricingPolicyEngine:
                 "range_only_after_context": bool(release_modes.get("range_only_after_context", True)),
                 "precise_only_after_scope": bool(release_modes.get("precise_only_after_scope", True)),
             },
+            "variable_definitions": config.get("variable_definitions", {}) if isinstance(config.get("variable_definitions", {}), dict) else {},
         }
 
     def _questioning_strategy_config(self, architecture: dict[str, Any]) -> dict[str, Any]:
@@ -110,10 +161,12 @@ class CommercialPricingPolicyEngine:
         self,
         state: ConversationState,
         *,
+        scope_text: str,
         capability_statuses: dict[str, str],
         flows_known: bool,
         project_complexity: str,
         scope_confidence: str,
+        pricing_validation: dict[str, Any] | None = None,
     ) -> dict[str, dict[str, str | bool]]:
         lead_summary = state.lead_summary or {}
         hypotheses = state.diagnostic_hypotheses or {}
@@ -121,13 +174,11 @@ class CommercialPricingPolicyEngine:
         offer_type = _clean_text(hypotheses.get("tipo_oferta", hypotheses.get("offer_type", "")))
         niche_known = bool(lead_summary.get("niche_known", False))
         niche_specificity = _clean_text(lead_summary.get("niche_specificity", "unknown")) or "unknown"
-        offer_known = bool(lead_summary.get("offer_known", False))
         operation_model_known = bool(lead_summary.get("operation_model_known", False))
         channel_usage_known = bool(lead_summary.get("channel_usage_known", False))
         customer_type_known = bool(lead_summary.get("customer_type_known", False))
         business_context_ready_for_sizing = bool(lead_summary.get("business_context_ready_for_sizing", False))
 
-        has_business_identity = niche_known and niche_specificity in {"generic", "specific"}
         has_operation_anchor = operation_model_known or customer_type_known or bool(operation_model)
         has_minimum_operation_context = bool(has_operation_anchor or business_context_ready_for_sizing)
 
@@ -145,94 +196,131 @@ class CommercialPricingPolicyEngine:
             or niche_specificity == "specific"
         )
         uso_whatsapp_known = bool(
-            (
-                channel_usage_known
-                and has_minimum_operation_context
-            )
-            or _status_is_known(capability_statuses.get("fechamento_whatsapp", ""))
-            or _status_is_known(capability_statuses.get("catalogo", ""))
-            or _status_is_known(capability_statuses.get("agendamento", ""))
+            channel_usage_known
+            and has_minimum_operation_context
         )
         principal_trava_known = bool(lead_summary.get("pain_known", False))
-        quantidade_fluxos_known = bool(flows_known or _status_is_known(capability_statuses.get("multi_fluxo", "")))
-        integracao_known = bool(_status_is_known(capability_statuses.get("integracao", "")))
-        fechamento_known = bool(_status_is_known(capability_statuses.get("fechamento_whatsapp", "")))
+        quantidade_fluxos_known = bool(flows_known)
+        integracao_known = _bool_signal(
+            hypotheses.get("integracao_known", False),
+            hypotheses.get("integration_known", False),
+            hypotheses.get("necessidade_de_integracao_known", False),
+        )
+        fechamento_known = _bool_signal(
+            hypotheses.get("fechamento_no_whatsapp_ou_triagem_known", False),
+            hypotheses.get("closing_channel_known", False),
+        )
         complexidade_fluxo_known = bool(flows_known and scope_confidence in {"media", "alta"})
-        jornadas_known = bool(flows_known or _status_is_known(capability_statuses.get("multiunidade", "")))
+        jornadas_known = bool(flows_known and business_context_ready_for_sizing)
         fator_complexidade_known = bool(project_complexity and scope_confidence in {"media", "alta"})
+        exemplo_minimo_fluxo_aprovado = bool(
+            bool(hypotheses.get("exemplo_minimo_fluxo_aprovado", False))
+            or bool(hypotheses.get("flow_example_approved", False))
+            or (operation_model_known and channel_usage_known)
+        )
 
-        return {
+        contracts = {
             "tipo_de_operacao": variable(
                 tipo_operacao_known,
                 "como a operação de vocês funciona hoje",
-                "o que vocês fazem aí hoje?",
-                "isso define a base do escopo e o tamanho inicial da implantação",
-                "escopo base, esforço de implantação e faixa inicial",
+                "entender como a operação funciona hoje",
+                "isso muda o porte do caso e o nível de solução que faz sentido",
+                "porte do caso, desenho da rotina e forma certa de situar preço",
             ),
             "uso_atual_do_whatsapp": variable(
                 uso_whatsapp_known,
                 "como o WhatsApp entra hoje na operação",
-                "como o WhatsApp entra hoje na operação de vocês?",
-                "isso muda o desenho do fluxo e o que precisa acontecer dentro do WhatsApp",
-                "desenho do fluxo, escopo funcional e faixa",
+                "entender como o WhatsApp entra hoje na rotina",
+                "isso muda o tipo de fluxo que precisa acontecer no canal",
+                "tipo de fluxo, desenho da rotina e forma certa de situar preço",
             ),
             "principal_trava_operacional": variable(
                 principal_trava_known,
                 "qual trava mais hoje na rotina",
-                "onde isso mais trava hoje na rotina de vocês?",
-                "isso ajuda a calibrar o nível de automação e o tipo de desenho que faz sentido",
-                "profundidade da solução, esforço e proposta",
+                "entender onde a rotina mais trava hoje",
+                "isso muda a profundidade da solução e o tipo de desenho que faz sentido",
+                "profundidade da solução, desenho da rotina e forma certa de situar preço",
+            ),
+            "exemplo_minimo_de_fluxo_aprovado": variable(
+                exemplo_minimo_fluxo_aprovado,
+                "se um exemplo minimo do fluxo ja ficou claro e aprovado",
+                "validar um exemplo mínimo do fluxo antes de falar preço",
+                "sem uma cena mínima do fluxo, ainda falta base para situar o valor com segurança",
+                "desenho real do fluxo e forma certa de situar preço",
             ),
             "quantidade_de_fluxos": variable(
                 quantidade_fluxos_known,
                 "se isso entra em um fluxo ou em mais de uma frente",
-                "isso entra em um fluxo principal ou em mais de uma frente aí?",
-                "isso muda a quantidade de jornadas e a complexidade do projeto",
-                "quantidade de jornadas, complexidade e faixa",
+                "entender se isso entra em uma frente principal ou em mais de uma",
+                "isso muda a quantidade de jornadas e a complexidade do caso",
+                "quantidade de jornadas, complexidade e forma certa de situar preço",
             ),
             "necessidade_de_integracao": variable(
                 integracao_known,
                 "se a primeira versão precisa integrar com outro sistema",
-                "na primeira versão isso precisa integrar com algum sistema ou pode rodar sozinho?",
-                "integração muda esforço técnico, implantação e faixa",
-                "implantação, esforço técnico e faixa",
+                "entender se a primeira versão precisa integrar com outro sistema",
+                "integração muda o esforço técnico e o tamanho real da primeira entrega",
+                "esforço técnico, tamanho da entrega e forma certa de situar preço",
             ),
             "fechamento_no_whatsapp_ou_triagem": variable(
                 fechamento_known,
                 "se o WhatsApp fica na triagem ou já entra no fechamento",
-                "o WhatsApp de vocês hoje fica mais na triagem ou vocês chegam a fechar por lá também?",
-                "isso muda bastante o fluxo, a automação e a proposta",
-                "desenho do fluxo, automação e escopo",
+                "entender se o WhatsApp fica mais na triagem ou já entra no fechamento",
+                "isso muda o fluxo, o nível de automação e o desenho do caso",
+                "fluxo, automação e forma certa de situar preço",
             ),
             "complexidade_do_fluxo": variable(
                 complexidade_fluxo_known,
                 "o nível de etapas e desvios do fluxo",
-                "esse fluxo aí é mais direto ou tem várias etapas até concluir?",
-                "isso muda a complexidade do desenho e da implantação",
-                "complexidade, implantação e faixa",
+                "entender se o fluxo é mais direto ou tem várias etapas",
+                "isso muda a complexidade do desenho e o porte da entrega",
+                "complexidade, porte da entrega e forma certa de situar preço",
             ),
             "integracao": variable(
                 integracao_known,
                 "se existe integração estrutural no escopo",
-                "tem alguma integração que já precisa entrar nessa primeira fase?",
-                "integração muda o esforço técnico e o escopo real",
-                "escopo técnico, esforço e faixa",
+                "entender se existe integração estrutural já na primeira fase",
+                "isso muda o esforço técnico e o tamanho real da primeira fase",
+                "esforço técnico, tamanho da primeira fase e forma certa de situar preço",
             ),
             "quantidade_de_jornadas": variable(
                 jornadas_known,
                 "quantas jornadas precisam entrar nessa primeira fase",
-                "vocês querem resolver uma jornada principal ou mais de uma frente já nessa primeira fase?",
-                "isso muda a quantidade de jornadas e o tamanho do projeto",
-                "jornadas, complexidade e faixa",
+                "entender quantas jornadas precisam entrar nessa primeira fase",
+                "isso muda a quantidade de jornadas e o tamanho do caso",
+                "jornadas, tamanho do caso e forma certa de situar preço",
             ),
             "fator_estrutural_de_complexidade": variable(
                 fator_complexidade_known,
                 "qual é o principal fator estrutural de complexidade",
-                "o que mais pesa na estrutura disso hoje para vocês?",
-                "isso ajuda a calibrar o desenho e evita passar uma faixa torta",
-                "complexidade estrutural, proposta e faixa",
+                "entender o principal fator estrutural de complexidade",
+                "isso muda o desenho do caso e evita situar preço com base fraca",
+                "complexidade estrutural, desenho do caso e forma certa de situar preço",
             ),
         }
+
+        variable_defs = pricing_validation.get("variable_definitions", {})
+        if isinstance(variable_defs, dict):
+            for var_name, var_def in variable_defs.items():
+                if var_name in contracts or not isinstance(var_def, dict):
+                    continue
+                known_fields = var_def.get("known_fields", [])
+                if not isinstance(known_fields, list):
+                    known_fields = [known_fields] if known_fields else []
+                var_known = bool(known_fields) and all(
+                    bool(lead_summary.get(_clean_text(f), False))
+                    for f in known_fields
+                    if _clean_text(f)
+                )
+                contracts[var_name] = variable(
+                    var_known,
+                    _clean_text(var_def.get("label", "")) or "",
+                    _clean_text(var_def.get("question", "")) or "",
+                    _clean_text(var_def.get("reason", "")) or "",
+                    _clean_text(var_def.get("changes", "")) or "",
+                )
+
+        return contracts
 
     def _select_pricing_variable(
         self,
@@ -273,6 +361,7 @@ class CommercialPricingPolicyEngine:
         variable_contracts: dict[str, dict[str, str | bool]],
         minimum_missing: list[str],
         all_missing: list[str],
+        readiness_stage: str,
         floor_anchor_allowed: bool,
         allow_range_quote: bool,
         allow_precise_quote: bool,
@@ -286,9 +375,12 @@ class CommercialPricingPolicyEngine:
         minimum_pricing_question_reason = _clean_text(selected_contract.get("reason", ""))
         question_will_change_what = _clean_text(selected_contract.get("changes", ""))
         selected_label = _clean_text(selected_contract.get("label", "escopo real do caso")) or "escopo real do caso"
+        question_anchor_is_literal = bool(minimum_pricing_question.endswith("?")) if minimum_pricing_question else False
 
         price_response_mode = "block_price"
-        if allow_precise_quote and (minimum_validation_satisfied or not bool(release_modes.get("precise_only_after_scope", True))):
+        if readiness_stage == READINESS_STAGE_A and not (allow_range_quote or allow_precise_quote):
+            price_response_mode = "block_price"
+        elif allow_precise_quote and (minimum_validation_satisfied or not bool(release_modes.get("precise_only_after_scope", True))):
             price_response_mode = "precise_ok"
         elif allow_range_quote and (minimum_validation_satisfied or not bool(release_modes.get("range_only_after_context", True))):
             price_response_mode = "range_ok"
@@ -300,16 +392,21 @@ class CommercialPricingPolicyEngine:
         if selected_variable:
             price_block_reason_short = f"ainda falta validar {selected_label}"
             price_block_reason_explained = (
-                f"Antes de te passar isso direito, preciso entender {selected_label}, "
-                f"porque isso muda {question_will_change_what or 'o escopo e a faixa da proposta'}."
+                f"Ainda falta clareza sobre {selected_label}; "
+                f"isso muda {question_will_change_what or 'o tamanho real do caso e a forma de situar preço'}."
             )
+            if selected_variable == "exemplo_minimo_de_fluxo_aprovado":
+                price_block_reason_explained = (
+                    "Ainda falta validar uma cena mínima do fluxo; "
+                    "sem isso, o valor fica sem base suficiente para ser situado com segurança."
+                )
         else:
             price_block_reason_short = "ainda falta delimitar o escopo mínimo"
             price_block_reason_explained = (
-                "Antes de te passar isso direito, preciso delimitar o escopo mínimo, "
-                "porque isso muda o tamanho da implantação e a faixa mais honesta para o caso."
+                "Ainda falta delimitar melhor o caso; "
+                "isso muda o tamanho real da entrega e a forma certa de situar preço."
             )
-            question_will_change_what = question_will_change_what or "escopo, complexidade e faixa"
+            question_will_change_what = question_will_change_what or "tamanho do caso, complexidade e forma certa de situar preço"
 
         return {
             "validation_source": "offer_blueprint",
@@ -321,6 +418,7 @@ class CommercialPricingPolicyEngine:
             "price_response_mode": price_response_mode,
             "minimum_pricing_question": minimum_pricing_question,
             "minimum_pricing_question_reason": minimum_pricing_question_reason,
+            "question_anchor_is_literal": question_anchor_is_literal,
             "price_block_reason_short": price_block_reason_short,
             "price_block_reason_explained": price_block_reason_explained,
             "question_will_change_what": question_will_change_what,
@@ -370,225 +468,56 @@ class CommercialPricingPolicyEngine:
         ]
         return " ".join(part for part in parts if _clean_text(part)).lower()
 
-    def _detect_resources(self, state: ConversationState, scope_text: str, active_pain_context: str) -> tuple[list[str], list[str], list[str]]:
+    def _detect_resources(self, state: ConversationState) -> tuple[list[str], list[str], list[str]]:
         hypotheses = state.diagnostic_hypotheses or {}
-        surface = state.surface_guidance or {}
-        pains = hypotheses.get("dores_reais", hypotheses.get("diagnostic_clusters", []))
-        resources: list[str] = []
-        drivers: list[str] = []
-        out_of_scope: list[str] = []
-
-        def add_resource(name: str) -> None:
-            resources.append(name)
-
-        if _contains_any(scope_text, ("menu", "botão", "botao", "triagem", "entrada", "separar logo no começo")):
-            add_resource("menu_botoes")
-        if _contains_any(scope_text, ("carrossel", "vitrine", "comparar visualmente", "comparar opções", "comparar opcoes")):
-            add_resource("carrossel")
-        if _contains_any(scope_text, ("lista", "categoria", "categorias", "mostrar peça", "mostrar peca", "lista de peças", "lista de pecas")):
-            add_resource("lista")
-        if _contains_any(scope_text, ("coleta", "formul", "modelo do carro", "ano", "motor", "placa", "dados do carro", "dados do veiculo", "dados do veículo")):
-            add_resource("formulario_coleta")
-        if _contains_any(scope_text, ("orçamento", "orcamento", "cotação", "cotacao", "passar preço", "passar preco")):
-            add_resource("orcamento_guiado")
-        if _contains_any(scope_text, ("agendamento", "agenda", "horário", "horario", "visita", "encaixe")):
-            add_resource("agendamento")
-        if _contains_any(scope_text, ("pagamento", "cobrança", "cobranca", "pix", "cartão", "cartao", "checkout", "boleto")):
-            add_resource("pagamento")
-        if _contains_any(scope_text, ("confirmação", "confirmacao", "confirmar", "resumo final", "pedido final")):
-            add_resource("confirmacao")
-        if _contains_any(scope_text, ("follow", "abandono", "retomada", "sumiu", "sumir", "esfriou")):
-            add_resource("followup")
-        if _contains_any(scope_text, ("funil", "pipeline", "priorização", "priorizacao", "etapa")):
-            add_resource("funil")
-
-        function_names = [
-            str(surface.get("hero_saga_function", "") or ""),
-            str(surface.get("support_saga_function", "") or ""),
-        ]
-        for pain in pains[:4]:
-            if isinstance(pain, dict):
-                function_names.extend(
-                    [
-                        str(pain.get("hero_function", "") or ""),
-                        str(pain.get("support_function", "") or ""),
-                    ]
-                )
-        function_blob = " ".join(function_names).lower()
-        if "carrossel" in function_blob:
-            add_resource("carrossel")
-        if "lista" in function_blob:
-            add_resource("lista")
-        if "formul" in function_blob or "coleta" in function_blob:
-            add_resource("formulario_coleta")
-        if "agendamento" in function_blob:
-            add_resource("agendamento")
-        if "confirmação" in function_blob or "confirmacao" in function_blob:
-            add_resource("confirmacao")
-        if "funil" in function_blob:
-            add_resource("funil")
-
-        explicit_driver_text = f"{scope_text} {active_pain_context}".lower()
-        if _contains_any(explicit_driver_text, ("integração", "integracao", "api", "erp", "crm", "webhook", "sistema externo")) and not _contains_any(
-            explicit_driver_text,
-            ("sem integração", "sem integracao", "não tem integração", "nao tem integracao", "sem erp", "sem crm"),
-        ):
-            drivers.append("integracoes")
-            out_of_scope.append("integrações complexas")
-        if _contains_any(explicit_driver_text, ("multiatendente", "muitos atendentes", "vários atendentes", "varios atendentes", "equipe grande", "muitos vendedores")) and not _contains_any(
-            explicit_driver_text,
-            ("sem multiatendente", "não tem multiatendente", "nao tem multiatendente", "uma pessoa atende", "um atendente", "um vendedor"),
-        ):
-            drivers.append("multiatendente")
-            out_of_scope.append("operação com multiatendente fora do padrão")
-        if _contains_any(explicit_driver_text, ("múltiplos números", "multiplos numeros", "vários números", "varios numeros", "mais de um número", "mais de um numero")) and not _contains_any(
-            explicit_driver_text,
-            ("um número só", "um numero so", "número único", "numero unico"),
-        ):
-            drivers.append("multiplos_numeros")
-            out_of_scope.append("múltiplos números")
-        if _contains_any(explicit_driver_text, ("multiunidade", "múltiplas unidades", "multiplas unidades", "franquia", "filiais")):
-            drivers.append("multiunidade")
-            out_of_scope.append("multiunidade")
-        if _contains_any(explicit_driver_text, ("catálogo grande", "catalogo grande", "muitos produtos", "muitas peças", "muitas categorias", "muitos tratamentos", "muitos serviços", "muitos servicos")) and not _contains_any(
-            explicit_driver_text,
-            ("sem catálogo grande", "sem catalogo grande", "sem muitas categorias", "sem muitos produtos", "sem muitas peças"),
-        ):
-            drivers.append("catalogo_grande")
-            out_of_scope.append("catálogo grande")
-        if _contains_any(explicit_driver_text, ("múltiplas jornadas", "multiplas jornadas", "várias jornadas", "varias jornadas", "vários setores", "varios setores", "muitas áreas", "muitas areas")):
-            drivers.append("jornadas_avancadas")
-            out_of_scope.append("expansão de jornadas")
-        if _contains_any(explicit_driver_text, ("personalização", "personalizacao", "fora do padrão", "fora do padrao", "sob medida", "condicional robusta")):
-            drivers.append("personalizacao_alta")
-            out_of_scope.append("customização alta fora do padrão")
-        if _contains_any(explicit_driver_text, ("orçamento complexo", "orcamento complexo", "muitas regras", "regras de negócio", "regras de negocio", "condicional")):
-            drivers.append("logica_robusta")
-            out_of_scope.append("lógica avançada fora do escopo base")
-
+        resources = [str(item).strip() for item in hypotheses.get("required_resources", []) if str(item).strip()]
+        drivers = [str(item).strip() for item in hypotheses.get("complexity_drivers", []) if str(item).strip()]
+        out_of_scope = [str(item).strip() for item in hypotheses.get("out_of_scope_flags", []) if str(item).strip()]
         return _unique_list(resources), _unique_list(drivers), _unique_list(out_of_scope)
 
-    def _infer_capability_status(self, scope_text: str, yes_terms: tuple[str, ...], no_terms: tuple[str, ...] = ()) -> str:
-        if no_terms and _contains_any(scope_text, no_terms):
-            return "absent"
-        if _contains_any(scope_text, yes_terms):
-            return "present"
-        return "unknown"
+    def _detect_capability_statuses(self, state: ConversationState) -> dict[str, str]:
+        return self._structured_capability_statuses(state)
 
-    def _detect_capability_statuses(self, scope_text: str) -> dict[str, str]:
-        return {
-            "catalogo": self._infer_capability_status(
-                scope_text,
-                ("catálogo", "catalogo", "carrossel", "vitrine", "lista de peças", "lista de pecas", "mostrar peça", "mostrar peca"),
-                ("sem catálogo", "sem catalogo"),
-            ),
-            "fechamento_whatsapp": self._infer_capability_status(
-                scope_text,
-                ("fecha pedido", "fechar pedido", "fecha no whatsapp", "fecha no whats", "pedido no whatsapp", "compra no whatsapp"),
-                ("só cota", "so cota", "só cotação", "so cotacao", "não fecha no whatsapp", "nao fecha no whatsapp", "só orçamento", "so orcamento"),
-            ),
-            "pagamento": self._infer_capability_status(
-                scope_text,
-                ("pagamento", "pix", "cartão", "cartao", "boleto", "checkout", "cobrança", "cobranca"),
-            ),
-            "agendamento": self._infer_capability_status(
-                scope_text,
-                ("agendamento", "agenda", "horário", "horario", "visita", "encaixe", "marcar"),
-            ),
-            "confirmacao": self._infer_capability_status(
-                scope_text,
-                ("confirmação", "confirmacao", "confirmar", "resumo final", "pedido final"),
-            ),
-            "handoff": self._infer_capability_status(
-                scope_text,
-                (
-                    "falar com atendente",
-                    "falar com vendedor",
-                    "falar com humano",
-                    "passar para atendente",
-                    "passar para vendedor",
-                    "passar para humano",
-                    "transferir para atendente",
-                    "transferir para vendedor",
-                    "transferir para humano",
-                    "handoff",
-                    "encaminhar para técnico",
-                    "encaminhar para tecnico",
-                ),
-            ),
-            "integracao": self._infer_capability_status(
-                scope_text,
-                ("integração", "integracao", "api", "erp", "crm", "webhook", "estoque integrado"),
-                ("sem integração", "sem integracao", "não tem integração", "nao tem integracao", "sem erp", "sem crm"),
-            ),
-            "multi_fluxo": self._infer_capability_status(
-                scope_text,
-                ("mais de um fluxo", "múltiplos fluxos", "multiplos fluxos", "vários fluxos", "varios fluxos", "várias frentes", "varias frentes", "segundo fluxo"),
-            ),
-            "multiatendente": self._infer_capability_status(
-                scope_text,
-                ("multiatendente", "muitos atendentes", "vários atendentes", "varios atendentes", "muitos vendedores", "equipe"),
-                ("sem multiatendente", "não tem multiatendente", "nao tem multiatendente", "uma pessoa atende", "um atendente", "um vendedor"),
-            ),
-            "multiunidade": self._infer_capability_status(
-                scope_text,
-                ("multiunidade", "múltiplas unidades", "multiplas unidades", "franquia", "filiais"),
-                ("sem multiunidade", "uma unidade", "unidade única", "unidade unica"),
-            ),
-        }
-
-    def _infer_flows_estimate(
-        self,
-        pains: list[dict[str, Any]],
-        scope_text: str,
-        capability_statuses: dict[str, str],
-    ) -> tuple[str, int, list[str], bool]:
+    def _infer_flows_estimate(self, state: ConversationState, pains: list[dict[str, Any]]) -> tuple[str, int, list[str], bool]:
+        lead_summary = state.lead_summary or {}
+        hypotheses = state.diagnostic_hypotheses or {}
         reasons: list[str] = []
-        if _contains_any(
-            scope_text,
-            ("múltiplas jornadas", "multiplas jornadas", "setores", "categorias", "online", "presencial", "infantil", "adulto", "unidades", "jornadas"),
-        ) and not _contains_any(scope_text, ("sem muitas categorias", "sem categoria", "um fluxo principal")):
-            reasons.append("há sinal explícito de mais de um fluxo, jornada ou setor")
-            return "fluxos_por_categoria_jornada_setor", 3, reasons, True
-        if capability_statuses.get("multi_fluxo") == "present" or _contains_any(
-            scope_text,
-            ("mais de um fluxo", "múltiplos fluxos", "multiplos fluxos", "vários fluxos", "varios fluxos", "segundo fluxo"),
+        if _bool_signal(
+            hypotheses.get("multi_fluxo", False),
+            hypotheses.get("multiple_flows", False),
+            hypotheses.get("quantidade_de_jornadas_known", False),
         ):
-            reasons.append("há sinal explícito de mais de um fluxo principal")
+            reasons.append("já existe sinal estruturado de mais de uma frente ou jornada")
+            return "fluxos_por_categoria_jornada_setor", 3, reasons, True
+        if bool(lead_summary.get("commercial_scope_ready", False)):
+            reasons.append("já existe base comercial suficiente para assumir um fluxo principal inicial")
+            return "um_fluxo_principal", 1, reasons, True
+        if len(pains) >= 2 and bool(lead_summary.get("pain_known", False)):
+            reasons.append("há mais de uma frente de dor, mas o tamanho do desenho ainda não está fechado")
             return "multiplos_fluxos", 2, reasons, True
-        if _contains_any(scope_text, ("triagem", "cotação", "cotacao", "orçamento", "orcamento", "pedido", "manutenção", "manutencao")) and len(pains) >= 2:
-            reasons.append("há indício de um fluxo principal com ramificações, mas o tamanho ainda não está totalmente claro")
-            return "um_fluxo_principal", 1, reasons, False
-        if _contains_any(scope_text, ("um fluxo", "fluxo simples", "triagem simples")):
-            reasons.append("o caso parece concentrado em um fluxo principal")
-            return "um_fluxo_principal", 0, reasons, True
         reasons.append("o número de fluxos ainda não está claro")
         return "um_fluxo_principal", 0, reasons, False
 
-    def _infer_operation_type(self, state: ConversationState, scope_text: str, flows_estimate: str) -> tuple[str, int, str]:
+    def _infer_operation_type(self, state: ConversationState, flows_estimate: str) -> tuple[str, int, str]:
+        lead_summary = state.lead_summary or {}
         hypotheses = state.diagnostic_hypotheses or {}
-        offer_type = str(hypotheses.get("tipo_oferta", hypotheses.get("offer_type", "")) or "").lower()
         saga_mode = str(hypotheses.get("saga_mode", "") or "").lower()
         if flows_estimate == "fluxos_por_categoria_jornada_setor":
             return "multiplas_jornadas", 3, "a operação tem jornadas ou setores múltiplos"
-        if _contains_any(scope_text, ("produto e serviço", "produto/serviço", "produto/servico", "híbrida", "hibrida")) or ("produto" in offer_type and "serv" in offer_type):
-            return "operacao_hibrida", 2, "a operação mistura lógica de produto e serviço"
-        if saga_mode == "consultative_handoff" or _contains_any(scope_text, ("consultivo", "briefing", "projeto", "avaliação", "avaliacao", "diagnóstico", "diagnostico")):
+        if saga_mode == "consultative_handoff":
             return "servico_consultivo", 2, "o caso pede qualificação e leitura consultiva"
-        if saga_mode == "service_led_self_service" or _contains_any(scope_text, ("agenda", "consulta", "visita", "tratamento", "aula", "matrícula", "matricula")):
+        if saga_mode == "service_led_self_service":
             return "servico_simples", 1, "a operação é de serviço com próximo passo guiável"
-        if _contains_any(scope_text, ("catálogo", "catalogo", "variações", "variacoes", "estoque", "tamanho", "cor", "peça", "peca")):
-            return "produto_catalogo_moderado", 1, "a operação depende de produto, cotação ou navegação guiada"
-        return "produto_fisico_simples", 0, "a operação parece centrada em um fluxo comercial mais simples"
+        if bool(lead_summary.get("operation_model_known", False)) and bool(lead_summary.get("offer_known", False)):
+            return "operacao_contextualizada", 1, "a operação já tem base mínima contextualizada"
+        return "operacao_em_aberto", 0, "a operação ainda precisa ser delimitada com mais clareza"
 
-    def _infer_journey_mode(self, saga_mode: str, operation_type: str, active_pain_type: str, capability_statuses: dict[str, str]) -> str:
+    def _infer_journey_mode(self, saga_mode: str, active_pain_type: str) -> str:
         if saga_mode == "consultative_handoff":
             return "consultative_screening"
         if active_pain_type in {"agendamento_horario", "confirmacao_presenca"}:
             return "guided_service_execution"
-        if capability_statuses.get("catalogo") == "present":
-            return "guided_catalog"
-        if active_pain_type in {"orcamento_complexo", "envio_lista_pedido"} or operation_type in {"produto_catalogo_moderado", "operacao_hibrida"}:
+        if active_pain_type in {"orcamento_complexo", "envio_lista_pedido", "montagem_orcamento_pedido"}:
             return "guided_quote_or_order"
         return "triage_and_quote"
 
@@ -602,11 +531,12 @@ class CommercialPricingPolicyEngine:
         summary = state.lead_summary or {}
         mapped = state.diagnostic_hypotheses or {}
         gaps = [str(item).strip() for item in mapped.get("lacunas_em_aberto", []) if str(item).strip()]
-        known_capability_count = sum(1 for status in capability_statuses.values() if _status_is_known(status))
         confidence_score = 0
         if bool(summary.get("minimum_context_ready", False)):
             confidence_score += 1
         if bool(summary.get("commercial_scope_ready", False)):
+            confidence_score += 1
+        if bool(summary.get("business_context_ready_for_sizing", False)):
             confidence_score += 1
         if bool(summary.get("pain_known", False)):
             confidence_score += 1
@@ -620,10 +550,9 @@ class CommercialPricingPolicyEngine:
             confidence_score += 1
         if flows_known:
             confidence_score += 1
-        confidence_score += min(known_capability_count, 3)
         if len(gaps) >= 3:
             confidence_score -= 1
-        if any(driver in complexity_drivers for driver in {"integracoes", "multiunidade", "personalizacao_alta"}) and known_capability_count < 2:
+        if any(driver in complexity_drivers for driver in {"integracoes", "multiunidade", "personalizacao_alta"}) and not bool(summary.get("commercial_scope_ready", False)):
             gaps.append("detalhar melhor a parte robusta da operação antes de subir faixa")
             confidence_score -= 1
 
@@ -637,9 +566,6 @@ class CommercialPricingPolicyEngine:
         reasons: list[str] = []
         normalized = scope_text.lower()
         pressure = "none"
-        if _contains_any(normalized, ("barato", "mais barato", "preço baixo", "preco baixo", "desconto", "fechar barato", "valor menor", "mais em conta")):
-            pressure = "high"
-            reasons.append("o cliente sinaliza pressão por preço baixo")
         amounts = [int(match.group(1)) for match in _CURRENCY_RE.finditer(normalized)]
         if any(amount < PRICE_FLOOR_IMPLANTATION for amount in amounts):
             pressure = "high"
@@ -736,17 +662,27 @@ class CommercialPricingPolicyEngine:
             else:
                 readiness_blockers.append(f"falta {label}")
 
-        known_capability_count = sum(1 for status in capability_statuses.values() if _status_is_known(status))
-        present_capability_count = sum(1 for status in capability_statuses.values() if status == "present")
+        lead_summary = state.lead_summary or {}
+        business_ready = bool(lead_summary.get("business_context_ready_for_sizing", False))
+        commercial_scope_ready = bool(lead_summary.get("commercial_scope_ready", False))
+        minimum_context_ready = bool(lead_summary.get("minimum_context_ready", False))
 
         if flows_known:
             readiness_score += 1
         else:
             readiness_blockers.append("falta dimensionar a quantidade aproximada de fluxos")
 
-        readiness_score += min(known_capability_count, 3)
-        if known_capability_count < 2:
-            readiness_blockers.append("faltam decisões estruturais do escopo, como catálogo, pagamento, confirmação ou handoff")
+        if minimum_context_ready:
+            readiness_score += 1
+        else:
+            readiness_blockers.append("a conversa ainda não firmou contexto mínimo")
+
+        if business_ready:
+            readiness_score += 2
+        elif commercial_scope_ready:
+            readiness_score += 1
+        else:
+            readiness_blockers.append("ainda falta amarrar o contexto comercial mínimo")
 
         if scope_confidence == "alta":
             readiness_score += 2
@@ -755,9 +691,9 @@ class CommercialPricingPolicyEngine:
         else:
             readiness_blockers.append("a confiança de escopo ainda está baixa")
 
-        if scope_confidence == "alta" and flows_known and known_capability_count >= 3 and present_capability_count >= 1:
+        if business_ready and commercial_scope_ready and flows_known and scope_confidence == "alta":
             return readiness_score, READINESS_STAGE_C, _unique_list(readiness_blockers)
-        if scope_confidence != "baixa" and flows_known and known_capability_count >= 2:
+        if business_ready and scope_confidence != "baixa":
             return readiness_score, READINESS_STAGE_B, _unique_list(readiness_blockers)
         return readiness_score, READINESS_STAGE_A, _unique_list(readiness_blockers)
 
@@ -768,34 +704,17 @@ class CommercialPricingPolicyEngine:
         capability_statuses: dict[str, str],
         flows_known: bool,
     ) -> list[str]:
+        lead_summary = state.lead_summary or {}
         mapped = state.diagnostic_hypotheses or {}
         gaps = [str(item).strip() for item in mapped.get("lacunas_em_aberto", []) if str(item).strip()]
-        human_labels = {
-            "catalogo": "se existe catálogo, lista ou vitrine para mostrar as peças",
-            "fechamento_whatsapp": "se vocês fecham pedido no próprio WhatsApp ou só fazem cotação",
-            "pagamento": "se o fluxo envolve pagamento no WhatsApp",
-            "agendamento": "se existe agendamento ou marcação como parte do fluxo",
-            "confirmacao": "se precisa confirmação ou resumo final antes de concluir",
-            "handoff": "se parte dos casos vai para humano ou técnico depois da triagem",
-            "integracao": "se existe integração com estoque, ERP ou outro sistema",
-            "multi_fluxo": "quantos fluxos ou jornadas principais realmente existem",
-            "multiatendente": "quantas pessoas atendem esse WhatsApp",
-            "multiunidade": "se a operação envolve mais de uma unidade ou número",
-        }
         if not flows_known:
             gaps.append("quantos fluxos ou jornadas principais entram nesse WhatsApp")
-        for key in (
-            "fechamento_whatsapp",
-            "catalogo",
-            "pagamento",
-            "confirmacao",
-            "integracao",
-            "multi_fluxo",
-            "multiatendente",
-            "handoff",
-        ):
-            if capability_statuses.get(key) == "unknown":
-                gaps.append(human_labels[key])
+        if not bool(lead_summary.get("channel_usage_known", False)):
+            gaps.append("como o WhatsApp entra hoje na operação de vocês")
+        if not bool(lead_summary.get("operation_model_known", False)) and not bool(lead_summary.get("customer_type_known", False)):
+            gaps.append("como a operação de vocês funciona hoje")
+        if not bool(lead_summary.get("pain_known", False)):
+            gaps.append("onde isso mais trava hoje na rotina de vocês")
         if readiness_stage == READINESS_STAGE_A:
             gaps.append("se o caso é algo mais enxuto de triagem/cotação ou um fluxo mais completo no WhatsApp")
         return _unique_list(gaps)
@@ -825,7 +744,6 @@ class CommercialPricingPolicyEngine:
         adjusted_points = points
         adjusted_complexity = project_complexity
         hard_drivers = {driver for driver in complexity_drivers if driver in {"integracoes", "multiunidade", "personalizacao_alta"}}
-        known_capability_count = sum(1 for status in capability_statuses.values() if _status_is_known(status))
 
         if readiness_stage == READINESS_STAGE_A:
             adjusted_points = min(adjusted_points, 4 if not hard_drivers else 6)
@@ -846,7 +764,7 @@ class CommercialPricingPolicyEngine:
             adjusted_complexity = "media"
             notes.append("confiança média não sustenta faixa de projeto grande sem mais prova")
 
-        if known_capability_count <= 1 and not flows_known and not hard_drivers:
+        if not flows_known and not hard_drivers:
             adjusted_points = min(adjusted_points, 4)
             adjusted_complexity = "simples"
             notes.append("quase nada do escopo estrutural foi confirmado; travando escalonamento agressivo")
@@ -904,17 +822,14 @@ class CommercialPricingPolicyEngine:
         pains = [pain for pain in hypotheses.get("dores_reais", hypotheses.get("diagnostic_clusters", [])) if isinstance(pain, dict)]
 
         scope_text = self._build_scope_text(state, user_message)
-        active_pain_context = self._build_active_pain_context(state)
-        capability_statuses = self._detect_capability_statuses(scope_text)
-        resources, complexity_drivers, out_of_scope = self._detect_resources(state, scope_text, active_pain_context)
-        flows_estimate, flows_points, flow_reasons, flows_known = self._infer_flows_estimate(pains, scope_text, capability_statuses)
-        operation_type, operation_points, operation_reason = self._infer_operation_type(state, scope_text, flows_estimate)
+        capability_statuses = self._detect_capability_statuses(state)
+        resources, complexity_drivers, out_of_scope = self._detect_resources(state)
+        flows_estimate, flows_points, flow_reasons, flows_known = self._infer_flows_estimate(state, pains)
+        operation_type, operation_points, operation_reason = self._infer_operation_type(state, flows_estimate)
         active_pain_type = str(surface.get("active_pain_type", "") or (pains[0].get("active_pain_type", "") if pains else "")).strip()
         journey_mode = self._infer_journey_mode(
             str(surface.get("saga_mode", hypotheses.get("saga_mode", "")) or ""),
-            operation_type,
             active_pain_type,
-            capability_statuses,
         )
         scope_confidence, scope_confidence_score, scope_gaps = self._infer_scope_confidence(
             state,
@@ -1031,13 +946,23 @@ class CommercialPricingPolicyEngine:
 
         variable_contracts = self._resolve_pricing_variables(
             state,
+            scope_text=scope_text,
             capability_statuses=capability_statuses,
             flows_known=flows_known,
             project_complexity=project_complexity,
             scope_confidence=scope_confidence,
+            pricing_validation=pricing_validation,
         )
         selected_variable, minimum_missing, all_missing = self._select_pricing_variable(pricing_validation, variable_contracts)
         minimum_validation_satisfied = not minimum_missing if bool(pricing_validation.get("require_minimum_validation_before_price", True)) else True
+        if (
+            proof_before_price
+            and not minimum_missing
+            and not bool(variable_contracts.get("exemplo_minimo_de_fluxo_aprovado", {}).get("known", False))
+        ):
+            minimum_missing = ["exemplo_minimo_de_fluxo_aprovado"]
+            selected_variable = "exemplo_minimo_de_fluxo_aprovado"
+            minimum_validation_satisfied = False
         if (
             minimum_validation_satisfied
             and bool(lead_summary.get("business_context_ready_for_sizing", False))
@@ -1051,10 +976,25 @@ class CommercialPricingPolicyEngine:
             variable_contracts=variable_contracts,
             minimum_missing=minimum_missing,
             all_missing=all_missing,
+            readiness_stage=readiness_stage,
             floor_anchor_allowed=floor_anchor_allowed,
             allow_range_quote=allow_range_quote,
             allow_precise_quote=allow_precise_quote,
         )
+
+        previous_pricing = state.pricing_policy or {}
+        block_price_consecutive_turns = int(previous_pricing.get("block_price_consecutive_turns", 0))
+        last_counted_turn = int(previous_pricing.get("_block_price_last_counted_turn", -1))
+        current_turn = state.turn_count
+        if current_turn != last_counted_turn:
+            if pricing_gate_contract.get("price_response_mode") == "block_price":
+                block_price_consecutive_turns += 1
+            else:
+                block_price_consecutive_turns = 0
+        known_context_count = int(lead_summary.get("known_context_count", 0))
+        if block_price_consecutive_turns >= 3 and floor_anchor_allowed and known_context_count >= 3:
+            pricing_gate_contract["price_response_mode"] = "floor_only"
+            block_price_consecutive_turns = 0
 
         discount_allowed = bool(
             allow_precise_quote
@@ -1150,6 +1090,7 @@ class CommercialPricingPolicyEngine:
             "offer_trust_strategy": _clean_text(architecture.get("trust_strategy", "")),
             "proof_before_price": proof_before_price,
             "price_requires_proof": price_requires_proof,
+            "flow_example_approved": bool(variable_contracts.get("exemplo_minimo_de_fluxo_aprovado", {}).get("known", False)),
             "price_requires_fit": price_requires_fit,
             "offer_sales_motion": offer_sales_motion,
             "pricing_validation": pricing_validation,
@@ -1188,6 +1129,8 @@ class CommercialPricingPolicyEngine:
             "scoring_reasons": scoring_reasons,
             "active_saga_mode": str(surface.get("saga_mode", hypotheses.get("saga_mode", "")) or ""),
             "pricing_variable_contracts": variable_contracts,
+            "block_price_consecutive_turns": block_price_consecutive_turns,
+            "_block_price_last_counted_turn": current_turn,
         }
         payload.update(pricing_gate_contract)
         state.pricing_policy = payload

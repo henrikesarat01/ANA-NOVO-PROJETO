@@ -126,17 +126,17 @@ CATEGORY_HERO_DEFAULTS = {
 }
 
 CATEGORY_SUPPORT_DEFAULTS = {
-    "entrada_triagem": ("Qualificação Inteligente", "Coleta de Dados Estruturada", "Funil de Conversão e Abandonos"),
-    "escolha_navegacao_descoberta": ("Qualificação Inteligente", "User Journey", "Coleta de Dados Estruturada"),
-    "apresentacao_produto": ("Coleta de Dados Estruturada", "Funil de Conversão e Abandonos"),
-    "montagem_orcamento_pedido": ("Coleta de Dados Estruturada", "Confirmação de Pedido", "Funil de Conversão e Abandonos"),
-    "agendamento": ("Coleta de Dados Estruturada", "Confirmação de Pedido", "Funil de Conversão e Abandonos"),
+    "entrada_triagem": ("Qualificação Inteligente", "Formulários Interativos", "Falar com Atendente"),
+    "escolha_navegacao_descoberta": ("Detalhes do Produto", "Qualificação Inteligente", "Formulários Interativos"),
+    "apresentacao_produto": ("Detalhes do Produto", "Lista Interativa", "Qualificação Inteligente"),
+    "montagem_orcamento_pedido": ("Confirmação de Pedido", "Formulários Interativos", "Detalhes do Produto"),
+    "agendamento": ("Confirmação de Pedido", "Formulários Interativos", "Timeline de Conversões"),
     "acompanhamento_retomada": ("Acompanhamento de Abandono", "Funil de Conversão e Abandonos", "User Journey"),
-    "confirmacao_fechamento": ("Coleta de Dados Estruturada", "Funil de Conversão e Abandonos"),
+    "confirmacao_fechamento": ("Confirmação de Pedido", "Formulários Interativos", "Funil de Conversão e Abandonos"),
     "priorizacao_fila": ("Qualificação Inteligente", "Funil de Conversão e Abandonos", "Kanban CRM"),
     "visibilidade_gestao": ("Funil de Conversão e Abandonos", "User Journey", "Kanban CRM"),
-    "simulacao_comercial": ("Qualificação Inteligente", "Coleta de Dados Estruturada", "Funil de Conversão e Abandonos"),
-    "repeticao_operacional": ("Coleta de Dados Estruturada", "Qualificação Inteligente", "Funil de Conversão e Abandonos"),
+    "simulacao_comercial": ("Qualificação Inteligente", "Detalhes do Produto", "Confirmação de Pedido"),
+    "repeticao_operacional": ("Formulários Interativos", "Qualificação Inteligente", "Funil de Conversão e Abandonos"),
 }
 
 ACTIVE_PAIN_TYPE_HERO_DEFAULTS = {
@@ -212,20 +212,20 @@ ACTIVE_PAIN_TYPE_HERO_DEFAULTS = {
 }
 
 ACTIVE_PAIN_TYPE_SUPPORT_DEFAULTS = {
-    "triagem_intencao": ("Qualificação Inteligente", "Coleta de Dados Estruturada"),
-    "roteamento_canal_misto": ("Coleta de Dados Estruturada", "Qualificação Inteligente"),
-    "descoberta_visual_produto": ("Coleta de Dados Estruturada", "Qualificação Inteligente"),
-    "comparacao_opcoes": ("Qualificação Inteligente", "Coleta de Dados Estruturada"),
-    "orcamento_complexo": ("Coleta de Dados Estruturada", "Confirmação de Pedido"),
-    "envio_lista_pedido": ("Confirmação de Pedido", "Coleta de Dados Estruturada"),
-    "agendamento_horario": ("Coleta de Dados Estruturada", "Confirmação de Pedido", "Timeline de Conversões"),
-    "confirmacao_presenca": ("Timeline de Conversões", "Funil de Conversão e Abandonos"),
+    "triagem_intencao": ("Qualificação Inteligente", "Formulários Interativos"),
+    "roteamento_canal_misto": ("Qualificação Inteligente", "Formulários Interativos"),
+    "descoberta_visual_produto": ("Detalhes do Produto", "Qualificação Inteligente"),
+    "comparacao_opcoes": ("Detalhes do Produto", "Qualificação Inteligente"),
+    "orcamento_complexo": ("Confirmação de Pedido", "Formulários Interativos"),
+    "envio_lista_pedido": ("Confirmação de Pedido", "Formulários Interativos"),
+    "agendamento_horario": ("Confirmação de Pedido", "Formulários Interativos", "Timeline de Conversões"),
+    "confirmacao_presenca": ("Confirmação de Pedido", "Formulários Interativos"),
     "followup_abandono": ("Funil de Conversão e Abandonos", "Timeline de Conversões"),
     "priorizacao_leads": ("Funil de Conversão e Abandonos", "Timeline de Conversões"),
-    "briefing_comercial": ("Coleta de Dados Estruturada", "Timeline de Conversões"),
+    "briefing_comercial": ("Formulários Interativos", "Qualificação Inteligente"),
     "qualificacao_comercial": ("Funil de Conversão e Abandonos", "Timeline de Conversões"),
     "visibilidade_pipeline": ("Funil de Conversão e Abandonos", "Kanban CRM"),
-    "simulacao_comercial": ("Qualificação Inteligente", "Coleta de Dados Estruturada"),
+    "simulacao_comercial": ("Qualificação Inteligente", "Detalhes do Produto"),
 }
 
 ACTIVE_PAIN_TYPE_CATEGORY_MAP = {
@@ -288,7 +288,6 @@ INTERNAL_TOOLING_FUNCTIONS = {
 }
 
 SUPPORT_LED_FUNCTIONS = {
-    "Coleta de Dados Estruturada",
     "Qualificação Inteligente",
     "Acompanhamento de Abandono",
     "Funil de Conversão e Abandonos",
@@ -363,14 +362,6 @@ FUNCTION_PROFILES = {
         support_score=8,
         explainability_score=8,
     ),
-    "Coleta de Dados Estruturada": FunctionProfile(
-        function_name="Coleta de Dados Estruturada",
-        mode="support",
-        pain_categories=("montagem_orcamento_pedido", "repeticao_operacional", "confirmacao_fechamento", "entrada_triagem"),
-        visual_score=3,
-        support_score=10,
-        explainability_score=5,
-    ),
     "Qualificação Inteligente": FunctionProfile(
         function_name="Qualificação Inteligente",
         mode="support",
@@ -401,6 +392,14 @@ FUNCTION_PROFILES = {
         pain_categories=("confirmacao_fechamento", "agendamento"),
         visual_score=8,
         support_score=7,
+        explainability_score=8,
+    ),
+    "Pagamento Integrado": FunctionProfile(
+        function_name="Pagamento Integrado",
+        mode="hybrid",
+        pain_categories=("confirmacao_fechamento", "montagem_orcamento_pedido", "simulacao_comercial"),
+        visual_score=7,
+        support_score=8,
         explainability_score=8,
     ),
     "Acompanhamento de Abandono": FunctionProfile(
@@ -453,6 +452,10 @@ def canonical_function_name(name: str) -> str:
         "menu com opcoes de entrada": "Menu de Entrada (Botões Iniciais)",
         "menu com botões": "Menu de Entrada (Botões Iniciais)",
         "menu com botoes": "Menu de Entrada (Botões Iniciais)",
+        "Menu de Opções": "Menu de Entrada (Botões Iniciais)",
+        "Menu de Opcoes": "Menu de Entrada (Botões Iniciais)",
+        "menu de opções": "Menu de Entrada (Botões Iniciais)",
+        "menu de opcoes": "Menu de Entrada (Botões Iniciais)",
         "Lista": "Lista Interativa",
         "lista": "Lista Interativa",
         "Carrossel": "Carrossel de Produtos",
@@ -461,7 +464,16 @@ def canonical_function_name(name: str) -> str:
         "Formulário": "Formulários Interativos",
         "formulário guiado": "Formulários Interativos",
         "formulario guiado": "Formulários Interativos",
-        "Coleta de Dados": "Coleta de Dados Estruturada",
+        "Qualificação": "Qualificação Inteligente",
+        "qualificação de lead": "Qualificação Inteligente",
+        "qualificacao de lead": "Qualificação Inteligente",
+        "Qualificação de Lead": "Qualificação Inteligente",
+        "Qualificação por Quiz": "Qualificação Inteligente",
+        "qualificação por quiz": "Qualificação Inteligente",
+        "qualificacao por quiz": "Qualificação Inteligente",
+        "Qualificação Inteligente": "Qualificação Inteligente",
+        "Triagem Inteligente": "Qualificação Inteligente",
+        "triagem inteligente": "Qualificação Inteligente",
         "qualificacao": "Qualificação Inteligente",
         "qualificação": "Qualificação Inteligente",
         "timeline": "Timeline de Conversões",
@@ -486,6 +498,10 @@ def get_function_profile(name: str) -> FunctionProfile:
             explainability_score=5,
         ),
     )
+
+
+def is_known_function_name(name: str) -> bool:
+    return canonical_function_name(name) in FUNCTION_PROFILES
 
 
 def prefers_visual_hero(pain_category: str) -> bool:
@@ -681,13 +697,21 @@ def contextual_function_score(
     if preferred_role == "hero" and canonical in SUPPORT_LED_FUNCTIONS:
         score -= 8
 
+    if preferred_role == "support":
+        if canonical == "Qualificação Inteligente" and active_pain_type not in {"triagem_intencao", "qualificacao_comercial", "priorizacao_leads", "briefing_comercial"} and pain_category not in {"entrada_triagem", "priorizacao_fila"}:
+            score -= 8
+        if canonical in {"Funil de Conversão e Abandonos", "Timeline de Conversões"} and pain_category not in {"acompanhamento_retomada", "priorizacao_fila", "visibilidade_gestao"} and active_pain_type not in {"followup_abandono", "priorizacao_leads", "visibilidade_pipeline"}:
+            score -= 16
+        if canonical in {"Funil de Conversão e Abandonos", "Timeline de Conversões"} and pain_category in {"escolha_navegacao_descoberta", "apresentacao_produto", "montagem_orcamento_pedido", "confirmacao_fechamento"}:
+            score -= 12
+
     if saga_mode == PRODUCT_LED_SELF_SERVICE:
         if profile.mode == "visual":
             score += 10 if preferred_role == "hero" else 3
         if canonical in {"Carrossel de Produtos", "Lista Interativa", "Detalhes do Produto", "Cardápio Digital", "Simulação de Financiamento", "Confirmação de Pedido"}:
             score += 10 if preferred_role == "hero" else 4
         if canonical in {"Qualificação Inteligente", "Funil de Conversão e Abandonos", "Timeline de Conversões", "Acompanhamento de Abandono", "Falar com Atendente"}:
-            score -= 8 if preferred_role == "hero" else 3
+            score -= 8 if preferred_role == "hero" else 7
 
     if saga_mode == SERVICE_LED_SELF_SERVICE:
         if canonical in {"Agendamento de Visita", "Confirmação de Pedido", "Menu de Entrada (Botões Iniciais)", "Botões Clicáveis", "Formulários Interativos"}:
@@ -748,7 +772,6 @@ def contextual_function_score(
         "Menu de Entrada (Botões Iniciais)": ("briefing", "escopo", "agenda", "horario", "horário", "consulta"),
         "Botões Clicáveis": ("briefing", "escopo", "agenda", "horario", "horário", "consulta"),
         "Qualificação Inteligente": ("horario", "horário", "consulta", "visita", "item", "categoria", "produto"),
-        "Coleta de Dados Estruturada": ("horario", "horário", "consulta", "visita", "comprar", "alugar", "item", "categoria"),
         "Acompanhamento de Abandono": ("simular", "simulação", "simulacao", "financiamento", "parcela"),
         "Funil de Conversão e Abandonos": ("simular", "simulação", "simulacao", "financiamento", "parcela"),
     }

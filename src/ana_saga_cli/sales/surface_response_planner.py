@@ -25,6 +25,32 @@ class SurfaceResponsePlanner:
     def __init__(self, llm: LLMClient) -> None:
         self.llm = llm
 
+    def _looks_like_menu_question(self, question_anchor: str) -> bool:
+        lowered = str(question_anchor or "").strip().lower()
+        if not lowered:
+            return False
+        if " ou " in lowered:
+            return True
+        if any(marker in lowered for marker in (":", " - ", " — ")) and "," in lowered:
+            return True
+        return lowered.count(",") >= 2
+
+    def _sanitize_question_anchor(self, state: ConversationState, plan: dict[str, Any]) -> dict[str, Any]:
+        response_policy = state.response_policy or {}
+        question_anchor = str(plan.get("question_anchor", "") or "").strip()
+        if not question_anchor:
+            return plan
+
+        if self._looks_like_menu_question(question_anchor):
+            plan["question_anchor"] = ""
+            existing_avoid = [str(item).strip() for item in plan.get("avoid_topics", []) if str(item).strip()]
+            plan["avoid_topics"] = list(dict.fromkeys(existing_avoid + ["pergunta em menu ou lista", "taxonomia operacional na pergunta"]))[:4]
+
+        question_goal = str(response_policy.get("question_goal", "") or "").strip()
+        if bool(response_policy.get("commercial_direct_question_detected", False)) and question_goal == "pricing":
+            plan["question_anchor"] = ""
+        return plan
+
     def _parse_json(self, raw: str) -> dict[str, Any]:
         return parse_last_json_object(raw)
 
@@ -254,7 +280,7 @@ Regras obrigatórias:
 - Não trate consultative_handoff como padrão. Se houver caminho autoguiado plausível, preserve esse modo.
 - A hero precisa refletir a dor ativa deste turno, não a função mais comum do nicho.
 - Se a dor pedir escolha, navegação, apresentação, orçamento, agendamento ou confirmação, priorize hero visual antes de função estrutural.
-- Não use Coleta de Dados Estruturada, Qualificação Inteligente, Formulários Interativos ou Funil como hero quando houver opção mais visual e aderente ao cenário.
+- Não use Qualificação Inteligente, Formulários Interativos ou Funil como hero quando houver opção mais visual e aderente ao cenário.
 - Se a dor for descobrir intenção ou separar tipos de atendimento, prefira menu, botões ou lista antes de carrossel.
 - Se a dor for mostrar opções, comparar visualmente ou orientar quem não sabe o nome técnico, prefira carrossel, lista ou detalhes antes de coleta.
 - Se a dor for briefing, levantamento inicial ou coleta comercial, formulário guiado pode ser hero.
@@ -452,7 +478,7 @@ ARQUITETURA DE VENDA DA OFERTA
             elif primary_question_style == "trust_question":
                 plan["question_anchor"] = "o que voce precisa sentir mais seguranca para olhar isso com calma?"
             elif primary_question_style == "usage_question":
-                plan["question_anchor"] = "como isso entra hoje no seu processo: escolha, atendimento, agenda ou proposta?"
+                plan["question_anchor"] = "como isso entra hoje na rotina de voces?"
 
         if planner_style_bias == "comparativo_tecnico_claro":
             plan["surface_tension"] = plan.get("surface_tension") or "reduzir risco de escolha errada e facilitar comparacao"
@@ -827,6 +853,7 @@ ARQUITETURA DE VENDA DA OFERTA
         plan = self._align_with_mapped_pain(state=state, plan=plan)
         plan = self._rebalance_visual_hero(plan=plan, arsenal_hits=arsenal_hits)
         plan = self._constrain_conservative_surface(state=state, plan=plan)
+        plan = self._sanitize_question_anchor(state=state, plan=plan)
         plan["pain_category_label"] = get_pain_category_label(str(plan.get("pain_category", "") or ""))
         plan["active_pain_type_label"] = get_active_pain_type_label(str(plan.get("active_pain_type", "") or ""))
         state.surface_guidance = plan

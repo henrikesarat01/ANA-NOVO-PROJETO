@@ -60,15 +60,6 @@ def _clean_text(value: Any) -> str:
     return str(value or "").strip()
 
 
-def _score_text(text: str, terms: tuple[str, ...], weight: int = 1, cap: int = 3) -> int:
-    normalized = text.lower()
-    hits = 0
-    for term in terms:
-        if term in normalized:
-            hits += 1
-    return min(hits, cap) * weight
-
-
 def _append_reason(reasons: list[str], reason: str) -> None:
     if reason and reason not in reasons:
         reasons.append(reason)
@@ -139,98 +130,8 @@ def infer_saga_mode(
 
     if support_function in {"Qualificação Inteligente", "Funil de Conversão e Abandonos", "Timeline de Conversões", "Falar com Atendente"}:
         boost(CONSULTATIVE_HANDOFF, 2, "a função de apoio dominante reforça uma condução mais consultiva")
-    if support_function in {"Coleta de Dados Estruturada", "Confirmação de Pedido"}:
+    if support_function in {"Confirmação de Pedido"}:
         boost(PRODUCT_LED_SELF_SERVICE, 1, "a sustentação operacional reforça fechamento guiado e estruturado")
-
-    semantic_text = " ".join(
-        part
-        for part in [niche, segment, offer_type, operation_model, context_text]
-        if _clean_text(part)
-    ).lower()
-
-    product_score = _score_text(
-        semantic_text,
-        (
-            "loja",
-            "varejo",
-            "produto",
-            "produtos",
-            "catalogo",
-            "catálogo",
-            "pedido",
-            "itens",
-            "peca",
-            "peça",
-            "roupa",
-            "calcado",
-            "calçado",
-            "celular",
-            "auto peças",
-            "auto pecas",
-            "simulação",
-            "simulacao",
-            "financiamento",
-            "parcela",
-            "parcelas",
-            "pronta entrega",
-        ),
-        weight=1,
-        cap=4,
-    )
-    if product_score:
-        boost(PRODUCT_LED_SELF_SERVICE, product_score, "o contexto do negócio indica venda orientada por produto, catálogo, pedido ou simulação")
-
-    service_score = _score_text(
-        semantic_text,
-        (
-            "clínica",
-            "clinica",
-            "consulta",
-            "agenda",
-            "agendamento",
-            "visita",
-            "encaixe",
-            "estética",
-            "estetica",
-            "odontológica",
-            "odontologica",
-            "serviço",
-            "servico",
-            "instalação",
-            "instalacao",
-            "manutenção",
-            "manutencao",
-        ),
-        weight=1,
-        cap=4,
-    )
-    if service_score:
-        boost(SERVICE_LED_SELF_SERVICE, service_score, "o contexto do negócio indica execução guiada de serviço, agenda ou visita")
-
-    consultative_score = _score_text(
-        semantic_text,
-        (
-            "advocacia",
-            "advogado",
-            "arquitetura",
-            "arquiteto",
-            "agência",
-            "agencia",
-            "marketing",
-            "projeto",
-            "briefing",
-            "consultoria",
-            "especialista",
-            "equipe comercial",
-            "proposta",
-            "diagnóstico",
-            "diagnostico",
-        ),
-        weight=1,
-        cap=4,
-    )
-    if consultative_score:
-        boost(CONSULTATIVE_HANDOFF, consultative_score, "o contexto do negócio indica venda consultiva, briefing ou avaliação humana")
 
     if PRODUCT_LED_SELF_SERVICE == max(scores, key=scores.get) and scores[PRODUCT_LED_SELF_SERVICE] >= scores[CONSULTATIVE_HANDOFF] + 2:
         boost(PRODUCT_LED_SELF_SERVICE, 1, "os sinais combinados mostram que o SAGA precisa vender dentro da própria conversa, sem depender de handoff")

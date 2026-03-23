@@ -23,6 +23,7 @@ from ana_saga_cli.sales.saga_function_selector import (
     get_operational_taxonomy,
     get_pain_category_label,
     infer_active_pain_type,
+    is_known_function_name,
     prefers_visual_hero,
     resolve_active_pain_type,
     requires_strict_visual_override,
@@ -32,12 +33,85 @@ from ana_saga_cli.sales.saga_function_selector import (
 
 
 class DiagnosticClusterMapper:
+    _PIPELINE_FUNCTIONS = {"Timeline de Conversões", "Funil de Conversão e Abandonos", "Acompanhamento de Abandono"}
+
     def __init__(self, llm: LLMClient, arsenal_retriever: ArsenalRetriever) -> None:
         self.llm = llm
         self.arsenal_retriever = arsenal_retriever
 
+    def _build_lead_summary_block(self, summary: dict[str, Any]) -> str:
+        if not summary:
+            return "- sem resumo consolidado do lead"
+
+        lines: list[str] = []
+        scalar_fields = (
+            ("niche_known", summary.get("niche_known")),
+            ("niche_specificity", summary.get("niche_specificity")),
+            ("offer_known", summary.get("offer_known")),
+            ("operation_model_known", summary.get("operation_model_known")),
+            ("channel_usage_known", summary.get("channel_usage_known")),
+            ("customer_type_known", summary.get("customer_type_known")),
+            ("pain_known", summary.get("pain_known")),
+            ("impact_known", summary.get("impact_known")),
+            ("known_context_count", summary.get("known_context_count")),
+            ("next_question_focus", summary.get("next_question_focus")),
+            ("commercial_scope_ready", summary.get("commercial_scope_ready")),
+            ("business_context_ready_for_sizing", summary.get("business_context_ready_for_sizing")),
+        )
+        for key, value in scalar_fields:
+            if value in (None, ""):
+                continue
+            lines.append(f"- {key}={value}")
+
+        text_fields = (
+            ("narrative_summary", summary.get("narrative_summary")),
+            ("evidence_summary", summary.get("evidence_summary")),
+            ("impact_summary", summary.get("impact_summary")),
+        )
+        for key, value in text_fields:
+            clean_value = str(value or "").strip()
+            if clean_value:
+                lines.append(f"- {key}={clean_value}")
+
+        gaps = summary.get("business_context_gaps", [])
+        if isinstance(gaps, list):
+            clean_gaps = [str(item).strip() for item in gaps if str(item).strip()]
+            if clean_gaps:
+                lines.append(f"- business_context_gaps={', '.join(clean_gaps)}")
+
+        return "\n".join(lines) or "- sem resumo consolidado do lead"
+
     def _parse_json(self, raw: str) -> dict[str, Any]:
         return parse_last_json_object(raw)
+
+    def _known_function_names(self) -> set[str]:
+        known_from_entries = {
+            canonical_function_name(entry.function_name)
+            for entry in self.arsenal_retriever.entries
+            if canonical_function_name(entry.function_name)
+        }
+        return known_from_entries | {
+            canonical_function_name(name)
+            for name in known_from_entries | {
+                "Botões Clicáveis",
+                "Menu de Entrada (Botões Iniciais)",
+                "Lista Interativa",
+                "Carrossel de Produtos",
+                "Cardápio Digital",
+                "Detalhes do Produto",
+                "Formulários Interativos",
+                "Qualificação Inteligente",
+                "Falar com Atendente",
+                "Agendamento de Visita",
+                "Confirmação de Pedido",
+                "Pagamento Integrado",
+                "Acompanhamento de Abandono",
+                "Funil de Conversão e Abandonos",
+                "Simulação de Financiamento",
+                "Timeline de Conversões",
+            }
+            if is_known_function_name(name)
+        }
 
     def _is_active(self, state: ConversationState) -> bool:
         summary = state.lead_summary or {}
@@ -136,9 +210,10 @@ class DiagnosticClusterMapper:
 
         unique: list[str] = []
         seen = set()
+        known_functions = self._known_function_names()
         for item in functions:
             value = canonical_function_name(str(item).strip())
-            if not value or value in seen:
+            if not value or value in seen or value not in known_functions:
                 continue
             seen.add(value)
             unique.append(value)
@@ -171,6 +246,122 @@ class DiagnosticClusterMapper:
             ),
         )
 
+    def _allow_pipeline_functions(self, pain_category: str, active_pain_type: str) -> bool:
+        return pain_category in {"acompanhamento_retomada", "priorizacao_fila", "visibilidade_gestao"} or active_pain_type in {
+            "followup_abandono",
+            "priorizacao_leads",
+            "visibilidade_pipeline",
+        }
+
+    def _build_function_stack(
+        self,
+        *,
+        pain_category: str,
+        active_pain_type: str,
+        saga_mode: str,
+        pain_context: str,
+        hero_function: str,
+        support_function: str,
+        functions: list[str],
+        hero_candidates: list[str],
+        support_candidates: list[str],
+    ) -> list[str]:
+        ordered: list[str] = []
+        allow_pipeline_functions = self._allow_pipeline_functions(pain_category, active_pain_type)
+        known_functions = self._known_function_names()
+        for item in [hero_function, support_function, *functions, *hero_candidates, *support_candidates]:
+            canonical = canonical_function_name(str(item or "").strip())
+            if not canonical or canonical in ordered:
+                continue
+            if canonical not in known_functions:
+                continue
+            if not (is_surfaceable_function(canonical, pain_category, "hero") or is_surfaceable_function(canonical, pain_category, "support")):
+                continue
+            if canonical in self._PIPELINE_FUNCTIONS and not allow_pipeline_functions and canonical not in {hero_function, support_function}:
+                continue
+            ordered.append(canonical)
+
+        for item in [
+            *get_category_default_functions(pain_category, "hero"),
+            *get_category_default_functions(pain_category, "support"),
+            *get_active_pain_default_functions(active_pain_type, "hero"),
+            *get_active_pain_default_functions(active_pain_type, "support"),
+        ]:
+            canonical = canonical_function_name(str(item or "").strip())
+            if not canonical or canonical in ordered:
+                continue
+            if canonical not in known_functions:
+                continue
+            if not (is_surfaceable_function(canonical, pain_category, "hero") or is_surfaceable_function(canonical, pain_category, "support")):
+                continue
+            if canonical in self._PIPELINE_FUNCTIONS and not allow_pipeline_functions:
+                continue
+            ordered.append(canonical)
+
+        head = [item for item in [hero_function, support_function] if item]
+        tail_candidates = [item for item in ordered if item not in head]
+        explicit_function_set = {canonical_function_name(item) for item in functions if str(item).strip()}
+        explicit_hero_set = {canonical_function_name(item) for item in hero_candidates if str(item).strip()}
+        explicit_support_set = {canonical_function_name(item) for item in support_candidates if str(item).strip()}
+        explicit_tail: list[str] = []
+        fallback_tail: list[str] = []
+        for item in tail_candidates:
+            if item in explicit_function_set or item in explicit_hero_set or item in explicit_support_set:
+                explicit_tail.append(item)
+            else:
+                fallback_tail.append(item)
+        ranked_fallback_tail = sorted(
+            fallback_tail,
+            key=lambda item: max(
+                contextual_function_score(
+                    item,
+                    pain_category,
+                    active_pain_type,
+                    "support",
+                    saga_mode,
+                    hero_candidates,
+                    support_candidates,
+                    pain_context,
+                )
+                + (40 if item in explicit_function_set else 0)
+                + (18 if item in explicit_support_set else 0)
+                + (12 if item in explicit_hero_set else 0),
+                contextual_function_score(
+                    item,
+                    pain_category,
+                    active_pain_type,
+                    "hero",
+                    saga_mode,
+                    hero_candidates,
+                    support_candidates,
+                    pain_context,
+                )
+                - 4
+                + (40 if item in explicit_function_set else 0)
+                + (18 if item in explicit_hero_set else 0)
+                + (12 if item in explicit_support_set else 0),
+            ),
+            reverse=True,
+        )
+        return [*head, *explicit_tail, *ranked_fallback_tail][:4]
+
+    def _build_function_characteristics(self, function_names: list[str]) -> list[dict[str, str]]:
+        entries = find_entries_by_function_names(self.arsenal_retriever.entries, function_names)
+        by_name = {
+            canonical_function_name(entry.function_name): {
+                "function_name": canonical_function_name(entry.function_name),
+                "characteristic": str(entry.characteristic or "").strip(),
+                "product": str(entry.product or "").strip(),
+            }
+            for entry in entries
+        }
+        characteristics: list[dict[str, str]] = []
+        for function_name in function_names:
+            canonical = canonical_function_name(function_name)
+            if canonical in by_name:
+                characteristics.append(by_name[canonical])
+        return characteristics
+
     def _normalize_pain(self, payload: dict[str, Any]) -> dict[str, Any]:
         functions = self._normalize_functions(payload)
         pain_category = str(payload.get("categoria_operacional", "") or "").strip() or "repeticao_operacional"
@@ -191,28 +382,35 @@ class DiagnosticClusterMapper:
         if active_pain_type not in ACTIVE_PAIN_TYPES:
             active_pain_type = infer_active_pain_type(pain_category, pain_context)
         pain_category = get_active_pain_type_category(active_pain_type, pain_category) or pain_category
-        hero_candidates = sanitize_function_candidates([
+        known_functions = self._known_function_names()
+        raw_hero_candidates = sanitize_function_candidates([
             canonical_function_name(str(item).strip())
             for item in payload.get("hero_function_candidates", [])
             if str(item).strip()
         ], pain_category, "hero")
-        support_candidates = sanitize_function_candidates([
+        raw_support_candidates = sanitize_function_candidates([
             canonical_function_name(str(item).strip())
             for item in payload.get("support_function_candidates", [])
             if str(item).strip()
         ], pain_category, "support")
-        for function_name in get_category_default_functions(pain_category, "hero"):
-            if function_name not in hero_candidates:
-                hero_candidates.append(function_name)
-        for function_name in get_active_pain_default_functions(active_pain_type, "hero"):
-            if function_name not in hero_candidates:
-                hero_candidates.append(function_name)
-        for function_name in get_category_default_functions(pain_category, "support"):
-            if function_name not in support_candidates:
-                support_candidates.append(function_name)
-        for function_name in get_active_pain_default_functions(active_pain_type, "support"):
-            if function_name not in support_candidates:
-                support_candidates.append(function_name)
+        raw_hero_candidates = [item for item in raw_hero_candidates if item in known_functions]
+        raw_support_candidates = [item for item in raw_support_candidates if item in known_functions]
+        hero_candidates = list(raw_hero_candidates)
+        support_candidates = list(raw_support_candidates)
+        if not hero_candidates:
+            for function_name in get_category_default_functions(pain_category, "hero"):
+                if function_name not in hero_candidates:
+                    hero_candidates.append(function_name)
+            for function_name in get_active_pain_default_functions(active_pain_type, "hero"):
+                if function_name not in hero_candidates:
+                    hero_candidates.append(function_name)
+        if not support_candidates:
+            for function_name in get_category_default_functions(pain_category, "support"):
+                if function_name not in support_candidates:
+                    support_candidates.append(function_name)
+            for function_name in get_active_pain_default_functions(active_pain_type, "support"):
+                if function_name not in support_candidates:
+                    support_candidates.append(function_name)
         hero_candidates = sanitize_function_candidates(hero_candidates, pain_category, "hero")
         support_candidates = sanitize_function_candidates(support_candidates, pain_category, "support")
 
@@ -226,6 +424,10 @@ class DiagnosticClusterMapper:
         support_function = canonical_function_name(
             str(payload.get("support_function", "") or payload.get("funcao_apoio", "") or "").strip()
         )
+        if hero_function not in known_functions:
+            hero_function = ""
+        if support_function not in known_functions:
+            support_function = ""
         if hero_function and not is_surfaceable_function(hero_function, pain_category, "hero"):
             hero_function = ""
         if support_function and not is_surfaceable_function(support_function, pain_category, "support"):
@@ -238,7 +440,7 @@ class DiagnosticClusterMapper:
         available_functions = []
         for function_name in [*hero_candidates, *support_candidates, *functions]:
             canonical = canonical_function_name(function_name)
-            if canonical and canonical not in available_functions:
+            if canonical and canonical in known_functions and canonical not in available_functions:
                 available_functions.append(canonical)
 
         available_hero_functions = sanitize_function_candidates(available_functions, pain_category, "hero")
@@ -300,7 +502,7 @@ class DiagnosticClusterMapper:
         )
         saga_mode = str(mode_payload["saga_mode"])
 
-        if not support_function:
+        if not support_function and (raw_support_candidates or support_candidates):
             support_pool = [item for item in available_support_functions if item != hero_function]
             if support_pool:
                 support_function = self._best_function_candidate(
@@ -314,7 +516,7 @@ class DiagnosticClusterMapper:
                     pain_context,
                 )
 
-        if not support_function and fallback_support_functions:
+        if not support_function and fallback_support_functions and raw_support_candidates:
             support_function = self._best_function_candidate(
                 fallback_support_functions,
                 pain_category,
@@ -357,7 +559,7 @@ class DiagnosticClusterMapper:
                     pain_context,
                 )
 
-        if not support_function and hero_function:
+        if not support_function and hero_function and not raw_support_candidates and not str(payload.get("support_function", "")).strip():
             default_support_pool = [
                 item
                 for item in sanitize_function_candidates(
@@ -381,7 +583,38 @@ class DiagnosticClusterMapper:
                 pain_context,
             )
 
+        if support_function in self._PIPELINE_FUNCTIONS and not self._allow_pipeline_functions(pain_category, active_pain_type):
+            non_pipeline_support_pool = [
+                item
+                for item in available_support_functions
+                if item != hero_function and item not in self._PIPELINE_FUNCTIONS
+            ]
+            if non_pipeline_support_pool:
+                support_function = self._best_function_candidate(
+                    non_pipeline_support_pool,
+                    pain_category,
+                    active_pain_type,
+                    "support",
+                    saga_mode,
+                    hero_candidates,
+                    support_candidates,
+                    pain_context,
+                )
+
         taxonomy = get_operational_taxonomy(pain_category, active_pain_type)
+        function_stack = self._build_function_stack(
+            pain_category=pain_category,
+            active_pain_type=active_pain_type,
+            saga_mode=saga_mode,
+            pain_context=pain_context,
+            hero_function=hero_function,
+            support_function=support_function,
+            functions=functions,
+            hero_candidates=hero_candidates,
+            support_candidates=support_candidates,
+        )
+        complementary_functions = [item for item in function_stack if item not in {hero_function, support_function}][:2]
+        function_characteristics = self._build_function_characteristics(function_stack)
         causal_layer = build_causal_layer(
             payload,
             hero_function=hero_function,
@@ -399,9 +632,9 @@ class DiagnosticClusterMapper:
                 or payload.get("cause", "")
                 or ""
             ).strip(),
-            "funcao_saga_que_ajuda": hero_function or (functions[0] if functions else ""),
+            "funcao_saga_que_ajuda": hero_function or (function_stack[0] if function_stack else ""),
             "como_o_saga_resolve": str(payload.get("como_o_saga_resolve", "") or payload.get("resolution_logic", "") or "").strip(),
-            "funcoes_saga_relacionadas": functions,
+            "funcoes_saga_relacionadas": function_stack,
             "categoria_operacional": pain_category,
             "categoria_operacional_id": taxonomy["categoria_operacional_id"],
             "categoria_operacional_label": taxonomy["categoria_operacional_label"],
@@ -413,6 +646,8 @@ class DiagnosticClusterMapper:
             "funcao_principal_tipo": primary_role,
             "hero_function": hero_function,
             "support_function": support_function,
+            "complementary_functions": complementary_functions,
+            "function_characteristics": function_characteristics,
             "hero_function_candidates": hero_candidates,
             "support_function_candidates": support_candidates,
             "active_pain_context": pain_context,
@@ -438,6 +673,7 @@ class DiagnosticClusterMapper:
 
     def _build_map(self, state: ConversationState, user_message: str, hits: list[ArsenalEntry]) -> dict[str, Any]:
         summary = state.lead_summary or {}
+        lead_summary_block = self._build_lead_summary_block(summary)
         history = "\n".join(f"{turn.role}: {turn.content}" for turn in state.turns[-8:])
         candidates = "\n".join(
             f"- função={hit.function_name} | problema={hit.problem} | causa={hit.cause} | raiz={hit.root} | caracteristica={hit.characteristic}"
@@ -466,6 +702,11 @@ Regras obrigatórias:
     - Use tipos como: triagem_intencao, roteamento_canal_misto, descoberta_visual_produto, comparacao_opcoes, orcamento_complexo, envio_lista_pedido, agendamento_horario, confirmacao_presenca, followup_abandono, priorizacao_leads, briefing_comercial, qualificacao_comercial, visibilidade_pipeline, simulacao_comercial.
     - Se a dor dominante for simular parcela, entrada, financiamento ou cenário comercial antes de avançar, use simulacao_comercial em vez de followup ou orçamento genérico.
     - Para cada dor, escolha uma hero_function e uma support_function.
+    - Além delas, traga mais 2 funções complementares que ajudem a sustentar ou completar a solução no mesmo cenário.
+    - O conjunto final precisa fechar 4 funções relacionadas por dor: hero, support e mais 2 complementares sem repetir nome.
+    - Para essas 4 funções, priorize combinações coerentes entre vitrine, confirmação, pagamento, triagem, agendamento, recuperação ou qualificação, conforme a dor real.
+    - Não use função de acompanhamento, timeline ou funil como apoio cedo demais quando a dor ainda é de descoberta, apresentação visual, comparação ou fechamento imediato.
+    - Se a dor ainda está em mostrar, escolher, comparar ou fechar no próprio WhatsApp, as funções complementares devem reforçar essa jornada antes de empurrar leitura de pipeline.
     - Hero function: a função mais visual, concreta e explicável para aquela dor específica.
     - Support function: a função estrutural que sustenta a hero por trás sem tomar o protagonismo.
     - A hero tem que ser escolhida pelo tipo de dor ativa, não pelo nicho sozinho.
@@ -504,6 +745,7 @@ Schema:
             "como_o_saga_resolve": "",
             "hero_function": "",
             "support_function": "",
+            "complementary_functions": ["", ""],
             "hero_function_candidates": [""],
             "support_function_candidates": [""],
             "funcao_principal_tipo": "hero|support",
@@ -516,7 +758,14 @@ Schema:
             "mecanismo_de_resolucao": "",
             "ganho_funcional": "",
             "valor_percebido": "",
-            "funcoes_saga_relacionadas": [""]
+            "funcoes_saga_relacionadas": ["", "", "", ""],
+            "function_characteristics": [
+                {
+                    "function_name": "",
+                    "characteristic": "",
+                    "product": ""
+                }
+            ]
         }
     ],
     "prioridades_do_mapa": [""],
@@ -528,6 +777,7 @@ Schema:
 {state.stage_id}
 
 RESUMO ESTRUTURADO DO LEAD
+    {lead_summary_block}
 
 HISTÓRICO RECENTE
 {history}

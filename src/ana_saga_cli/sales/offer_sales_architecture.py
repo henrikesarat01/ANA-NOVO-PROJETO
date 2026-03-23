@@ -41,7 +41,7 @@ _DEFAULT_BLUEPRINT = {
         "full_range_allowed_only_after_context": True,
         "implantation_details_only_after_fit": True,
         "precise_quote_only_after_scope": True,
-        "proof_before_price": False,
+        "proof_before_price": True,
     },
     "pricing_validation": {
         "require_minimum_validation_before_price": True,
@@ -55,6 +55,7 @@ _DEFAULT_BLUEPRINT = {
         "minimum_required_variables": [
             "tipo_de_operacao",
             "uso_atual_do_whatsapp",
+            "exemplo_minimo_de_fluxo_aprovado",
         ],
         "optional_but_relevant_variables": [
             "principal_trava_operacional",
@@ -65,6 +66,7 @@ _DEFAULT_BLUEPRINT = {
         "variables_that_change_price": [
             "tipo_de_operacao",
             "uso_atual_do_whatsapp",
+            "exemplo_minimo_de_fluxo_aprovado",
             "complexidade_do_fluxo",
             "integracao",
             "quantidade_de_jornadas",
@@ -72,6 +74,7 @@ _DEFAULT_BLUEPRINT = {
         "preferred_question_sequence": [
             "tipo_de_operacao",
             "uso_atual_do_whatsapp",
+            "exemplo_minimo_de_fluxo_aprovado",
             "principal_trava_operacional",
             "fator_estrutural_de_complexidade",
         ],
@@ -141,6 +144,7 @@ _DEFAULT_BLUEPRINT = {
         "comparison_axis": "se está comparando mais preço ou modo de usar",
         "clarity_priority": "o que o cliente quer entender primeiro",
         "proof_preference": "se prefere um exemplo rápido ou demonstração",
+        "proof_validation": "validar um exemplo minimo do fluxo antes de falar valor",
         "value_priority": "o que pesa mais para valer a pena",
         "pricing_context": "se quer uma base agora ou prefere entender o contexto antes",
     },
@@ -295,6 +299,7 @@ class OfferSalesArchitectureResolver:
                 "range_only_after_context": _normalize_bool(price_release_modes.get("range_only_after_context", True), True),
                 "precise_only_after_scope": _normalize_bool(price_release_modes.get("precise_only_after_scope", True), True),
             },
+            "variable_definitions": pricing_validation.get("variable_definitions", {}) if isinstance(pricing_validation.get("variable_definitions", {}), dict) else {},
         }
 
         questioning_strategy = payload["questioning_strategy"]
@@ -306,6 +311,9 @@ class OfferSalesArchitectureResolver:
             "avoid_interrogatory_flow": _normalize_bool(questioning_strategy.get("avoid_interrogatory_flow", True), True),
             "avoid_generic_qualification": _normalize_bool(questioning_strategy.get("avoid_generic_qualification", True), True),
             "prefer_smallest_useful_question": _normalize_bool(questioning_strategy.get("prefer_smallest_useful_question", True), True),
+            "infer_capability_paths_from_context": _normalize_bool(questioning_strategy.get("infer_capability_paths_from_context", False), False),
+            "choose_questions_that_disambiguate_relevant_capabilities": _normalize_bool(questioning_strategy.get("choose_questions_that_disambiguate_relevant_capabilities", False), False),
+            "avoid_questions_unlinked_to_real_capabilities": _normalize_bool(questioning_strategy.get("avoid_questions_unlinked_to_real_capabilities", False), False),
         }
 
         payload["sales_motion"] = self._derive_sales_motion(payload)
@@ -325,6 +333,15 @@ class OfferSalesArchitectureResolver:
         payload["planner_style_bias"] = _clean_text(payload["runtime_hints"].get("planner_style_bias", "consultivo_objetivo")) or "consultivo_objetivo"
         payload["mapper_activation_mode"] = self._derive_mapper_activation_mode(payload)
         payload["response_opening_bias"] = _clean_text(payload["runtime_hints"].get("response_opening_bias", "anchor_then_invite")) or "anchor_then_invite"
+        payload["capability_bridge_goal"] = _clean_text(payload["discovery_goals"].get("capability_bridge", ""))
+        payload["capability_priority_goal"] = _clean_text(payload["discovery_goals"].get("capability_priority", ""))
+        payload["capability_questioning_enabled"] = bool(
+            payload["questioning_strategy"].get("infer_capability_paths_from_context", False)
+            or payload["questioning_strategy"].get("choose_questions_that_disambiguate_relevant_capabilities", False)
+            or payload["questioning_strategy"].get("avoid_questions_unlinked_to_real_capabilities", False)
+            or payload["capability_bridge_goal"]
+            or payload["capability_priority_goal"]
+        )
         payload["microcommitment_ladder"] = list(payload["conversation_progression"][:4])
         try:
             payload["confidence"] = float(payload["runtime_hints"].get("confidence", 0.0) or 0.0)

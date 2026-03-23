@@ -80,16 +80,14 @@ def is_social_lateral_opening(state: ConversationState) -> bool:
     permission = get_transition_permission(state)
     if permission == "hold":
         return True
-    # Only commercial_explicit + allow_commercial breaks the social
-    # hold.  work_curiosity + allow_context means the client is
-    # talking about the topic but hasn't positioned as a buyer yet —
-    # keep the hold until there's a clear posture change.
-    if permission != "allow_commercial":
-        return True
     topic = get_topic_domain(state)
-    if topic != "commercial_explicit":
-        return True
-    return False
+    # If the semantic layer explicitly released the turn to context,
+    # trust that read and stop treating the message as purely social.
+    if permission == "allow_context" and topic == "work_curiosity":
+        return False
+    if permission == "allow_commercial" and topic == "commercial_explicit":
+        return False
+    return True
 
 
 def get_opening_semantic_state(state: ConversationState) -> dict[str, str | bool]:

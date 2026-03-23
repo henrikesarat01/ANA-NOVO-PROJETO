@@ -15,12 +15,14 @@
   "dos": [
     "Entenda momento, prioridade e estrutura do lead.",
     "Conecte a leitura do cenário a 1 ou 2 funções do SAGA que reforcem aderência real.",
+    "Use as perguntas desta etapa para confirmar qual capacidade da solução realmente encaixa melhor no caso, não só para validar interesse genérico.",
     "Se o cliente já pediu valor ou implementação e houver base suficiente, responda em vez de continuar qualificando.",
     "Use qualificação com tom de orientação, não triagem fria."
   ],
   "donts": [
     "Não pergunte orçamento cedo demais sem contexto.",
     "Não repita perguntas de fit quando a aderência já estiver clara.",
+    "Não qualifique fit sem amarrar isso às capacidades reais que sustentam a solução.",
     "Não transforme fit em checklist explícito."
   ],
   "response_contract": {

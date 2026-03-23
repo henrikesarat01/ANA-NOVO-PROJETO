@@ -118,7 +118,7 @@ class MockLLMClient(LLMClient):
                     "hero_function": "Botões Clicáveis",
                     "support_function": "Qualificação Inteligente",
                     "hero_function_candidates": ["Botões Clicáveis", "Lista Interativa", "Menu de Entrada (Botões Iniciais)"],
-                    "support_function_candidates": ["Qualificação Inteligente", "Coleta de Dados Estruturada"],
+                    "support_function_candidates": ["Qualificação Inteligente", "Formulários Interativos"],
                     "funcao_principal_tipo": "hero",
                     "hero_support_logic": "o cliente toca numa opção visível logo na entrada e a qualificação roda por trás sem tomar a cena",
                     "funcoes_saga_relacionadas": [
@@ -465,89 +465,128 @@ class MockLLMClient(LLMClient):
         return "1_pergunta_opcional"
 
     def _infer_price_response_mode(self, instructions: str) -> str:
+        if "faça só a pergunta mínima que ainda falta para situar preço com honestidade" in instructions:
+            return "block_price"
         if "explique curto por que precisa saber isso" in instructions:
             return "block_price"
         if "se ancorar valor, use base conservadora" in instructions:
             return "floor_only"
         return ""
 
+    def _question_from_focus(self, focus: str) -> str:
+        normalized = self._normalize_message(focus).lower()
+        if not normalized:
+            return ""
+        if "operação funciona hoje" in normalized or "operacao funciona hoje" in normalized:
+            return "Como vocês operam isso hoje por aí?"
+        if "whatsapp entra hoje na rotina" in normalized:
+            return "Como o WhatsApp entra hoje na rotina de vocês?"
+        if "rotina mais trava hoje" in normalized:
+            return "Onde isso mais trava hoje na rotina de vocês?"
+        if "exemplo mínimo do fluxo" in normalized or "exemplo minimo do fluxo" in normalized:
+            return "Se eu te trouxer um exemplo bem simples do fluxo, você me diz se faz sentido?"
+        if "precisa integrar com outro sistema" in normalized:
+            return "Nessa primeira versão, isso precisa integrar com algum sistema?"
+        if "triagem ou já entra no fechamento" in normalized:
+            return "Hoje isso fica mais na triagem ou já entra no fechamento por aí?"
+        if "fluxo é mais direto ou tem várias etapas" in normalized or "fluxo e mais direto ou tem varias etapas" in normalized:
+            return "Esse fluxo é mais direto ou tem várias etapas até concluir?"
+        if "quantas jornadas" in normalized:
+            return "Vocês querem resolver uma jornada principal primeiro ou já tem mais de uma frente nessa fase?"
+        if normalized.startswith("entender "):
+            return f"Me conta só {self._normalize_message(focus)[9:].strip()}?"
+        if normalized.startswith("validar "):
+            return f"{self._normalize_message(focus)}?"
+        return f"Me conta só {self._normalize_message(focus)}?"
+
+    def _price_reason_from_change(self, change: str) -> str:
+        normalized = self._normalize_message(change)
+        if not normalized:
+            return ""
+        return f"Isso muda bastante {normalized}."
+
+    def _stage_response_seed(self, message: str, strategic_question: str) -> str:
+        base = self._normalize_message(message)
+        if strategic_question:
+            return self._normalize_message(strategic_question)
+        if not base:
+            return ""
+        base = re.sub(r"[!?]+", "", base).strip()
+        return base
+
     def _mock_stage_response(self, instructions: str, user_input: str) -> str:
         stage_id = self._extract_stage_id(instructions)
         message = self._normalize_message(self._extract_current_message(user_input))
 
-        if not message:
-            return "Recebi sua mensagem, mas ainda sem contexto suficiente para responder com mais precisao."
-
         opening_shape = self._infer_opening_shape(instructions)
         question_mode = self._infer_question_mode(instructions)
-        strategic_question = self._extract_instruction_value(instructions, "foco da pergunta")
+        strategic_question = self._extract_instruction_value(instructions, "pergunta alvo")
+        if not strategic_question:
+            strategic_question = self._extract_instruction_value(instructions, "foco da pergunta")
+        if not strategic_question:
+            strategic_question = self._extract_instruction_value(instructions, "ponto que precisa ficar claro")
         price_response_mode = self._infer_price_response_mode(instructions)
-        price_reason = self._extract_instruction_value(instructions, "postura comercial")
+        price_reason = self._extract_instruction_value(instructions, "motivo visivel da pergunta")
+        if not price_reason:
+            price_reason = self._extract_instruction_value(instructions, "postura comercial")
         question_will_change = self._extract_instruction_value(instructions, "o que muda com a resposta")
+        if not question_will_change:
+            question_will_change = self._extract_instruction_value(instructions, "o que essa resposta muda")
         barrier = self._extract_instruction_value(instructions, "barreira dominante")
         levers = set(self._extract_pipe_list(instructions, "alavancas"))
         suppressed = set(self._extract_pipe_list(instructions, "evitar neste turno"))
 
+        if strategic_question and not strategic_question.endswith("?"):
+            strategic_question = self._question_from_focus(strategic_question)
+        if not price_reason and question_will_change:
+            price_reason = self._price_reason_from_change(question_will_change)
+
+        seed = self._stage_response_seed(message, strategic_question)
+        if not seed:
+            return ""
+
+        def _append_question_then_reason(parts: list[str], question_text: str, reason_text: str) -> list[str]:
+            if question_text:
+                if not question_text.endswith("?"):
+                    question_text = f"{question_text}?"
+                parts.append(question_text)
+            if reason_text:
+                parts.append(reason_text.strip())
+            return parts
+
         sentences: list[str] = []
         if stage_id == "etapa_01_abertura":
-            return "Fala, tudo certo por aqui."
+            return f"{seed}." if seed and seed[-1] not in ".!" else seed
         if price_response_mode == "block_price":
             question = strategic_question
-            opening = price_reason or "Antes de te falar isso direito, preciso entender um ponto do teu caso"
-            if question_will_change:
-                opening = f"{opening} Isso muda {question_will_change}."
-            sentences = [opening.strip()]
-            if question:
-                if not question.endswith("?"):
-                    question = f"{question}?"
-                sentences.append(question)
+            opening = self._normalize_message(price_reason)
+            sentences = _append_question_then_reason([], question, opening)
+            if not sentences and seed:
+                return f"{seed}?" if not seed.endswith("?") else seed
             return re.sub(r"\s+", " ", " ".join(sentences)).strip()
         if price_response_mode == "floor_only":
             question = strategic_question
-            opening = "Consigo te dar uma base conservadora, mas sem cravar valor torto."
-            if price_reason:
-                opening = f"{opening} {price_reason}"
-            if question_will_change:
-                opening = f"{opening} Isso muda {question_will_change}."
-            sentences = [opening.strip()]
+            opening = self._normalize_message(price_reason)
             if question_mode != "sem_pergunta" and question:
-                if not question.endswith("?"):
-                    question = f"{question}?"
-                sentences.append(question)
+                sentences = _append_question_then_reason([], question, opening)
+            elif opening:
+                sentences = [opening.strip()]
+            if not sentences and seed:
+                return f"{seed}." if seed[-1] not in ".!" else seed
             return re.sub(r"\s+", " ", " ".join(sentences)).strip()
-        if barrier == "high_threat" or "validate_first" in levers:
-            sentences.append("Entendi.")
-        elif opening_shape == "answer_first":
-            sentences.append("Te situando rapido:")
-        elif opening_shape == "mini_scenario":
-            sentences.append("Na pratica:")
-        elif opening_shape == "anchor_then_invite":
-            sentences.append("Olha:")
-        else:
-            sentences.append("Boa.")
+        del opening_shape, barrier, levers, suppressed
 
-        if {"concretize_benefit", "use_real_scene", "show_visible_outcome", "connect_to_routine", "show_near_term_gain"} & levers:
-            sentences.append("Na pratica, isso deixa a conversa entrar no caminho certo mais cedo e tira parte do retrabalho do time.")
-        elif barrier == "low_tangible_reward":
-            sentences.append("O ganho real aparece no dia a dia, com menos ida e volta e mais previsibilidade na rotina.")
-
-        if {"highlight_hidden_cost", "show_cost_of_current_state"} & levers:
-            sentences.append("Do jeito atual, uma parte do custo fica escondida no tempo gasto para entender o basico e reorganizar a conversa toda hora.")
-
-        if {"clarify_next_step", "reduce_ambiguity"} & levers:
-            sentences.append("O proximo passo mais simples aqui e mapear um fluxo principal e te mostrar como isso rodaria sem abrir varias frentes ao mesmo tempo.")
-
-        if stage_id == "etapa_11_oferta" and opening_shape == "direct_quote_range":
-            sentences.append("Se fizer sentido, eu te passo uma faixa inicial e depois refinamos pelo escopo real.")
+        if question_mode == "sem_pergunta":
+            return f"{seed}." if seed and seed[-1] not in ".!" else seed
 
         question = strategic_question.strip()
         if question_mode != "sem_pergunta" and question:
-            if "reduce_options" in levers and " ou " in question.lower():
-                question = "qual e o ponto mais util para destravar isso ai hoje?"
             if not question.endswith("?"):
                 question = f"{question}?"
             sentences.append(question)
 
+        if not sentences:
+            return f"{seed}." if seed and seed[-1] not in ".!" else seed
         response = " ".join(sentences)
         return re.sub(r"\s+", " ", response).strip()
 

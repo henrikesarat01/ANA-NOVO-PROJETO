@@ -15,6 +15,7 @@ _CONTEXT_KEYS = (
     "channel_usage_known",
     "customer_type_known",
 )
+_CONTEXTUALIZATION_STAGE_ID = "etapa_03_contextualizacao_permissao"
 _DIAGNOSTIC_STAGE_ID = "etapa_04_diagnostico_situacional"
 _IMPACT_STAGE_ID = "etapa_05_diagnostico_impacto"
 
@@ -147,13 +148,12 @@ MENSAGEM NOVA DO CLIENTE
             and bool(summary.get("channel_usage_known", False))
         )
         operation_anchor = bool(summary.get("operation_model_known", False)) or bool(summary.get("customer_type_known", False))
-        return (core_tripod and operation_anchor) or known_count >= 4
+        return (core_tripod and operation_anchor) or known_count >= 3
 
     def _business_context_ready_for_sizing(self, summary: dict[str, Any], niche_specificity: str) -> bool:
         business_model_known = bool(summary.get("operation_model_known", False)) or bool(summary.get("customer_type_known", False))
         return (
-            niche_specificity in {"generic", "specific"}
-            and bool(summary.get("offer_known", False))
+            bool(summary.get("offer_known", False))
             and bool(summary.get("channel_usage_known", False))
             and business_model_known
         )
@@ -184,9 +184,13 @@ MENSAGEM NOVA DO CLIENTE
         minimum_context_ready = self._minimum_context_ready(merged_flags)
         missing_context_slots = [key for key in _CONTEXT_KEYS if not merged_flags[key]]
         newly_known_count = sum(1 for key in _CONTEXT_KEYS if merged_flags[key] and not previous_flags[key])
+        stage3_turns = int(stage_turn_counts.get(_CONTEXTUALIZATION_STAGE_ID, 0))
         stage4_turns = int(stage_turn_counts.get(_DIAGNOSTIC_STAGE_ID, 0))
         stage4_stalled_turns = int(summary.get("stage4_stalled_turns", 0))
         stage5_turns = int(stage_turn_counts.get(_IMPACT_STAGE_ID, 0))
+
+        if not minimum_context_ready and known_count >= 3 and stage3_turns >= 3:
+            minimum_context_ready = True
 
         if state.stage_id == _DIAGNOSTIC_STAGE_ID:
             if newly_known_count > 0 or (merged_flags["pain_known"] and not previous_flags["pain_known"]):
@@ -198,7 +202,7 @@ MENSAGEM NOVA DO CLIENTE
             state.stage_id == _DIAGNOSTIC_STAGE_ID and known_count >= 3 and (stage4_turns >= 3 or stage4_stalled_turns >= 1)
         )
         impact_context_ready = minimum_context_ready and merged_flags["pain_known"] and merged_flags["impact_known"]
-        commercial_scope_ready = niche_specificity == "specific"
+        commercial_scope_ready = niche_specificity == "specific" or (minimum_context_ready and business_context_ready_for_sizing)
         business_context_ready_for_sizing = self._business_context_ready_for_sizing(merged_flags, niche_specificity)
         force_stop_impact = impact_context_ready or (
             state.stage_id == _IMPACT_STAGE_ID and merged_flags["pain_known"] and stage5_turns >= 2

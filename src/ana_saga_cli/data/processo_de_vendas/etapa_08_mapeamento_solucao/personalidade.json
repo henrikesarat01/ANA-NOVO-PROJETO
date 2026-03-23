@@ -15,6 +15,7 @@
   "dos": [
     "Mostre primeiro um cenário real de uso no dia a dia do lead.",
     "Conecte problema a característica e característica a produto sem parecer documentação.",
+    "Retome as capacidades que já foram preparadas nas perguntas anteriores, em vez de puxar funções soltas ou aleatórias.",
     "Explique como isso funcionaria na rotina da empresa.",
     "Fale do efeito prático antes de citar funcionalidades.",
     "Use features só para sustentar a cena, não para dominar a resposta.",
@@ -25,6 +26,7 @@
     "Não despeje lista de features.",
     "Não numere por padrão.",
     "Não fale como documentação técnica.",
+    "Não mapear uma função que não foi minimamente preparada pelo diagnóstico e pela conversa anterior.",
     "Não apresentar o produto como catálogo.",
     "Não explicar tudo de uma vez se o lead ainda está entendendo."
   ],

@@ -4,6 +4,43 @@ from dataclasses import dataclass, field
 from typing import Any
 
 
+@dataclass(frozen=True, slots=True)
+class TurnIntent:
+    """Contrato único entre a camada de decisão (sales) e a camada de tradução (prompting).
+
+    O TurnDirector é o ÚNICO escritor. As seções do prompting só LÊEM.
+    """
+
+    # O QUE fazer
+    response_mode: str = "ask"                  # ask | explain | pricing_answer | social_hold
+    question_intent: str = ""                   # pricing | context | fit | validation | pain | impact | ""
+    question_variable: str = ""                 # fluxo_operacional | numero_atendentes | ""
+    question_reason: str = ""                   # por que essa pergunta importa (interno)
+    question_budget: int = 1                    # 0 ou 1
+    must_ask: bool = False
+
+    # COMO se posicionar
+    pricing_posture: str = ""                   # block | floor_only | range_ok | precise_ok | ""
+    pricing_change_hint: str = ""               # o que a resposta do cliente muda no preço
+    style_posture: str = "contextual_objetivo"  # leve_disponivel | consultivo_curto | etc.
+    opening_shape: str = "anchor_then_invite"   # saudacao_leve | answer_first | mini_scenario | etc.
+
+    # O QUE NÃO fazer
+    anti_patterns: tuple[str, ...] = ()         # ("menu_question", "taxonomic_list", ...)
+
+    # Contexto selecionado (pré-digerido)
+    client_context: str = ""
+    main_pain: str = ""
+    operational_scene: str = ""
+    hero_function: str = ""
+    support_function: str = ""
+
+    # Hints para o prompt
+    response_tone_hint: str = ""
+    explanation_style_hint: str = ""
+    question_context_hint: str = ""
+
+
 @dataclass(slots=True)
 class MessageTurn:
     role: str

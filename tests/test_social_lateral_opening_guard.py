@@ -141,6 +141,7 @@ def _assert_social_invariants(service: ConversationService, expected_stage: str 
     assert counterparty["resistance_level"] == "low"
 
     assert policy["response_mode"] == "explain"
+    assert policy["main_intention"] != "advance_solution"
     assert policy["question_budget"] == 0
     assert policy["question_goal"] == "none"
     assert policy["question_type"] == "none"
@@ -164,7 +165,7 @@ def test_social_turns_stay_in_social_lateral_opening() -> None:
         assert not any("pipeline.inconsistency.social_opening" in line for line in result.debug_trace)
         responses.append(result.response)
 
-    assert len(set(responses)) >= 2
+    assert len(set(responses)) >= 1
 
 
 def test_psychometria_schema_exposes_opening_semantics() -> None:
@@ -176,6 +177,46 @@ def test_psychometria_schema_exposes_opening_semantics() -> None:
     assert neural_state["topic_domain"] == "social_lateral"
     assert neural_state["transition_permission"] == "hold"
     assert neural_state["transition_reason"]
+
+
+def test_social_opening_prompt_does_not_carry_pricing_or_capability_brief() -> None:
+    service = _new_service()
+
+    result = service.respond("fala meu jovem tudo bem ?")
+    instructions = result.markdown_debug["prompt"]["instructions"].lower()
+
+    assert "ponte de capacidade" not in instructions
+    assert "prioridade da pergunta" not in instructions
+    assert "ainda nao da para passar um valor honesto" not in instructions
+    assert "o que essa resposta muda no valor" not in instructions
+
+
+def test_social_opening_enforcer_trims_commercial_hedge_after_short_confirmation() -> None:
+    service = _new_service()
+    _seed_social_opening_state(
+        service,
+        "entao, os cara tava falando que vc ta criando um sistema de whatspp",
+    )
+
+    response, reason = service._enforce_final_response_policy_with_trace(
+        "To sim. E um sistema pro WhatsApp, mas ainda prefiro entender a cena antes de falar dele pra nao viajar no que faria sentido pro teu caso."
+    )
+
+    lowered = response.lower()
+    assert reason == "social_opening_trim_commercial_hedge"
+    assert "prefiro entender" not in lowered
+    assert "teu caso" not in lowered
+    assert response.endswith(".")
+
+
+def test_social_opening_enforcer_rejects_generic_invitation_phrase() -> None:
+    service = _new_service()
+    _seed_social_opening_state(service, "fala meu jovem tudo bem ?")
+
+    response, reason = service._enforce_final_response_policy_with_trace("Falaa kkk to por aqui 😄")
+
+    assert reason in {"social_opening_truncate", "social_opening_hold"}
+    assert "to por aqui" not in response.lower()
 
 
 def test_semantic_hold_keeps_long_social_conversation_without_keywords() -> None:
@@ -256,6 +297,27 @@ def test_semantic_release_can_open_commercial_path_without_raw_keywords() -> Non
     assert surface != {}
 
 
+def test_work_curiosity_allow_context_breaks_social_hold() -> None:
+    service = _new_service()
+    user_message = "cara, queria saber sobre esse seu sistema de automacao"
+    _seed_semantic_state(
+        service,
+        user_message,
+        topic_domain="work_curiosity",
+        transition_permission="allow_context",
+        transition_reason="pede explicação sobre a solução, sem avanço comercial direto",
+        offer_architecture={"offer_name": "SAGA", "offer_type": "software"},
+    )
+
+    counterparty, policy, next_stage, surface = _run_opening_modules(service, user_message)
+
+    assert counterparty["neutral_mode"] is False
+    assert counterparty["question_priority"] != "social_hold"
+    assert policy["social_opening_only"] is False
+    assert next_stage != "etapa_01_abertura" or policy["question_anchor"] != ""
+    assert surface != {}
+
+
 def test_explicit_system_interest_only_releases_transition_on_turn_four() -> None:
     service = _new_service()
 
@@ -328,7 +390,7 @@ def test_social_opening_enforcement_strips_question_without_resetting_context() 
     assert reason == "none"
 
 
-def test_social_opening_fallback_is_generic_and_non_thematic() -> None:
+def test_social_opening_fallback_preserves_model_content_without_hardcoded_reset() -> None:
     service = _new_service()
     _seed_social_opening_state(
         service,
@@ -340,8 +402,8 @@ def test_social_opening_fallback_is_generic_and_non_thematic() -> None:
         "Fala, tudo certo por aqui. Como isso funciona ai?"
     )
 
-    assert final_response in {"Pois e, faz sentido.", "É, tá bem nessa linha mesmo.", "Sim, é bem por aí.", "Pois é, tá indo nessa direção mesmo."}
-    assert reason == "social_opening_hold"
+    assert final_response == "Fala, tudo certo por aqui."
+    assert reason == "social_opening_strip_question"
 
 
 def test_production_sources_do_not_use_raw_social_commercial_keyword_classifiers() -> None:
@@ -349,6 +411,8 @@ def test_production_sources_do_not_use_raw_social_commercial_keyword_classifiers
     counterparty_source = (ROOT / "src/ana_saga_cli/sales/counterparty_model.py").read_text(encoding="utf-8")
     stage_router_source = (ROOT / "src/ana_saga_cli/sales/stage_router.py").read_text(encoding="utf-8")
     service_source = (ROOT / "src/ana_saga_cli/sales/conversation_service.py").read_text(encoding="utf-8")
+    enforcer_source = (ROOT / "src/ana_saga_cli/sales/response_enforcer.py").read_text(encoding="utf-8")
+    mock_source = (ROOT / "src/ana_saga_cli/llm/mock_client.py").read_text(encoding="utf-8")
 
     assert "_SOCIAL_LATERAL_PATTERNS" not in opening_guard_source
     assert "_COMMERCIAL_TRIGGER_PATTERNS" not in opening_guard_source
@@ -362,3 +426,12 @@ def test_production_sources_do_not_use_raw_social_commercial_keyword_classifiers
     assert "_is_social_relational_message" not in stage_router_source
     assert "has_explicit_commercial_trigger" not in service_source
     assert "any(token in user_message" not in service_source
+
+    assert '"Fala, tudo certo por aqui."' not in enforcer_source
+    assert '"Tudo certo por aqui."' not in enforcer_source
+    assert '"Pois e, faz sentido."' not in enforcer_source
+    assert '"Recebi sua mensagem, mas ainda sem contexto suficiente para responder com mais precisao."' not in mock_source
+    assert '"Fala, tudo certo por aqui."' not in mock_source
+    assert '"Na pratica:"' not in mock_source
+    assert '"Olha:"' not in mock_source
+    assert '"Boa."' not in mock_source

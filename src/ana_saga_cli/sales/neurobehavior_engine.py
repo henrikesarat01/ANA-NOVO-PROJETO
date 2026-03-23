@@ -93,11 +93,6 @@ def _list_of_text(values: Any, limit: int | None = None) -> list[str]:
     return items[:limit]
 
 
-def _contains_any(text: str, terms: tuple[str, ...]) -> bool:
-    normalized = _lower_text(text)
-    return any(term in normalized for term in terms)
-
-
 def _count_nonempty(*values: Any) -> int:
     return sum(1 for value in values if _clean_text(value))
 
@@ -152,27 +147,24 @@ def _message_tokens(message: str) -> list[str]:
     return [token for token in _lower_text(message).split() if token]
 
 
-def _contains_operational_signal(message: str) -> bool:
-    return _contains_any(
-        message,
+def _has_structured_context_signal(state: ConversationState) -> bool:
+    lead_summary = state.lead_summary or {}
+    neural_state = state.neural_state or {}
+    response_policy = state.response_policy or {}
+    pricing_policy = state.pricing_policy or {}
+
+    return any(
         (
-            "pedido",
-            "atendimento",
-            "agendamento",
-            "orcamento",
-            "orçamento",
-            "suporte",
-            "entrega",
-            "catalogo",
-            "catálogo",
-            "loja",
-            "cliente",
-            "fluxo",
-            "rotina",
-            "triagem",
-            "pagamento",
-            "agenda",
-        ),
+            bool(lead_summary.get("channel_usage_known", False)),
+            bool(lead_summary.get("operation_model_known", False)),
+            bool(lead_summary.get("customer_type_known", False)),
+            bool(lead_summary.get("pain_known", False)),
+            bool(lead_summary.get("impact_known", False)),
+            bool(_clean_text(neural_state.get("operational_frame", ""))),
+            bool(_clean_text(neural_state.get("pain_reading", ""))),
+            bool(_clean_text(response_policy.get("question_anchor", ""))),
+            len(_list_of_text(pricing_policy.get("scope_gaps", []))) > 0,
+        )
     )
 
 
@@ -193,12 +185,12 @@ def _is_trivial_or_shallow_turn(state: ConversationState) -> bool:
         return False
     if state.stage_id == "etapa_01_abertura" and token_count <= 8 and not direct_pricing:
         return True
-    if token_count <= 4 and not direct_pricing and not _contains_operational_signal(lowered):
+    if token_count <= 4 and not direct_pricing and not _has_structured_context_signal(state):
         return True
     if state.stage_id in {"etapa_02_conexao_inicial", "etapa_03_contextualizacao_permissao"}:
-        if known_context <= 1 and not pain_known and not impact_known and not _contains_operational_signal(lowered):
+        if known_context <= 1 and not pain_known and not impact_known and not _has_structured_context_signal(state):
             return True
-        if direct_pricing and known_context <= 1 and not _contains_operational_signal(lowered):
+        if direct_pricing and known_context <= 1 and not _has_structured_context_signal(state):
             return True
     return False
 
@@ -265,7 +257,7 @@ def _infer_perceived_risk(state: ConversationState) -> str:
         score += 2
     if _lower_text(counterparty.get("trust_level", "")) == "low":
         score += 2
-    if _contains_any(counterparty.get("conversation_tension", ""), ("seguran", "risco", "receio", "trav", "insegur")):
+    if _clean_text(counterparty.get("conversation_tension", "")):
         score += 1
     if _lower_text(pricing_policy.get("commercial_risk", "")) in {"alto", "high", "medio", "moderado"}:
         score += 2 if _lower_text(pricing_policy.get("commercial_risk", "")) in {"alto", "high"} else 1
@@ -334,9 +326,7 @@ def _infer_choice_overload(state: ConversationState) -> str:
         score += 1
     if bool(response_policy.get("must_ask", False)) and bool(response_policy.get("optional_ask", False)):
         score += 1
-    if question_anchor.count(",") >= 2 or question_anchor.count(" ou ") >= 2:
-        score += 1
-    if _contains_any(question_anchor, ("pedido", "atendimento", "orcamento", "orçamento", "suporte", "agendamento")) and question_anchor.count(" ou ") >= 1:
+    if question_anchor.count(",") >= 2:
         score += 1
     return _level_from_score(score, medium_threshold=2, high_threshold=4)
 
@@ -352,7 +342,7 @@ def _infer_threat_level(state: ConversationState) -> str:
         score += 2
     elif _lower_text(counterparty.get("resistance_level", "")) == "medium":
         score += 1
-    if _contains_any(counterparty.get("conversation_tension", ""), ("seguran", "trav", "receio", "risco")):
+    if _clean_text(counterparty.get("conversation_tension", "")):
         score += 1
     if _lower_text(neural_state.get("emotional_state", "")) in {"guarded", "skeptical", "defensive", "frustrated"}:
         score += 2
@@ -369,7 +359,9 @@ def _infer_tangible_reward_gap(state: ConversationState) -> str:
         score += 1
     if not _clean_text(response_policy.get("value_priority_hint", "")):
         score += 1
-    if not _clean_text(lead_summary.get("impact_summary", "")) or _contains_any(lead_summary.get("impact_summary", ""), ("clareza", "valor", "seguran")):
+    if not _clean_text(lead_summary.get("impact_summary", "")):
+        score += 1
+    elif _lower_text((state.counterparty_model or {}).get("question_priority", "")) in {"clarity_question", "trust_question"}:
         score += 1
     return _level_from_score(score, medium_threshold=2, high_threshold=3)
 
@@ -385,7 +377,7 @@ def _infer_loss_salience_gap(state: ConversationState) -> str:
         score += 1
     if bool(lead_summary.get("pain_known", False)) and bool(lead_summary.get("impact_known", False)):
         score += 1
-    if not _contains_any(lead_summary.get("impact_summary", ""), ("tempo", "retrabalho", "perde", "custo", "fila", "lento", "sum")):
+    if not _clean_text(lead_summary.get("impact_summary", "")):
         score += 1
     intent = _lower_text(counterparty.get("counterparty_intent", ""))
     if intent == "delay" and bool(lead_summary.get("pain_known", False)):

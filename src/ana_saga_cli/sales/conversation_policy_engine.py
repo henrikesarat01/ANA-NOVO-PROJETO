@@ -63,6 +63,14 @@ class ConversationPolicyEngine:
     def __init__(self, llm: LLMClient) -> None:
         self.llm = llm
 
+    def _dedupe_functions(self, function_names: list[str]) -> list[str]:
+        normalized: list[str] = []
+        for function_name in function_names:
+            canonical = canonical_function_name(_clean_text(function_name))
+            if canonical and canonical not in normalized:
+                normalized.append(canonical)
+        return normalized
+
     def _goals(self, state: ConversationState) -> dict[str, str]:
         arch = state.offer_sales_architecture or {}
         return arch.get("discovery_goals", {}) if isinstance(arch.get("discovery_goals"), dict) else {}
@@ -80,6 +88,7 @@ class ConversationPolicyEngine:
             "minimum_pricing_question",
             "minimum_pricing_question_reason",
             "minimum_pricing_question_variable",
+            "question_anchor_is_literal",
             "price_block_reason_short",
             "price_block_reason_explained",
             "question_will_change_what",
@@ -126,6 +135,8 @@ class ConversationPolicyEngine:
             policy["answer_now_instead_of_asking"] = False
             policy["question_type"] = "pricing_gate_question"
             policy["question_anchor"] = minimum_question
+            policy["question_anchor_is_literal"] = bool(pricing_policy.get("question_anchor_is_literal", False))
+            policy["question_context_hint"] = question_will_change_what or policy.get("question_context_hint", "")
             policy["ask_reason"] = ask_reason
             return policy
 
@@ -141,6 +152,8 @@ class ConversationPolicyEngine:
             policy["answer_now_instead_of_asking"] = not allow_followup
             policy["question_type"] = "pricing_gate_question" if allow_followup else "none"
             policy["question_anchor"] = minimum_question if allow_followup else ""
+            policy["question_anchor_is_literal"] = bool(pricing_policy.get("question_anchor_is_literal", False)) if allow_followup else True
+            policy["question_context_hint"] = question_will_change_what or policy.get("question_context_hint", "")
             policy["ask_reason"] = ask_reason
             policy["allow_followup_question_with_price"] = allow_followup
             return policy
@@ -165,7 +178,7 @@ class ConversationPolicyEngine:
     def _force_social_lateral_opening_policy(self, state: ConversationState, policy: dict[str, Any]) -> dict[str, Any]:
         opening_state = get_opening_semantic_state(state)
         policy["response_mode"] = "explain"
-        policy["main_intention"] = "advance_solution"
+        policy["main_intention"] = "confirm_impact"
         policy["question_goal"] = "none"
         policy["question_type"] = "none"
         policy["question_budget"] = 0
@@ -190,7 +203,7 @@ class ConversationPolicyEngine:
     def _parse_json(self, raw: str) -> dict[str, Any]:
         return parse_last_json_object(raw)
 
-    def _resolve_active_pain(self, state: ConversationState) -> dict[str, str]:
+    def _resolve_active_pain(self, state: ConversationState) -> dict[str, Any]:
         guidance = state.surface_guidance or {}
         hypotheses = state.diagnostic_hypotheses or {}
         pains = hypotheses.get("dores_reais", hypotheses.get("diagnostic_clusters", []))
@@ -255,6 +268,19 @@ class ConversationPolicyEngine:
                 or ""
             ).strip()
         )
+        related_functions = self._dedupe_functions(
+            [
+                *selected_pain.get("funcoes_saga_relacionadas", selected_pain.get("saga_functions", [])),
+                hero_function,
+                support_function,
+            ]
+        )
+        complementary_functions = self._dedupe_functions(
+            [
+                *selected_pain.get("complementary_functions", []),
+                *[item for item in related_functions if item not in {hero_function, support_function}],
+            ]
+        )[:2]
         causal_layer = get_causal_layer(selected_pain)
         return {
             "cluster_name": cluster_name,
@@ -266,6 +292,8 @@ class ConversationPolicyEngine:
             "mode_reasoning": str(guidance.get("mode_reasoning", "") or selected_pain.get("mode_reasoning", hypotheses.get("mode_reasoning", "")) or "").strip(),
             "hero_function": hero_function,
             "support_function": support_function,
+            "related_functions": related_functions,
+            "complementary_functions": complementary_functions,
             "contexto_de_uso": causal_layer.get("contexto_de_uso", ""),
             "origem_do_desafio": causal_layer.get("origem_do_desafio", ""),
             "desafio_do_cliente": causal_layer.get("desafio_do_cliente", ""),
@@ -274,7 +302,7 @@ class ConversationPolicyEngine:
             "valor_percebido": causal_layer.get("valor_percebido", ""),
         }
 
-    def _build_aligned_connection_goal(self, alignment: dict[str, str], offer_name: str) -> str:
+    def _build_aligned_connection_goal(self, alignment: dict[str, Any], offer_name: str) -> str:
         hero_function = alignment.get("hero_function", "")
         support_function = alignment.get("support_function", "")
         cluster_name = alignment.get("cluster_name", "")
@@ -337,6 +365,123 @@ class ConversationPolicyEngine:
             return goals.get("handoff_readiness", "o que precisa ficar pronto antes de passar o caso para o time")
         return _clean_text(gap)
 
+    def _select_stage_function_fit_question(
+        self,
+        state: ConversationState,
+        policy: dict[str, Any],
+        alignment: dict[str, Any],
+    ) -> tuple[str, str, str] | None:
+        if state.stage_id not in {
+            "etapa_06_qualificacao_fit",
+            "etapa_07_transicao_solucao",
+            "etapa_08_mapeamento_solucao",
+            "etapa_09_ancoragem_valor",
+            "etapa_10_checagem_aderencia",
+        }:
+            return None
+        if policy.get("response_mode") != "ask":
+            return None
+        if bool(policy.get("policy_used_pricing_gate", False)):
+            return None
+
+        hero_function = _clean_text(alignment.get("hero_function", ""))
+        support_function = _clean_text(alignment.get("support_function", ""))
+        complementary_functions = self._dedupe_functions(list(alignment.get("complementary_functions", [])))
+        if not complementary_functions:
+            complementary_functions = [
+                item
+                for item in self._dedupe_functions(list(alignment.get("related_functions", [])))
+                if item not in {hero_function, support_function}
+            ][:2]
+
+        if not hero_function and not complementary_functions:
+            return None
+
+        complementary_summary = " e ".join(complementary_functions[:2])
+        support_summary = support_function or complementary_summary
+        counterparty_priority = _clean_text((state.counterparty_model or {}).get("question_priority", ""))
+
+        if state.stage_id == "etapa_06_qualificacao_fit":
+            if hero_function and complementary_summary:
+                anchor = f"validar se {hero_function} puxa o encaixe principal e se {complementary_summary} completam a jornada"
+            elif hero_function and support_summary:
+                anchor = f"validar se {hero_function} puxa o encaixe principal com apoio de {support_summary}"
+            else:
+                anchor = f"validar se {complementary_summary} fecham o encaixe principal da rotina"
+            return "fit", anchor, "offer_blueprint_question"
+
+        if state.stage_id == "etapa_07_transicao_solucao":
+            if hero_function and complementary_summary:
+                anchor = f"confirmar se a transição deve abrir em {hero_function} e seguir com {complementary_summary}"
+            elif hero_function and support_summary:
+                anchor = f"confirmar se a transição deve abrir em {hero_function} com apoio de {support_summary}"
+            else:
+                anchor = f"confirmar se a transição deve seguir por {complementary_summary}"
+            return "fit", anchor, "offer_blueprint_question"
+
+        if state.stage_id == "etapa_08_mapeamento_solucao":
+            if hero_function and complementary_summary:
+                anchor = f"mapear onde entram {hero_function} e depois {complementary_summary} para fechar o fluxo"
+            elif hero_function and support_summary:
+                anchor = f"mapear onde entram {hero_function} e {support_summary} para fechar o fluxo"
+            else:
+                anchor = f"mapear onde entram {complementary_summary} para fechar o fluxo"
+            return "fit", anchor, "offer_blueprint_question"
+
+        if state.stage_id == "etapa_09_ancoragem_valor":
+            if counterparty_priority == "trust_question":
+                if hero_function and complementary_summary:
+                    anchor = f"entender se ver {hero_function} junto de {complementary_summary} aplicado ao caso ja da seguranca para avancar"
+                elif hero_function and support_summary:
+                    anchor = f"entender se ver {hero_function} com apoio de {support_summary} aplicado ao caso ja da seguranca para avancar"
+                else:
+                    anchor = f"entender se ver {complementary_summary} no caso ja da seguranca para avancar"
+            elif counterparty_priority == "clarity_question":
+                if hero_function and complementary_summary:
+                    anchor = f"entender se fica claro como {hero_function} e {complementary_summary} funcionam juntos na rotina"
+                elif hero_function and support_summary:
+                    anchor = f"entender se fica claro como {hero_function} funciona com apoio de {support_summary} na rotina"
+                else:
+                    anchor = f"entender se fica claro como {complementary_summary} entram na rotina"
+            elif counterparty_priority == "comparison_question":
+                if hero_function and complementary_summary:
+                    anchor = f"entender se o cliente compara mais {hero_function} isolado ou a jornada completa com {complementary_summary}"
+                elif hero_function and support_summary:
+                    anchor = f"entender se o cliente compara mais {hero_function} isolado ou com apoio de {support_summary}"
+                else:
+                    anchor = f"entender se o cliente compara mais as partes de {complementary_summary} ou a jornada completa"
+            else:
+                if hero_function and complementary_summary:
+                    anchor = f"validar se {hero_function} com {complementary_summary} materializam valor no caso real"
+                elif hero_function and support_summary:
+                    anchor = f"validar se {hero_function} com apoio de {support_summary} materializa valor no caso real"
+                else:
+                    anchor = f"validar se {complementary_summary} materializam valor no caso real"
+            return "fit", anchor, "offer_blueprint_question"
+
+        if counterparty_priority == "trust_question":
+            if hero_function and complementary_summary:
+                anchor = f"checar se {hero_function} com {complementary_summary} batem com o que precisa acontecer para o caso fazer sentido"
+            elif hero_function and support_summary:
+                anchor = f"checar se {hero_function} com apoio de {support_summary} batem com o que precisa acontecer para o caso fazer sentido"
+            else:
+                anchor = f"checar se {complementary_summary} batem com o que precisa acontecer para o caso fazer sentido"
+        elif counterparty_priority == "clarity_question":
+            if hero_function and complementary_summary:
+                anchor = f"confirmar se a combinacao de {hero_function} com {complementary_summary} fecha o desenho mais claro para a operacao"
+            elif hero_function and support_summary:
+                anchor = f"confirmar se a combinacao de {hero_function} com apoio de {support_summary} fecha o desenho mais claro para a operacao"
+            else:
+                anchor = f"confirmar se a combinacao de {complementary_summary} fecha o desenho mais claro para a operacao"
+        else:
+            if hero_function and complementary_summary:
+                anchor = f"checar se {hero_function} com {complementary_summary} batem com o que a operacao precisa para fazer sentido"
+            elif hero_function and support_summary:
+                anchor = f"checar se {hero_function} com apoio de {support_summary} batem com o que a operacao precisa para fazer sentido"
+            else:
+                anchor = f"checar se {complementary_summary} batem com o que a operacao precisa para fazer sentido"
+        return "fit", anchor, "offer_blueprint_question"
+
     def _select_discovery_question(self, state: ConversationState) -> tuple[str, str]:
         lead_summary = state.lead_summary or {}
         goals = self._goals(state)
@@ -361,7 +506,7 @@ class ConversationPolicyEngine:
             return "fit", goals.get("customer_type", "identificar o perfil de quem mais procura")
         return "fit", goals.get("general_fit", "entender onde a solução ajudaria mais na operação")
 
-    def _select_sizing_question(self, state: ConversationState, policy: dict[str, Any], alignment: dict[str, str]) -> tuple[str, str]:
+    def _select_sizing_question(self, state: ConversationState, policy: dict[str, Any], alignment: dict[str, Any]) -> tuple[str, str]:
         pricing_policy = state.pricing_policy or {}
         goals = self._goals(state)
         capability_statuses = pricing_policy.get("capability_statuses", {})
@@ -631,6 +776,7 @@ class ConversationPolicyEngine:
 
     def _build_offer_architecture_hints(self, state: ConversationState) -> dict[str, Any]:
         architecture = state.offer_sales_architecture or {}
+        questioning_strategy = architecture.get("questioning_strategy", {}) if isinstance(architecture.get("questioning_strategy", {}), dict) else {}
         return {
             "offer_name": _clean_text(architecture.get("offer_name", "")),
             "offer_type": _clean_text(architecture.get("offer_type", "")),
@@ -644,9 +790,47 @@ class ConversationPolicyEngine:
             "offer_allowed_moves_early": [_clean_text(item) for item in architecture.get("early_allowed_moves", []) if _clean_text(item)],
             "offer_forbidden_moves_early": [_clean_text(item) for item in architecture.get("early_forbidden_moves", []) if _clean_text(item)],
             "offer_progression": [_clean_text(item) for item in architecture.get("conversation_progression", []) if _clean_text(item)],
+            "offer_capability_bridge_goal": _clean_text(architecture.get("capability_bridge_goal", "")),
+            "offer_capability_priority_goal": _clean_text(architecture.get("capability_priority_goal", "")),
+            "offer_capability_questioning_enabled": bool(architecture.get("capability_questioning_enabled", False)),
+            "offer_capability_context_inference": bool(questioning_strategy.get("infer_capability_paths_from_context", False)),
+            "offer_capability_disambiguation": bool(questioning_strategy.get("choose_questions_that_disambiguate_relevant_capabilities", False)),
+            "offer_capability_question_guardrail": bool(questioning_strategy.get("avoid_questions_unlinked_to_real_capabilities", False)),
         }
 
-    def _offer_question_from_style(self, state: ConversationState, policy: dict[str, Any], alignment: dict[str, str], style: str) -> tuple[str, str, str]:
+    def _select_capability_bridge_question(self, state: ConversationState, policy: dict[str, Any], alignment: dict[str, Any]) -> tuple[str, str, str] | None:
+        architecture = state.offer_sales_architecture or {}
+        questioning_strategy = architecture.get("questioning_strategy", {}) if isinstance(architecture.get("questioning_strategy", {}), dict) else {}
+        if not bool(architecture.get("capability_questioning_enabled", False)):
+            return None
+        if not questioning_strategy.get("choose_questions_that_disambiguate_relevant_capabilities", False):
+            return None
+
+        hero_function = _clean_text(alignment.get("hero_function", ""))
+        support_function = _clean_text(alignment.get("support_function", ""))
+        if not hero_function and not support_function:
+            return None
+
+        lead_summary = state.lead_summary or {}
+        if not bool(lead_summary.get("niche_known", False)) and not bool(lead_summary.get("minimum_context_ready", False)):
+            return None
+
+        bridge_goal = _clean_text(architecture.get("capability_bridge_goal", ""))
+        priority_goal = _clean_text(architecture.get("capability_priority_goal", ""))
+        if hero_function and support_function:
+            anchor = f"confirmar se a trava principal pede mais {hero_function} ou {support_function} na rotina"
+        elif hero_function:
+            anchor = f"entender em que momento da rotina {hero_function} faria diferenca de verdade"
+        else:
+            anchor = f"entender onde {support_function} entra para destravar a rotina"
+
+        if priority_goal:
+            anchor = f"{anchor} | prioridade: {priority_goal}"
+        elif bridge_goal:
+            anchor = f"{anchor} | objetivo: {bridge_goal}"
+        return "fit", anchor, "capability_bridge_question"
+
+    def _offer_question_from_style(self, state: ConversationState, policy: dict[str, Any], alignment: dict[str, Any], style: str) -> tuple[str, str, str]:
         pricing_policy = state.pricing_policy or {}
         architecture = state.offer_sales_architecture or {}
         goals = self._goals(state)
@@ -688,7 +872,7 @@ class ConversationPolicyEngine:
             return "fit", goals.get("channel_usage", "descobrir se o contato chega mais como pedido ou atendimento"), "offer_blueprint_question"
         return "none", "", "none"
 
-    def _select_offer_architecture_question(self, state: ConversationState, policy: dict[str, Any], alignment: dict[str, str]) -> tuple[str, str, str] | None:
+    def _select_offer_architecture_question(self, state: ConversationState, policy: dict[str, Any], alignment: dict[str, Any]) -> tuple[str, str, str] | None:
         architecture = state.offer_sales_architecture or {}
         style = _clean_text(architecture.get("primary_question_style", ""))
         if not style:
@@ -707,14 +891,48 @@ class ConversationPolicyEngine:
             return False
         return True
 
-    def _counterparty_question_choice(self, state: ConversationState, policy: dict[str, Any], alignment: dict[str, str]) -> tuple[str, str, str] | None:
-        choice = self._choose_counterparty_priority_question(state, policy)
+    def _counterparty_question_choice(self, state: ConversationState, policy: dict[str, Any], alignment: dict[str, Any]) -> tuple[str, str, str] | None:
+        choice = self._choose_counterparty_priority_question(state, policy, alignment)
         if choice is None:
             return None
         style = _COUNTERPARTY_TO_QUESTION_STYLE.get(_clean_text((state.counterparty_model or {}).get("question_priority", "")), "")
         if style and not self._is_offer_style_allowed_early(state, style):
             return None
         return choice
+
+    def _build_cluster_counterparty_anchor(self, priority: str, alignment: dict[str, Any]) -> str:
+        hero_function = _clean_text(alignment.get("hero_function", ""))
+        support_function = _clean_text(alignment.get("support_function", ""))
+        complementary_functions = self._dedupe_functions(list(alignment.get("complementary_functions", [])))
+        if not complementary_functions:
+            complementary_functions = [
+                item
+                for item in self._dedupe_functions(list(alignment.get("related_functions", [])))
+                if item not in {hero_function, support_function}
+            ][:2]
+
+        complementary_summary = " e ".join(complementary_functions[:2])
+        support_summary = support_function or complementary_summary
+
+        if priority == "trust_question":
+            if hero_function and complementary_summary:
+                return f"entender se ver {hero_function} com {complementary_summary} aplicados ao caso ja daria seguranca para avancar"
+            if hero_function and support_summary:
+                return f"entender se ver {hero_function} com apoio de {support_summary} aplicado ao caso ja daria seguranca para avancar"
+            if complementary_summary:
+                return f"entender se ver {complementary_summary} aplicados ao caso ja daria seguranca para avancar"
+            return ""
+
+        if priority == "comparison_question":
+            if hero_function and complementary_summary:
+                return f"entender se a comparacao mais util hoje e entre {hero_function} isolado ou a jornada com {complementary_summary}"
+            if hero_function and support_summary:
+                return f"entender se a comparacao mais util hoje e entre {hero_function} isolado ou com apoio de {support_summary}"
+            if complementary_summary:
+                return f"entender se a comparacao mais util hoje e entre as partes de {complementary_summary} ou a jornada completa"
+            return ""
+
+        return ""
 
     def _should_offer_question_yield_to_structural_focus(self, state: ConversationState) -> bool:
         lead_summary = state.lead_summary or {}
@@ -740,7 +958,7 @@ class ConversationPolicyEngine:
             or _clean_text(neural_state.get("blocked_variable", ""))
         )
 
-    def _choose_counterparty_priority_question(self, state: ConversationState, policy: dict[str, Any]) -> tuple[str, str, str] | None:
+    def _choose_counterparty_priority_question(self, state: ConversationState, policy: dict[str, Any], alignment: dict[str, Any]) -> tuple[str, str, str] | None:
         model = state.counterparty_model or {}
         goals = self._goals(state)
         priority = _clean_text(model.get("question_priority", ""))
@@ -750,6 +968,9 @@ class ConversationPolicyEngine:
         if priority == "clarity_question":
             return "fit", goals.get("clarity_priority", "o que o cliente quer entender primeiro"), "counterparty_question"
         if priority == "trust_question":
+            anchored = self._build_cluster_counterparty_anchor(priority, alignment)
+            if anchored:
+                return "fit", anchored, "counterparty_question"
             return "fit", goals.get("trust_need", "o que daria mais segurança ao cliente para avaliar"), "counterparty_question"
         if priority == "tension_question":
             return "pain", goals.get("tension_source", "onde a operação mais embola hoje"), "counterparty_question"
@@ -758,6 +979,9 @@ class ConversationPolicyEngine:
         if priority == "value_question":
             return "fit", goals.get("value_priority", "o que pesa mais para valer a pena"), "counterparty_question"
         if priority == "comparison_question":
+            anchored = self._build_cluster_counterparty_anchor(priority, alignment)
+            if anchored:
+                return "fit", anchored, "counterparty_question"
             return "fit", goals.get("comparison_axis", "se está comparando mais preço ou modo de usar"), "counterparty_question"
         if priority == "pricing_question":
             if bool(policy.get("enough_context_for_pricing_response", False)):
@@ -765,7 +989,7 @@ class ConversationPolicyEngine:
             return "fit", goals.get("channel_usage", "descobrir se o contato chega mais como pedido ou atendimento"), "counterparty_question"
         return None
 
-    def _rewrite_taxonomic_question(self, state: ConversationState, policy: dict[str, Any], alignment: dict[str, str]) -> str:
+    def _rewrite_taxonomic_question(self, state: ConversationState, policy: dict[str, Any], alignment: dict[str, Any]) -> str:
         pricing_policy = state.pricing_policy or {}
         lead_summary = state.lead_summary or {}
         goals = self._goals(state)
@@ -792,7 +1016,7 @@ class ConversationPolicyEngine:
             return goals.get("service_fit", "entender onde a solução ajuda mais: triagem ou agenda")
         return goals.get("general_fit", "entender onde a solução ajudaria mais na operação")
 
-    def _sanitize_question_anchor(self, state: ConversationState, policy: dict[str, Any], alignment: dict[str, str]) -> dict[str, Any]:
+    def _sanitize_question_anchor(self, state: ConversationState, policy: dict[str, Any], alignment: dict[str, Any]) -> dict[str, Any]:
         question_anchor = _clean_text(policy.get("question_anchor", ""))
         if not question_anchor:
             return policy
@@ -802,7 +1026,7 @@ class ConversationPolicyEngine:
                 policy["question_type"] = "human_discovery_question"
         return policy
 
-    def _choose_question_strategy(self, state: ConversationState, policy: dict[str, Any], alignment: dict[str, str]) -> tuple[str, str, str]:
+    def _choose_question_strategy(self, state: ConversationState, policy: dict[str, Any], alignment: dict[str, Any]) -> tuple[str, str, str]:
         if bool(policy.get("answer_now_instead_of_asking", False)):
             return "none", "", "none"
         if policy.get("response_mode") != "ask":
@@ -825,6 +1049,9 @@ class ConversationPolicyEngine:
         )
 
         if not business_context_ready_for_sizing:
+            capability_choice = self._select_capability_bridge_question(state, policy, alignment)
+            if capability_choice is not None:
+                return capability_choice
             question_goal, question_anchor = self._select_discovery_question(state)
             return question_goal, question_anchor, "discovery_question"
 
@@ -838,6 +1065,10 @@ class ConversationPolicyEngine:
             if saga_mode == "consultative_handoff":
                 return "pain", goals.get("pain_handoff", "onde o caso mais trava: briefing ou proposta"), "pain_question"
             return "pain", goals.get("pain_general", "onde a operação mais trava hoje"), "pain_question"
+
+        stage_fit_choice = self._select_stage_function_fit_question(state, policy, alignment)
+        if stage_fit_choice is not None:
+            return stage_fit_choice
 
         offer_choice = self._select_offer_architecture_question(state, policy, alignment)
         if offer_choice is not None:
@@ -899,6 +1130,8 @@ class ConversationPolicyEngine:
         policy["mode_reasoning"] = alignment.get("mode_reasoning", "")
         policy["hero_saga_function"] = alignment.get("hero_function", "")
         policy["support_saga_function"] = alignment.get("support_function", "")
+        policy["related_saga_functions"] = alignment.get("related_functions", [])
+        policy["complementary_saga_functions"] = alignment.get("complementary_functions", [])
         policy["contexto_de_uso"] = alignment.get("contexto_de_uso", "")
         policy["origem_do_desafio"] = alignment.get("origem_do_desafio", "")
         policy["desafio_do_cliente"] = alignment.get("desafio_do_cliente", "")
@@ -1074,7 +1307,7 @@ Regras:
 - question_budget deve ser 0 ou 1.
 - must_ask=true só quando a pergunta desbloqueia algo importante.
 - optional_ask=true quando perguntar pode ajudar, mas já dá para avançar sem isso.
-- Se price_response_mode=block_price, a policy deve usar exatamente a minimum_pricing_question e deixar o motivo visível para o cliente.
+- Se price_response_mode=block_price, a policy deve preservar apenas a necessidade interna da pergunta mínima e o que essa resposta muda; não escreva pergunta literal nem motivo pronto para o cliente.
 - Se price_response_mode=floor_only, a policy pode ancorar de forma conservadora e fazer no máximo 1 pergunta complementar.
 - Se price_response_mode=range_ok, a policy pode responder faixa sem bloquear por reflexo.
 - Se price_response_mode=precise_ok, a policy não deve travar preço artificialmente.

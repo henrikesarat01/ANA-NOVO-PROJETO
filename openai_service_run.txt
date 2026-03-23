@@ -1,0 +1,36 @@
+TURN 1
+USER: oi, tudo bem?
+ANA: Oii, tudo bem por aí também 🙂
+STAGE: etapa_01_abertura
+DIAG: 0
+---
+TURN 2
+USER: tenho um petshop e to tentando organizar melhor atendimento e vendas
+ANA: Boa — em petshop costuma virar tudo no mesmo WhatsApp mesmo 😅 Hoje aí o pessoal chega mais já pedindo alguma coisa direto ou cai muito “oi, queria ver”/atendimento misturado?
+STAGE: etapa_03_contextualizacao_permissao
+DIAG: 0
+---
+TURN 3
+USER: hoje a equipe se perde no whatsapp e demora pra responder
+ANA: É, aí o problema costuma não ser só “muita mensagem” é tudo cair misturado no mesmo lugar e a equipe ter que abrir conversa por conversa pra descobrir se é compra, banho e tosa, dúvida ou acompanhamento. No petshop isso bagunça rápido mesmo.
+STAGE: etapa_04_diagnostico_situacional
+DIAG: 2
+---
+TURN 4
+USER: quanto custa o saga?
+ANA: Tem um cenário mais enxuto e outro mais completo — então o valor muda conforme o tamanho da bagunça que ele vai segurar aí 😅 No teu caso, como hoje a equipe já se perde no mesmo WhatsApp e demora pra achar contexto, o custo não é só “ter ferramenta”: é tempo indo embora, cliente esperando e venda esfriando no meio. Normalmente fica numa faixa de R$ 1.500 a R$ 2.600. Isso entra num fluxo principal só ou em mais de uma frente aí?
+STAGE: etapa_09_ancoragem_valor
+DIAG: 2
+---
+TURN 5
+USER: somos em 4 pessoas e o maior problema e nao perder cliente no meio do caminho
+ANA: Aí faz bastante diferença, sim. No caso mais enxuto, ele já ajuda a puxar de volta quem pediu orçamento, perguntou de produto ou tentou agendar e ficou no vácuo. No mais completo, além disso, organiza melhor essas retomadas quando tem várias conversas rolando ao mesmo tempo — que é justamente onde 4 pessoas no mesmo WhatsApp costumam deixar cliente escapar sem perceber. E aí o ponto nem é “ter automação por ter”. É evitar aquele cliente que tava quase fechando banho, tosa ou compra e some só porque ninguém voltou na hora certa. Pra te falar o valor certo sem chutar: isso entra numa frente só aí ou produto e banho/tosa acabam se misturando no mesmo fluxo?
+STAGE: etapa_09_ancoragem_valor
+DIAG: 3
+---
+TURN 6
+USER: e na pratica, o que ele organizaria aqui?
+ANA: Na prática, ele põe ordem justamente no que hoje se mistura aí. Tipo assim: quem pediu banho e tosa e sumiu não some no meio das outras conversas. quem pediu preço de ração, areia, medicamento ou orçamento também não fica enterrado no WhatsApp. e o que já era pra virar agendamento ou venda volta pra fila certa, em vez de depender de alguém lembrar no braço. No caso mais enxuto, ele já organiza esse resgate dos atendimentos que pararam no meio. Num caso mais completo, além de resgatar, ele separa melhor o que é produto, o que é serviço e o que tá mais perto de fechar. A diferença prática costuma ser bem pé no chão: menos conversa perdida, menos cliente esfriando por falta de retorno e menos correria da equipe tentando achar quem ficou pra trás. Hoje isso entra mais numa frente só ou mistura banho e tosa com produtos no mesmo fluxo?
+STAGE: etapa_09_ancoragem_valor
+DIAG: 4
+---
