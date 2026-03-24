@@ -11,8 +11,4 @@ def build_stage_section(stage: StageDefinition) -> str:
         f"título: {stage.title}",
         f"objetivo: {stage.goal}",
     ]
-    if stage.dos:
-        lines.append(f"fazer: {' | '.join(stage.dos[:2])}")
-    if stage.donts:
-        lines.append(f"evitar: {' | '.join(stage.donts[:2])}")
     return f"ETAPA\n{join_lines(lines)}"

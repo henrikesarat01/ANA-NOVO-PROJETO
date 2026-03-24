@@ -33,6 +33,7 @@ class AppConfig:
     stage_debug: bool = os.getenv("ANA_STAGE_DEBUG", "false").strip().lower() == "true"
     stage_debug_scope: str = os.getenv("ANA_STAGE_DEBUG_SCOPE", "neural").strip().lower()
     naturality_debug: bool = os.getenv("ANA_NATURALITY_DEBUG", "false").strip().lower() == "true"
+    repair_enabled: bool = os.getenv("ANA_ENABLE_REPAIR", "false").strip().lower() == "true"
     max_arsenal_hits: int = 6
     product_name: str = "SAGA"
     system_name: str = "ANA"

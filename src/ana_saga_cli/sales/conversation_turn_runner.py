@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from copy import deepcopy
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -9,6 +10,7 @@ from ana_saga_cli.knowledge.loader import (
     load_product_identity,
     load_product_inventory,
 )
+from ana_saga_cli.prompting.sections.philosophy import build_turn_philosophy_section
 from ana_saga_cli.knowledge.retriever import InventoryRetriever
 from ana_saga_cli.sales.capability_contract import (
     read_primary_capability,
@@ -36,6 +38,8 @@ class _TurnStart:
     user_message: str
     entry_stage: str
     debug_trace: list[str] | None
+    state_before_turn: dict[str, Any]
+    state_after_user_turn: dict[str, Any]
 
 
 @dataclass(slots=True)
@@ -72,31 +76,78 @@ class _TurnResponse:
 class ConversationTurnRunner:
     def __init__(self, service: Any) -> None:
         self.service = service
+        self._last_repair_debug: dict[str, Any] = {"attempted": False}
+
+    def _debug_state_snapshot(self) -> dict[str, Any]:
+        state = self.service.state
+        recent_turns = [
+            {
+                "role": turn.role,
+                "content": turn.content,
+            }
+            for turn in state.turns[-8:]
+        ]
+        return {
+            "stage_id": state.stage_id,
+            "turn_count": state.turn_count,
+            "last_assistant_message": state.last_assistant_message,
+            "recent_turns": recent_turns,
+            "lead_summary": deepcopy(state.lead_summary),
+            "diagnostic_hypotheses": deepcopy(state.diagnostic_hypotheses),
+            "neural_state": deepcopy(state.neural_state),
+            "counterparty_model": deepcopy(state.counterparty_model),
+            "response_policy": deepcopy(state.response_policy),
+            "pricing_policy": deepcopy(state.pricing_policy),
+            "surface_guidance": deepcopy(state.surface_guidance),
+            "offer_context": deepcopy(state.offer_context),
+            "channel_context": deepcopy(state.channel_context),
+            "discussed_features": list(state.discussed_features),
+            "asked_questions": list(state.asked_questions),
+        }
+
+    def _changed_keys(self, before: dict[str, Any], after: dict[str, Any]) -> list[str]:
+        changed: list[str] = []
+        for key in sorted(set(before) | set(after)):
+            if before.get(key) != after.get(key):
+                changed.append(key)
+        return changed
 
     def _repair_instructions(self) -> str:
         humanization = load_humanization_framework()
+        intent = self.service.turn_director.build_intent(
+            state=self.service.state,
+            arsenal_hits=[],
+        )
+        philosophy = build_turn_philosophy_section(
+            self.service.state,
+            intent,
+            self.service.state.stage_id,
+        )
         base = """REPAIR DE SUPERFÍCIE
-Reescreva a resposta mantendo os mesmos fatos, o mesmo sentido central e o mesmo idioma.
-Corrija apenas forma.
+Mantenha os mesmos fatos, o mesmo sentido central e o mesmo idioma.
+Corrija só a forma.
 Não invente contexto.
 Não explique bastidor.
-Se houver pergunta, faça no máximo uma e deixe natural.
-Se a restrição do turno proibir pergunta, remova a pergunta sem substituir por formulário.
-Se o contrato do turno bloquear preço, remova número, faixa, moeda e condição comercial; mantenha no máximo uma frase curta de contexto e a pergunta necessária.
-Se o turno estiver validando um fluxo, mantenha o exemplo completo do fluxo já descrito e encurte só a pergunta final; não mude para outra lacuna.
-Se a nova resposta estiver parecida demais com a fala anterior da ANA, responda só o ponto novo do turno e mude a formulação.
+Não transforme a resposta em pitch, formulário ou mini-apresentação.
+Se houver pergunta, mantenha no máximo uma e preserve o ponto decisivo do turno.
+Se a pergunta original estiver concreta e viva, preserve essa concretude.
+Se a violação for de forma, conserte a forma sem apagar a cena, os detalhes e o recorte do caso.
+Não genericize uma pergunta concreta que já esteja boa.
+Se o turno bloquear preço, não cite valor.
+Se o turno estiver validando fluxo, preserve o foco nesse fluxo.
+Se a nova resposta estiver parecida demais com a fala anterior da ANA, responda só o delta e mude a formulação.
 Nunca use rótulo interno, nome de variável ou linguagem de bastidor.
 """
         if humanization:
-            return f"{base}\nCONTRATO DE HUMANIZAÇÃO\n{humanization}"
-        return base
+            return f"{base}\n{philosophy}\n\nCONTRATO DE HUMANIZAÇÃO\n{humanization}"
+        return f"{base}\n{philosophy}"
 
     def _repair_input(self, raw_response: str, violation_type: str) -> str:
         policy = self.service.state.response_policy or {}
         pricing_policy = self.service.state.pricing_policy or {}
         question_shape = _clean_text(policy.get("question_shape", ""))
         if question_shape == "approval_check":
-            surface_focus = "validar se o fluxo exemplo completo do SAGA faz sentido no caso do cliente"
+            surface_focus = "validar se o fluxo exemplo completo da oferta faz sentido no caso do cliente"
         else:
             surface_focus = _clean_text(policy.get("question_variable", ""))
         lines = [
@@ -112,20 +163,57 @@ Nunca use rótulo interno, nome de variável ou linguagem de bastidor.
             "CONTRATO DO TURNO",
             f"- response_mode={policy.get('response_mode', '')}",
             f"- price_response_mode={pricing_policy.get('price_response_mode', '')}",
-            f"- question_budget={policy.get('question_budget', 0)}",
-            f"- must_ask={bool(policy.get('must_ask', False))}",
             f"- question_goal={policy.get('question_goal', '')}",
             f"- question_focus={surface_focus}",
             f"- question_shape={policy.get('question_shape', '')}",
-            f"- question_constraints={' | '.join(policy.get('question_constraints', ()) or ())}",
             f"- violation_type={violation_type}",
+            "",
+            "O QUE NÃO PODE SE PERDER",
+            "- o recorte concreto do caso",
+            "- a naturalidade da pergunta",
+            "- a única lacuna real do turno",
         ]
         return "\n".join(lines)
 
     def _repair_response_if_needed(self, raw_response: str, decision: Any) -> Any:
+        if not bool(getattr(self.service.config, "repair_enabled", False)):
+            self._last_repair_debug = {
+                "attempted": False,
+                "enabled": False,
+                "standby": True,
+                "trigger_reason": decision.reason if getattr(decision, "needs_repair", False) else "",
+                "trigger_violation_type": decision.violation_type if getattr(decision, "needs_repair", False) else "",
+                "original_response": raw_response,
+                "used_repaired_response": False,
+                "final_response_after_repair": decision.response,
+            }
+            return decision
         if not decision.needs_repair:
+            self._last_repair_debug = {"attempted": False, "enabled": True, "standby": False}
             return decision
         service = self.service
+        instructions = self._repair_instructions()
+        user_input = self._repair_input(raw_response, decision.violation_type)
+        self._last_repair_debug = {
+            "attempted": True,
+            "enabled": True,
+            "standby": False,
+            "trigger_reason": decision.reason,
+            "trigger_violation_type": decision.violation_type,
+            "original_response": raw_response,
+            "instructions": instructions,
+            "user_input": user_input,
+        }
+        service._add_trace(
+            None,
+            "pipeline.repair_prompt",
+            philosophy_mode=self._extract_prompt_philosophy_mode(instructions),
+            framework_name=self._extract_prompt_framework_name(instructions),
+            philosophy_lines=self._count_prompt_section_lines(instructions, "FILOSOFIA DO TURNO"),
+            stage_personality_lines=self._count_prompt_section_lines(instructions, "PERSONALIDADE DO ESTÁGIO"),
+            stage_contract_lines=self._count_prompt_matching_lines(instructions, "PERSONALIDADE DO ESTÁGIO", "contrato real deste estágio"),
+            humanization_lines=self._count_prompt_section_lines(instructions, "CONTRATO DE HUMANIZAÇÃO"),
+        )
         with service.llm.trace_context(
             "conversation_service.repair_response",
             stage_id=service.state.stage_id,
@@ -135,24 +223,55 @@ Nunca use rótulo interno, nome de variável ou linguagem de bastidor.
             model=service.config.model,
         ):
             repaired = service.llm.generate(
-                instructions=self._repair_instructions(),
-                user_input=self._repair_input(raw_response, decision.violation_type),
+                instructions=instructions,
+                user_input=user_input,
             )
         second_decision = service._enforce_final_response_policy_with_trace(repaired)
+        self._last_repair_debug.update(
+            {
+                "repaired_response": repaired,
+                "repair_final_reason": second_decision.reason,
+                "repair_final_violation_type": second_decision.violation_type,
+            }
+        )
         if second_decision.needs_repair and _clean_text(second_decision.response) and _clean_text(second_decision.response) != _clean_text(raw_response):
+            self._last_repair_debug["used_repaired_response"] = True
+            self._last_repair_debug["final_response_after_repair"] = second_decision.response
             return second_decision
         if second_decision.needs_repair:
+            self._last_repair_debug["used_repaired_response"] = False
+            self._last_repair_debug["final_response_after_repair"] = decision.response
             return decision
+        self._last_repair_debug["used_repaired_response"] = True
+        self._last_repair_debug["final_response_after_repair"] = second_decision.response
         return second_decision
 
     def run(self, user_message: str) -> ConversationTurnOutcome:
+        self._last_repair_debug = {"attempted": False}
         start = self._start_turn(user_message)
         state_update = self._run_state_update_phase(start)
+        state_after_state_update = self._debug_state_snapshot()
         semantic = self._run_semantic_read_phase(start)
+        state_after_semantic = self._debug_state_snapshot()
         decision = self._run_turn_decision_phase(start)
+        state_after_decision = self._debug_state_snapshot()
         capability = self._run_capability_pricing_phase(start)
+        state_after_capability = self._debug_state_snapshot()
         prompt = self._run_prompt_phase(start, capability, decision)
-        response = self._run_response_phase(start, state_update, semantic, decision, capability, prompt)
+        response = self._run_response_phase(
+            start,
+            state_update,
+            semantic,
+            decision,
+            capability,
+            prompt,
+            forensic={
+                "state_after_state_update": state_after_state_update,
+                "state_after_semantic": state_after_semantic,
+                "state_after_decision": state_after_decision,
+                "state_after_capability": state_after_capability,
+            },
+        )
         return ConversationTurnOutcome(
             stage_id=decision["stage"].stage_id,
             response=response.response,
@@ -167,11 +286,13 @@ Nunca use rótulo interno, nome de variável ou linguagem de bastidor.
         service = self.service
         debug_trace: list[str] | None = [] if service.config.stage_debug else None
         entry_stage = service.state.stage_id
+        state_before_turn = self._debug_state_snapshot()
         service.llm.begin_turn_debug_session()
         service.state.add_user_turn(user_message)
         service.state.response_strategy = {}
         service.state.neurobehavior_state = {}
         service.state.surface_guidance = {}
+        state_after_user_turn = self._debug_state_snapshot()
         service._add_trace(
             debug_trace,
             "pipeline.turn.received",
@@ -179,10 +300,27 @@ Nunca use rótulo interno, nome de variável ou linguagem de bastidor.
             turn_count=service.state.turn_count,
             user_message=user_message,
         )
-        return _TurnStart(user_message=user_message, entry_stage=entry_stage, debug_trace=debug_trace)
+        service._add_trace(
+            debug_trace,
+            "pipeline.turn.state_entry",
+            previous_stage=state_before_turn.get("stage_id", "-"),
+            previous_turn_count=state_before_turn.get("turn_count", 0),
+            previous_known_context=(state_before_turn.get("lead_summary", {}) or {}).get("known_context_count", 0),
+            previous_response_mode=(state_before_turn.get("response_policy", {}) or {}).get("response_mode", "-"),
+            previous_price_mode=(state_before_turn.get("pricing_policy", {}) or {}).get("price_response_mode", "-"),
+            previous_reply=state_before_turn.get("last_assistant_message", "-"),
+        )
+        return _TurnStart(
+            user_message=user_message,
+            entry_stage=entry_stage,
+            debug_trace=debug_trace,
+            state_before_turn=state_before_turn,
+            state_after_user_turn=state_after_user_turn,
+        )
 
     def _run_state_update_phase(self, start: _TurnStart) -> dict[str, Any]:
         service = self.service
+        lead_before = deepcopy(service.state.lead_summary)
         lead_summary = service.lead_analyzer.update_state(service.state, start.user_message)
         offer_sales_architecture = service.offer_sales_architecture_resolver.update_state(service.state, start.user_message)
         service._add_trace(
@@ -197,6 +335,13 @@ Nunca use rótulo interno, nome de variável ou linguagem de bastidor.
             offer_name=offer_sales_architecture.get("offer_name", "-"),
             price_strategy=offer_sales_architecture.get("early_price_strategy", "-"),
         )
+        service._add_trace(
+            start.debug_trace,
+            "pipeline.state_update.delta",
+            changed_fields=self._changed_keys(lead_before, lead_summary),
+            narrative_summary=lead_summary.get("narrative_summary", "-"),
+            evidence_summary=lead_summary.get("evidence_summary", "-"),
+        )
         return {
             "lead_summary": lead_summary,
             "offer_sales_architecture": offer_sales_architecture,
@@ -204,6 +349,8 @@ Nunca use rótulo interno, nome de variável ou linguagem de bastidor.
 
     def _run_semantic_read_phase(self, start: _TurnStart) -> dict[str, Any]:
         service = self.service
+        neural_before = deepcopy(service.state.neural_state)
+        counterparty_before = deepcopy(service.state.counterparty_model)
         semantic_read = service.semantic_read_engine.update_state(service.state, start.user_message)
         counterparty_model = service.counterparty_model_builder.build(service.state, start.user_message)
         service._add_trace(
@@ -231,6 +378,12 @@ Nunca use rótulo interno, nome de variável ou linguagem de bastidor.
             tension=counterparty_model.get("conversation_tension", "-"),
             neutral_mode=counterparty_model.get("neutral_mode", False),
         )
+        service._add_trace(
+            start.debug_trace,
+            "pipeline.semantic_read.delta",
+            neural_changed=self._changed_keys(neural_before, semantic_read),
+            counterparty_changed=self._changed_keys(counterparty_before, counterparty_model),
+        )
         return {
             "semantic_read": semantic_read,
             "counterparty_model": counterparty_model,
@@ -247,6 +400,23 @@ Nunca use rótulo interno, nome de variável ou linguagem de bastidor.
         if self._stage_rank(target) > self._stage_rank(current):
             return target
         return current
+
+    @staticmethod
+    def _pricing_stage_from_question(question_variable: str, question_shape: str, current_stage: str) -> tuple[str, str]:
+        variable = _clean_text(question_variable)
+        shape = _clean_text(question_shape)
+
+        if current_stage == "etapa_01_abertura":
+            return "etapa_02_conexao_inicial", "commercial_opening_before_pricing"
+        if variable == "nicho_ou_segmento_produto_que_o_cliente_vende":
+            if current_stage == "etapa_02_conexao_inicial":
+                return "etapa_03_contextualizacao_permissao", "pricing_business_context"
+            return "etapa_03_contextualizacao_permissao", "pricing_business_context"
+        if variable in {"como_as_vendas_acontecem_hoje", "como_o_cliente_compra_hoje"}:
+            return "etapa_04_diagnostico_situacional", "pricing_journey_understanding"
+        if shape == "approval_check" or variable == "exemplo_minimo_de_fluxo_aprovado":
+            return "etapa_08_mapeamento_solucao", "pricing_flow_validation"
+        return "etapa_03_contextualizacao_permissao", "pricing_context_building"
 
     def _resolve_stage_progress(self) -> _StageProgressDecision:
         state = self.service.state
@@ -265,25 +435,31 @@ Nunca use rótulo interno, nome de variável ou linguagem de bastidor.
 
         response_mode = str(policy.get("response_mode", "") or "").strip()
         question_goal = str(policy.get("question_goal", "") or "").strip()
+        question_variable = str(policy.get("question_variable", "") or "").strip()
+        question_shape = str(policy.get("question_shape", "") or "").strip()
         target_stage = current_stage
         reason = "keep_stage"
 
         if response_mode == "ask":
             mapping = {
+                "connection": "etapa_02_conexao_inicial",
                 "context": "etapa_03_contextualizacao_permissao",
                 "pain": "etapa_04_diagnostico_situacional",
                 "impact": "etapa_05_diagnostico_impacto",
                 "fit": "etapa_06_qualificacao_fit",
             }
-            if question_goal == "pricing":
-                target_stage = (
-                    "etapa_09_ancoragem_valor"
-                    if not pricing.get("validation_missing", [])
-                    else "etapa_03_contextualizacao_permissao"
-                )
+            if current_stage == "etapa_01_abertura" and question_goal in {"", "context"}:
+                target_stage = "etapa_02_conexao_inicial"
+                reason = "commercial_opening_question"
+            elif question_goal == "pricing":
+                if not pricing.get("validation_missing", []):
+                    target_stage = "etapa_09_ancoragem_valor"
+                    reason = "pricing_answer_ready"
+                else:
+                    target_stage, reason = self._pricing_stage_from_question(question_variable, question_shape, current_stage)
             else:
                 target_stage = mapping.get(question_goal, current_stage)
-            reason = f"question_goal={question_goal or 'none'}"
+                reason = f"question_goal={question_goal or 'none'}"
         elif response_mode == "pricing_answer":
             target_stage = (
                 "etapa_12_negociacao_condicoes"
@@ -291,6 +467,12 @@ Nunca use rótulo interno, nome de variável ou linguagem de bastidor.
                 else "etapa_09_ancoragem_valor"
             )
             reason = "pricing_answer_ready"
+        elif response_mode == "explain" and current_stage == "etapa_01_abertura":
+            target_stage = "etapa_02_conexao_inicial"
+            reason = "commercial_opening"
+        elif response_mode == "explain" and question_shape == "approval_check":
+            target_stage = "etapa_08_mapeamento_solucao"
+            reason = "flow_explanation"
         elif bool(lead_summary.get("impact_known", False)):
             target_stage = "etapa_07_transicao_solucao"
             reason = "impact_known"
@@ -313,6 +495,8 @@ Nunca use rótulo interno, nome de variável ou linguagem de bastidor.
 
     def _run_turn_decision_phase(self, start: _TurnStart) -> dict[str, Any]:
         service = self.service
+        pricing_before = deepcopy(service.state.pricing_policy)
+        policy_before = deepcopy(service.state.response_policy)
         pricing_policy = service.commercial_pricing_policy.update_state(service.state, start.user_message)
         response_policy = service.conversation_policy_engine.reconcile_state(service.state)
         stage_decision = self._resolve_stage_progress()
@@ -331,8 +515,20 @@ Nunca use rótulo interno, nome de variável ou linguagem de bastidor.
             price_response_mode=pricing_policy.get("price_response_mode", "-"),
             validation_missing=pricing_policy.get("validation_missing", []),
             readiness_stage=pricing_policy.get("pricing_readiness_stage", "-"),
+            adaptive_enabled=pricing_policy.get("adaptive_inference_enabled", False),
+            adaptive_selected_variable=pricing_policy.get("adaptive_selected_variable", "-"),
+            adaptive_selection_reason=pricing_policy.get("adaptive_selection_reason", "-"),
+            adaptive_question_style=pricing_policy.get("adaptive_question_style", "-"),
+            adaptive_dynamic_known=pricing_policy.get("adaptive_dynamic_known", []),
+            adaptive_dynamic_missing=pricing_policy.get("adaptive_dynamic_missing", []),
             next_stage=stage_decision.next_stage_id,
             stage_reason=stage_decision.reason,
+        )
+        service._add_trace(
+            start.debug_trace,
+            "pipeline.turn_decision.delta",
+            pricing_changed=self._changed_keys(pricing_before, pricing_policy),
+            policy_changed=self._changed_keys(policy_before, response_policy),
         )
         return {
             "pricing_policy": pricing_policy,
@@ -421,6 +617,16 @@ Nunca use rótulo interno, nome de variável ou linguagem de bastidor.
             opening=surface_guidance.get("response_opening", "-"),
             brevity=surface_guidance.get("brevity_mode", "-"),
         )
+        service._add_trace(
+            start.debug_trace,
+            "pipeline.capability_pricing.delta",
+            allow_grounding=self._allow_capability_grounding(),
+            query=query,
+            product_slug=self._knowledge_product_slug(),
+            product_identity_loaded=bool(product_identity),
+            inventory_facts_loaded=len(inventory_facts),
+            surface_changed=self._changed_keys({}, surface_guidance),
+        )
         return {
             "arsenal_hits": arsenal_hits,
             "surface_guidance": surface_guidance,
@@ -452,6 +658,13 @@ Nunca use rótulo interno, nome de variável ou linguagem de bastidor.
             "pipeline.prompt",
             stage=decision["stage"].stage_id,
             response_mode=str((service.state.response_policy or {}).get("response_mode", "-")),
+            philosophy_mode=self._extract_prompt_philosophy_mode(instructions),
+            framework_name=self._extract_prompt_framework_name(instructions),
+            philosophy_lines=self._count_prompt_section_lines(instructions, "FILOSOFIA DO TURNO"),
+            adaptive_pricing_philosophy_lines=self._count_prompt_matching_lines(instructions, "FILOSOFIA DO TURNO", "filosofia adaptativa"),
+            stage_personality_lines=self._count_prompt_section_lines(instructions, "PERSONALIDADE DO ESTÁGIO"),
+            stage_contract_lines=self._count_prompt_matching_lines(instructions, "PERSONALIDADE DO ESTÁGIO", "contrato real deste estágio"),
+            humanization_lines=self._count_prompt_section_lines(instructions, "CONTRATO DE HUMANIZAÇÃO"),
             instruction_chars=len(instructions),
             input_chars=len(prompt_input),
         )
@@ -459,6 +672,75 @@ Nunca use rótulo interno, nome de variável ou linguagem de bastidor.
             "instructions": instructions,
             "prompt_input": prompt_input,
         }
+
+    @staticmethod
+    def _extract_prompt_philosophy_mode(instructions: str) -> str:
+        active = False
+        for raw_line in instructions.splitlines():
+            line = _clean_text(raw_line)
+            if line.upper() == "FILOSOFIA DO TURNO":
+                active = True
+                continue
+            if not active:
+                continue
+            if line.upper() in {"PERSONALIDADE DO ESTÁGIO", "CONTRATO DE HUMANIZAÇÃO", "GUARDRAILS", "ETAPA", "PLANO DO TURNO", "CONTEXTO"}:
+                break
+            lowered = line.lower()
+            if lowered.startswith("- modo ativo:"):
+                return _clean_text(line.split(":", 1)[1] if ":" in line else line)
+        return ""
+
+    @staticmethod
+    def _extract_prompt_framework_name(instructions: str) -> str:
+        active = False
+        for raw_line in instructions.splitlines():
+            line = _clean_text(raw_line)
+            if line.upper() == "FILOSOFIA DO TURNO":
+                active = True
+                continue
+            if not active:
+                continue
+            if line.upper() in {"PERSONALIDADE DO ESTÁGIO", "CONTRATO DE HUMANIZAÇÃO", "GUARDRAILS", "ETAPA", "PLANO DO TURNO", "CONTEXTO"}:
+                break
+            lowered = line.lower()
+            if lowered.startswith("- framework do estágio:"):
+                return _clean_text(line.split(":", 1)[1] if ":" in line else line)
+        return ""
+
+    @staticmethod
+    def _count_prompt_section_lines(instructions: str, header: str) -> int:
+        active = False
+        count = 0
+        for raw_line in instructions.splitlines():
+            line = _clean_text(raw_line)
+            if line.upper() == header.upper():
+                active = True
+                continue
+            if not active:
+                continue
+            if line.upper() in {"FILOSOFIA DO TURNO", "PERSONALIDADE DO ESTÁGIO", "CONTRATO DE HUMANIZAÇÃO", "GUARDRAILS", "ETAPA", "PLANO DO TURNO", "CONTEXTO"}:
+                break
+            if line:
+                count += 1
+        return count
+
+    @staticmethod
+    def _count_prompt_matching_lines(instructions: str, header: str, needle: str) -> int:
+        active = False
+        count = 0
+        needle_text = needle.lower()
+        for raw_line in instructions.splitlines():
+            line = _clean_text(raw_line)
+            if line.upper() == header.upper():
+                active = True
+                continue
+            if not active:
+                continue
+            if line.upper() in {"FILOSOFIA DO TURNO", "PERSONALIDADE DO ESTÁGIO", "CONTRATO DE HUMANIZAÇÃO", "GUARDRAILS", "ETAPA", "PLANO DO TURNO", "CONTEXTO"}:
+                break
+            if needle_text in line.lower():
+                count += 1
+        return count
 
     def _run_response_phase(
         self,
@@ -468,6 +750,7 @@ Nunca use rótulo interno, nome de variável ou linguagem de bastidor.
         decision: dict[str, Any],
         capability: dict[str, Any],
         prompt: dict[str, str],
+        forensic: dict[str, Any],
     ) -> Any:
         service = self.service
         service._add_trace(
@@ -493,6 +776,29 @@ Nunca use rótulo interno, nome de variável ou linguagem de bastidor.
         enforcement_decision = service._enforce_final_response_policy_with_trace(raw_response)
         enforcement_decision = self._repair_response_if_needed(raw_response, enforcement_decision)
         final_response = enforcement_decision.response
+        if self._last_repair_debug.get("attempted", False):
+            service._add_trace(
+                start.debug_trace,
+                "pipeline.repair",
+                framework_name=self._extract_prompt_framework_name(str(self._last_repair_debug.get("instructions", ""))),
+                philosophy_mode=self._extract_prompt_philosophy_mode(str(self._last_repair_debug.get("instructions", ""))),
+                stage_personality_lines=self._count_prompt_section_lines(str(self._last_repair_debug.get("instructions", "")), "PERSONALIDADE DO ESTÁGIO"),
+                stage_contract_lines=self._count_prompt_matching_lines(str(self._last_repair_debug.get("instructions", "")), "PERSONALIDADE DO ESTÁGIO", "contrato real deste estágio"),
+                humanization_lines=self._count_prompt_section_lines(str(self._last_repair_debug.get("instructions", "")), "CONTRATO DE HUMANIZAÇÃO"),
+                used_repaired_response=bool(self._last_repair_debug.get("used_repaired_response", False)),
+                trigger_reason=_clean_text(self._last_repair_debug.get("trigger_reason", "")),
+                final_reason=_clean_text(self._last_repair_debug.get("repair_final_reason", "")),
+            )
+        elif self._last_repair_debug.get("standby", False):
+            service._add_trace(
+                start.debug_trace,
+                "pipeline.repair",
+                standby=True,
+                enabled=False,
+                used_repaired_response=False,
+                trigger_reason=_clean_text(self._last_repair_debug.get("trigger_reason", "")),
+                trigger_violation_type=_clean_text(self._last_repair_debug.get("trigger_violation_type", "")),
+            )
         service.llm.annotate_last_call(
             output_used={
                 "raw_response": raw_response,
@@ -515,6 +821,7 @@ Nunca use rótulo interno, nome de variável ou linguagem de bastidor.
             final_preview=final_response,
         )
         service.state.add_assistant_turn(final_response)
+        state_after_response = self._debug_state_snapshot()
         llm_calls = service.llm.consume_turn_debug_session()
 
         route = semantic["route"]
@@ -551,6 +858,15 @@ Nunca use rótulo interno, nome de variável ou linguagem de bastidor.
             response=final_response,
             debug_trace=start.debug_trace or [],
             llm_calls=llm_calls,
+            state_before_turn=start.state_before_turn,
+            state_after_user_turn=start.state_after_user_turn,
+            state_after_state_update=forensic["state_after_state_update"],
+            state_after_semantic=forensic["state_after_semantic"],
+            state_after_decision=forensic["state_after_decision"],
+            state_after_capability=forensic["state_after_capability"],
+            state_after_response=state_after_response,
+            raw_response=raw_response,
+            repair_debug=self._last_repair_debug,
         )
 
         return _TurnResponse(

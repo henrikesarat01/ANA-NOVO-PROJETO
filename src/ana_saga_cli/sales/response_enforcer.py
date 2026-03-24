@@ -46,15 +46,28 @@ class ResponseEnforcer:
         cleaned = _clean_text(question)
         if not cleaned:
             return ""
+        question_shape = _clean_text((self.service.state.response_policy or {}).get("question_shape", ""))
         if any(marker in cleaned for marker in (";", "|", "/", "\n")):
             return "question_shape"
+        if ":" in cleaned:
+            tail = cleaned.split(":", 1)[1]
+            if tail.count(",") >= 2:
+                return "question_shape"
+            if " ou " in tail and len(cleaned.split()) > 24:
+                return "question_shape"
         comma_count = cleaned.count(",")
         token_count = len(cleaned.split())
-        if comma_count >= 2:
+        if question_shape == "approval_check":
+            if comma_count >= 5:
+                return "question_shape"
+            if token_count > 50:
+                return "question_shape"
+            return ""
+        if comma_count >= 4:
             return "question_shape"
-        if comma_count >= 1 and token_count >= 12:
+        if comma_count >= 3 and token_count >= 28:
             return "question_shape"
-        if token_count > 26:
+        if token_count > 40:
             return "question_shape"
         return ""
 

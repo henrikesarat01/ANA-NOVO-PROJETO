@@ -25,6 +25,7 @@ _KNOWLEDGE_ROOT = DATA_DIR / "knowledge"
 _FRAMEWORKS_DIR = _KNOWLEDGE_ROOT / "frameworks"
 _PRODUCTS_DIR = _KNOWLEDGE_ROOT / "products"
 _DEFAULT_PRODUCT_SLUG = "saga"
+_SALES_FRAMEWORKS_PATH = DATA_DIR / "frameworks.json"
 
 _LEGACY_FRAMEWORK_PATH = _KNOWLEDGE_ROOT / "BPCF-BIDIRECTIONAL-PROBLEM-CAUSE-FRAMEWORK.json"
 _LEGACY_ARSENAL_PATHS = {
@@ -73,6 +74,10 @@ def get_humanization_framework_path() -> Path:
     return _resolve_existing_path(primary)
 
 
+def get_sales_frameworks_path() -> Path:
+    return _resolve_existing_path(_SALES_FRAMEWORKS_PATH)
+
+
 def get_product_identity_path(product_slug: str = _DEFAULT_PRODUCT_SLUG) -> Path:
     primary = _product_dir(product_slug) / "identidade_do_produto.json"
     return _resolve_existing_path(primary)
@@ -114,6 +119,14 @@ def load_bpcf_framework() -> dict[str, Any]:
     payload = load_json(get_bpcf_framework_path())
     if not isinstance(payload, dict):
         raise ValueError("framework BPCF invalido: esperado objeto JSON no topo")
+    return payload
+
+
+@lru_cache(maxsize=1)
+def load_sales_frameworks() -> dict[str, Any]:
+    payload = load_json(get_sales_frameworks_path())
+    if not isinstance(payload, dict):
+        raise ValueError("frameworks de vendas invalidos: esperado objeto JSON no topo")
     return payload
 
 

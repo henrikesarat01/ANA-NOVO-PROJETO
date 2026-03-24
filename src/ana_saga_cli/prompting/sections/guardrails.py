@@ -1,4 +1,4 @@
-"""Seção GUARDRAILS — identidade ANA + proibições fixas."""
+"""Seções GUARDRAILS e CONTRATO DE HUMANIZAÇÃO."""
 from __future__ import annotations
 
 from ana_saga_cli.knowledge.loader import load_humanization_framework
@@ -21,8 +21,12 @@ FIXED_RESPONSE_GUARDRAILS = [
 
 
 def build_guardrails_section() -> str:
-    humanization = load_humanization_framework()
     fixed = join_lines(FIXED_RESPONSE_GUARDRAILS)
-    if humanization:
-        return f"GUARDRAILS\n{fixed}\n\nCONTRATO DE HUMANIZAÇÃO\n{humanization}"
     return f"GUARDRAILS\n{fixed}"
+
+
+def build_humanization_section() -> str:
+    humanization = load_humanization_framework()
+    if not humanization:
+        return ""
+    return f"CONTRATO DE HUMANIZAÇÃO\n{humanization}"

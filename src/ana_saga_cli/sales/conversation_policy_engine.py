@@ -27,6 +27,17 @@ _COUNTERPARTY_QUESTION_PRIORITIES = {
     "value_question",
 }
 _ANSWER_SCOPES = {"self_contained", "case_dependent", "commercial_dependent"}
+_EXPLICIT_PRICE_PATTERNS = (
+    "quanto custa",
+    "qual o valor",
+    "qual valor",
+    "preço",
+    "preco",
+    "mensalidade",
+    "valor mensal",
+    "quanto fica",
+    "quanto sai",
+)
 
 
 def _clean_text(value: Any) -> str:
@@ -135,15 +146,29 @@ class ConversationPolicyEngine:
     def _commercial_direct_signal(self, state: ConversationState) -> bool:
         neural_state = state.neural_state or {}
         counterparty = state.counterparty_model or {}
+        latest_user_message = self._latest_user_message(state)
         explicit_commercial_need = (
             self._answer_scope(state) == "commercial_dependent"
             and _clean_text(neural_state.get("topic_domain", "")) == "commercial_explicit"
         )
         return (
+            self._has_explicit_price_request(latest_user_message)
+            or
             _clean_text(neural_state.get("communicative_intent", "")) == "price_check"
             or explicit_commercial_need
             or _clean_text(counterparty.get("counterparty_intent", "")) == "test_price"
         )
+
+    def _latest_user_message(self, state: ConversationState) -> str:
+        for turn in reversed(state.turns):
+            if _clean_text(getattr(turn, "role", "")) == "user":
+                return _clean_text(getattr(turn, "content", "")).lower()
+        return ""
+
+    @staticmethod
+    def _has_explicit_price_request(message: str) -> bool:
+        lowered = _clean_text(message).lower()
+        return any(pattern in lowered for pattern in _EXPLICIT_PRICE_PATTERNS)
 
     def _answer_scope(self, state: ConversationState) -> str:
         neural_state = state.neural_state or {}
@@ -416,6 +441,7 @@ class ConversationPolicyEngine:
                 question_type="pricing_gate_question",
                 contract=contract,
                 must_ask=True,
+                context_hint=pricing_policy.get("minimum_pricing_question_context_hint", ""),
                 reason=pricing_policy.get("price_block_reason_explained", ""),
                 changes=pricing_policy.get("question_will_change_what", ""),
             )

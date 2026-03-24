@@ -15,8 +15,13 @@ from ana_saga_cli.domain.turn_context import (
     mapped_pains_from_hypotheses,
 )
 from ana_saga_cli.prompting.text_utils import clean_text, compact_text, first_nonempty, list_values
-from ana_saga_cli.prompting.sections.guardrails import build_guardrails_section
+from ana_saga_cli.prompting.sections.guardrails import (
+    build_guardrails_section,
+    build_humanization_section,
+)
+from ana_saga_cli.prompting.sections.philosophy import build_turn_philosophy_section
 from ana_saga_cli.prompting.sections.stage import build_stage_section
+from ana_saga_cli.prompting.sections.stage_personality import build_stage_personality_section
 from ana_saga_cli.prompting.sections.turn_plan import build_turn_plan_section
 from ana_saga_cli.prompting.sections.context import build_context_section
 from ana_saga_cli.prompting.sections.neural import get_neural_context_lines
@@ -126,6 +131,9 @@ class PromptAssembler:
         strategy_avoid = list_join(strategy_avoid_raw, limit=4)
 
         # --- seções ---
+        philosophy = build_turn_philosophy_section(state, intent, stage.stage_id)
+        stage_personality = build_stage_personality_section(stage)
+        humanization = build_humanization_section()
         guardrails = build_guardrails_section()
         stage_section = build_stage_section(stage)
         turn_plan = build_turn_plan_section(intent, strategy_avoid)
@@ -136,7 +144,7 @@ class PromptAssembler:
         if neural_ctx_lines:
             context += "\n" + "\n".join(f"- {line}" for line in neural_ctx_lines)
 
-        sections = [guardrails, stage_section, turn_plan, context]
+        sections = [philosophy, stage_personality, humanization, guardrails, stage_section, turn_plan, context]
 
         if useful_hits:
             from ana_saga_cli.prompting.text_utils import join_lines

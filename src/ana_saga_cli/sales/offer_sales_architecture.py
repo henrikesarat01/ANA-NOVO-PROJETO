@@ -252,6 +252,17 @@ class OfferSalesArchitectureResolver:
         pricing_validation = payload.get("pricing_validation", {}) if isinstance(payload.get("pricing_validation", {}), dict) else {}
         price_release_modes = pricing_validation.get("price_release_modes", {}) if isinstance(pricing_validation.get("price_release_modes", {}), dict) else {}
         raw_variable_definitions = pricing_validation.get("variable_definitions", {}) if isinstance(pricing_validation.get("variable_definitions", {}), dict) else {}
+        adaptive_inference = pricing_validation.get("adaptive_inference", {}) if isinstance(pricing_validation.get("adaptive_inference", {}), dict) else {}
+        minimum_required_variables = _normalize_text_list(pricing_validation.get("minimum_required_variables", []))
+        fixed_required_variables = _normalize_text_list(pricing_validation.get("fixed_required_variables", [])) or minimum_required_variables
+        adaptive_dynamic_variables = _normalize_text_list(pricing_validation.get("adaptive_dynamic_variables", []))
+        minimum_dynamic_signals_before_price = max(
+            0,
+            min(
+                len(adaptive_dynamic_variables),
+                int(pricing_validation.get("minimum_dynamic_signals_before_price", 1 if adaptive_dynamic_variables else 0) or 0),
+            ),
+        )
         payload["pricing_validation"] = {
             "require_minimum_validation_before_price": _normalize_bool(pricing_validation.get("require_minimum_validation_before_price", True), True),
             "allow_price_before_minimum_validation": _normalize_bool(pricing_validation.get("allow_price_before_minimum_validation", False), False),
@@ -261,10 +272,40 @@ class OfferSalesArchitectureResolver:
             "explanation_style_before_question": _clean_text(pricing_validation.get("explanation_style_before_question", "breve_contextual")) or "breve_contextual",
             "avoid_dry_questioning": _normalize_bool(pricing_validation.get("avoid_dry_questioning", True), True),
             "avoid_question_stack": _normalize_bool(pricing_validation.get("avoid_question_stack", True), True),
-            "minimum_required_variables": _normalize_text_list(pricing_validation.get("minimum_required_variables", [])),
+            "minimum_required_variables": minimum_required_variables,
+            "fixed_required_variables": fixed_required_variables,
+            "adaptive_dynamic_variables": adaptive_dynamic_variables,
+            "minimum_dynamic_signals_before_price": minimum_dynamic_signals_before_price,
+            "dynamic_checkpoints_are_mandatory": _normalize_bool(
+                pricing_validation.get("dynamic_checkpoints_are_mandatory", bool(adaptive_dynamic_variables)),
+                bool(adaptive_dynamic_variables),
+            ),
+            "confidence_modulates_question_style_not_requirement": _normalize_bool(
+                pricing_validation.get("confidence_modulates_question_style_not_requirement", bool(adaptive_dynamic_variables)),
+                bool(adaptive_dynamic_variables),
+            ),
             "optional_but_relevant_variables": _normalize_text_list(pricing_validation.get("optional_but_relevant_variables", [])),
             "variables_that_change_price": _normalize_text_list(pricing_validation.get("variables_that_change_price", [])),
             "preferred_question_sequence": _normalize_text_list(pricing_validation.get("preferred_question_sequence", [])),
+            "adaptive_inference": {
+                "enabled": _normalize_bool(adaptive_inference.get("enabled", bool(adaptive_dynamic_variables)), bool(adaptive_dynamic_variables)),
+                "infer_from_niche_before_asking": _normalize_bool(adaptive_inference.get("infer_from_niche_before_asking", True), True),
+                "choose_next_question_from_case_not_fixed_sequence": _normalize_bool(
+                    adaptive_inference.get("choose_next_question_from_case_not_fixed_sequence", True),
+                    True,
+                ),
+                "allow_flow_validation_after_dynamic_minimum": _normalize_bool(
+                    adaptive_inference.get("allow_flow_validation_after_dynamic_minimum", True),
+                    True,
+                ),
+                "log_detailed_reasoning": _normalize_bool(adaptive_inference.get("log_detailed_reasoning", True), True),
+                "filosofia_de_inferencia_do_fluxo": _clean_text(adaptive_inference.get("filosofia_de_inferencia_do_fluxo", "")),
+                "filosofia_de_selecao_da_proxima_pergunta": _clean_text(adaptive_inference.get("filosofia_de_selecao_da_proxima_pergunta", "")),
+                "filosofia_de_validacao_antes_do_preco": _clean_text(adaptive_inference.get("filosofia_de_validacao_antes_do_preco", "")),
+                "filosofia_de_pergunta_obrigatoria_com_forma_flexivel": _clean_text(
+                    adaptive_inference.get("filosofia_de_pergunta_obrigatoria_com_forma_flexivel", "")
+                ),
+            },
             "price_release_modes": {
                 "floor_only_after_minimum_validation": _normalize_bool(price_release_modes.get("floor_only_after_minimum_validation", True), True),
                 "range_only_after_context": _normalize_bool(price_release_modes.get("range_only_after_context", True), True),

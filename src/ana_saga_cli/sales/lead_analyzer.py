@@ -58,7 +58,7 @@ class LeadAnalyzer:
         )
 
     def _extract_snapshot(self, state: ConversationState, user_message: str) -> LeadContextSnapshot:
-        history = "\n".join(f"{turn.role}: {turn.content}" for turn in state.turns[-10:])
+        history = "\n".join(f"{turn.role}: {turn.content}" for turn in state.turns[-10:] if turn.role == "user")
         existing_summary = state.lead_summary or {}
         existing_lines = [
             f"- niche_known={bool(existing_summary.get('niche_known', False))}",
@@ -69,17 +69,18 @@ class LeadAnalyzer:
             f"- customer_type_known={bool(existing_summary.get('customer_type_known', False))}",
             f"- pain_known={bool(existing_summary.get('pain_known', False))}",
             f"- impact_known={bool(existing_summary.get('impact_known', False))}",
-            f"- summary={existing_summary.get('narrative_summary', '')}",
-            f"- impact_summary={existing_summary.get('impact_summary', '')}",
+            f"- known_context_count={int(existing_summary.get('known_context_count', 0) or 0)}",
         ]
 
         instructions = """
-Você extrai um resumo operacional do lead a partir da conversa.
+Você atualiza o estado factual do caso a partir da conversa.
 
 Regras:
 - Não use regra de keyword. Avalie pelo sentido da conversa.
+- Prefira fato observável a interpretação genérica.
+- Use como evidência principal o que veio do cliente.
+- Não copie formulação da ANA nem trate a fala da ANA como prova.
 - Marque um campo como conhecido quando já houver contexto suficiente, mesmo que a resposta seja ampla.
-- Respostas amplas podem fechar lacunas se deixarem o quadro geral claro.
 - Não exija detalhe fino quando o contexto base já estiver suficiente para avançar.
 - niche_specificity deve ser um de: unknown, generic, specific.
 - Use generic quando o lead só trouxer um enquadramento amplo demais para raciocínio operacional.
@@ -87,6 +88,9 @@ Regras:
 - pain_known=true apenas quando o lead já trouxe gargalo, dor, fricção, peso operacional/comercial ou problema relevante.
 - impact_known=true quando já ficar claro qual é o peso principal dessa dor no dia a dia.
 - Marque impact_known=true mesmo quando a resposta for curta, desde que a conversa já deixe clara a consequência prática.
+- narrative_summary deve ser uma linha factual, seca e curta.
+- evidence_summary deve citar fatos concretos do cliente que sustentam a leitura.
+- Evite frases vagas como "demonstrou interesse" quando der para dizer o fato concreto.
 - Responda apenas em JSON válido.
 
 Formato:
@@ -99,9 +103,9 @@ Formato:
   "customer_type_known": false,
   "pain_known": false,
     "impact_known": false,
-  "narrative_summary": "resumo curto do caso",
-    "evidence_summary": "o que na conversa sustenta essa leitura",
-    "impact_summary": "resumo curto do impacto, quando já estiver claro"
+  "narrative_summary": "estado factual curto do caso",
+    "evidence_summary": "fatos do cliente que sustentam a leitura",
+    "impact_summary": "impacto factual curto, quando já estiver claro"
 }
 """.strip()
 
@@ -109,10 +113,10 @@ Formato:
         user_input = f"""ETAPA ATUAL
 {state.stage_id}
 
-RESUMO ACUMULADO
+ESTADO ACUMULADO
 {existing_summary_block}
 
-HISTÓRICO RECENTE
+HISTÓRICO RECENTE DO CLIENTE
 {history}
 
 MENSAGEM NOVA DO CLIENTE

@@ -8,6 +8,17 @@ from ana_saga_cli.domain.models import ConversationState
 READINESS_STAGE_A = "A"
 READINESS_STAGE_B = "B"
 READINESS_STAGE_C = "C"
+_EXPLICIT_PRICE_PATTERNS = (
+    "quanto custa",
+    "qual o valor",
+    "qual valor",
+    "preço",
+    "preco",
+    "mensalidade",
+    "valor mensal",
+    "quanto fica",
+    "quanto sai",
+)
 
 
 def _clean_text(value: Any) -> str:
@@ -36,7 +47,27 @@ def _safe_int(value: Any, default: int = 0) -> int:
         return default
 
 
+def _latest_user_message(state: ConversationState) -> str:
+    for turn in reversed(state.turns):
+        if _clean_text(getattr(turn, "role", "")) == "user":
+            return _clean_text(getattr(turn, "content", "")).lower()
+    return ""
+
+
+def _has_explicit_price_request(state: ConversationState) -> bool:
+    latest_user_message = _latest_user_message(state)
+    return any(pattern in latest_user_message for pattern in _EXPLICIT_PRICE_PATTERNS)
+
+
 class CommercialPricingPolicyEngine:
+    @staticmethod
+    def _checkpoint_flag_key(variable: str) -> str:
+        return f"pricing_checkpoint_{_clean_text(variable)}_covered"
+
+    @staticmethod
+    def _checkpoint_source_key(variable: str) -> str:
+        return f"pricing_checkpoint_{_clean_text(variable)}_source"
+
     def _question_contract(self, architecture: dict[str, Any], focus: str) -> dict[str, Any]:
         for contract in (architecture.get("question_contracts", {}) or {}).values():
             if not isinstance(contract, dict):
@@ -103,6 +134,25 @@ class CommercialPricingPolicyEngine:
             return True
         return False
 
+    def _sync_pricing_checkpoint_state(self, state: ConversationState, tracked_variables: list[str]) -> dict[str, Any]:
+        hypotheses = dict(state.diagnostic_hypotheses or {})
+        previous_policy = state.response_policy or {}
+        latest_user_message = _clean_text(state.turns[-1].content if state.turns else "")
+        if _clean_text(previous_policy.get("response_mode", "")) != "ask":
+            return hypotheses
+        previous_variable = _clean_text(previous_policy.get("question_variable", ""))
+        if previous_variable not in tracked_variables:
+            return hypotheses
+        if not latest_user_message:
+            return hypotheses
+        flag_key = self._checkpoint_flag_key(previous_variable)
+        source_key = self._checkpoint_source_key(previous_variable)
+        if not hypotheses.get(flag_key, False):
+            hypotheses[flag_key] = True
+            hypotheses[source_key] = "explicit_checkpoint_answer"
+            state.diagnostic_hypotheses = hypotheses
+        return hypotheses
+
     def _known_variables(self, state: ConversationState, approval_variable: str) -> dict[str, bool]:
         lead_summary = state.lead_summary or {}
         hypotheses = state.diagnostic_hypotheses or {}
@@ -121,9 +171,21 @@ class CommercialPricingPolicyEngine:
             hypotheses.get("fechamento_no_whatsapp_ou_triagem_known"),
             hypotheses.get("closing_channel_known"),
         )
+        niche_checkpoint = _safe_bool(
+            hypotheses.get(self._checkpoint_flag_key("nicho_ou_segmento_produto_que_o_cliente_vende"), False),
+            lead_summary.get("niche_known", False),
+        )
+        sales_flow_checkpoint = bool(
+            hypotheses.get(self._checkpoint_flag_key("como_as_vendas_acontecem_hoje"), False)
+        )
+        customer_buy_checkpoint = bool(
+            hypotheses.get(self._checkpoint_flag_key("como_o_cliente_compra_hoje"), False)
+        )
         known_variables = {
             "nicho_ou_segmento": bool(lead_summary.get("niche_known", False)),
-            "tipo_de_operacao": bool(lead_summary.get("operation_model_known", False)),
+            "nicho_ou_segmento_produto_que_o_cliente_vende": bool(niche_checkpoint),
+            "tipo_de_operacao": bool(lead_summary.get("operation_model_known", False) or sales_flow_checkpoint),
+            "como_as_vendas_acontecem_hoje": sales_flow_checkpoint,
             "uso_atual_do_whatsapp": bool(
                 lead_summary.get("channel_usage_known", False)
                 and (
@@ -131,6 +193,7 @@ class CommercialPricingPolicyEngine:
                     or lead_summary.get("customer_type_known", False)
                 )
             ),
+            "como_o_cliente_compra_hoje": customer_buy_checkpoint,
             "principal_trava_operacional": bool(lead_summary.get("pain_known", False)),
             "quantidade_de_fluxos": bool(flows_known),
             "necessidade_de_integracao": bool(integration_known),
@@ -146,6 +209,245 @@ class CommercialPricingPolicyEngine:
             _clean_text(offer_context.get("flow_validation_status", "")) == "approved",
         )
         return known_variables
+
+    def _adaptive_question_style(
+        self,
+        *,
+        state: ConversationState,
+        selected_variable: str,
+    ) -> tuple[str, str]:
+        lead_summary = state.lead_summary or {}
+        if selected_variable == "como_as_vendas_acontecem_hoje":
+            if bool(lead_summary.get("operation_model_known", False) or lead_summary.get("customer_type_known", False)):
+                return (
+                    "confirmatory",
+                    "já existe uma hipótese da rotina; entre por confirmação curta de como a venda anda hoje, sem checklist",
+                )
+            return (
+                "exploratory",
+                "essa parte ainda está aberta; pergunte de forma concreta e simples como a venda acontece hoje",
+            )
+        if selected_variable == "como_o_cliente_compra_hoje":
+            if bool(lead_summary.get("channel_usage_known", False)):
+                return (
+                    "confirmatory",
+                    "já existe uma hipótese do canal; confirme como o cliente avança hoje até escolher, pedir ou fechar",
+                )
+            return (
+                "exploratory",
+                "pergunte de forma aberta como o cliente costuma avançar até comprar hoje",
+            )
+        if selected_variable == "nicho_ou_segmento_produto_que_o_cliente_vende":
+            return (
+                "exploratory",
+                "ancore a conversa no que ele vende hoje, do jeito mais direto e humano possível",
+            )
+        if selected_variable == "exemplo_minimo_de_fluxo_aprovado":
+            return (
+                "confirmatory_flow",
+                "agora não colete mais campo; valide o fluxo por uma cena curta e plausível do caso real",
+            )
+        return (
+            "exploratory",
+            "pergunte pelo recorte mais útil deste caso sem transformar isso em formulário",
+        )
+
+    def _candidate_functions(self, state: ConversationState) -> list[str]:
+        offer_context = state.offer_context or {}
+        if not isinstance(offer_context, dict):
+            return []
+        return [
+            _clean_text(item)
+            for item in list(offer_context.get("selected_capabilities", []) or [])
+            if _clean_text(item)
+        ][:4]
+
+    def _select_adaptive_dynamic_variable(
+        self,
+        *,
+        state: ConversationState,
+        known_variables: dict[str, bool],
+        dynamic_missing: list[str],
+    ) -> tuple[str, str, str, str]:
+        if not dynamic_missing:
+            return "", "dynamic_pool_exhausted", "", ""
+
+        selected = dynamic_missing[0]
+        candidate_functions = " ".join(self._candidate_functions(state)).lower()
+        if "como_as_vendas_acontecem_hoje" in dynamic_missing and "como_o_cliente_compra_hoje" in dynamic_missing:
+            if any(token in candidate_functions for token in ("catalog", "catalogo", "carrossel", "pedido", "checkout", "produto")):
+                selected = "como_o_cliente_compra_hoje"
+            else:
+                selected = "como_as_vendas_acontecem_hoje"
+        elif "como_as_vendas_acontecem_hoje" in dynamic_missing:
+            selected = "como_as_vendas_acontecem_hoje"
+        elif "como_o_cliente_compra_hoje" in dynamic_missing:
+            selected = "como_o_cliente_compra_hoje"
+
+        if selected == "como_as_vendas_acontecem_hoje":
+            return (
+                selected,
+                "dynamic_flow_anchor_missing",
+                "ainda falta encostar em como a venda anda na pratica",
+                "entender como a venda acontece do lado da operacao antes de desenhar o fluxo",
+            )
+        if selected == "como_o_cliente_compra_hoje":
+            return (
+                selected,
+                "dynamic_customer_journey_missing",
+                "ainda falta entender como o cliente avanca hoje ate comprar",
+                "entender o caminho do cliente antes de validar o fluxo final",
+            )
+        return (
+            selected,
+            "dynamic_gap_missing",
+            "ainda existe uma incerteza relevante no caminho da venda",
+            "reduzir a menor duvida que ainda muda o fluxo",
+        )
+
+    def _resolve_validation_contract(
+        self,
+        *,
+        state: ConversationState,
+        pricing_validation: dict[str, Any],
+        known_variables: dict[str, bool],
+        approval_variable: str,
+    ) -> dict[str, Any]:
+        adaptive_inference = pricing_validation.get("adaptive_inference", {}) if isinstance(pricing_validation.get("adaptive_inference", {}), dict) else {}
+        adaptive_enabled = bool(adaptive_inference.get("enabled", False))
+        minimum_required = [item for item in pricing_validation.get("minimum_required_variables", []) if _clean_text(item)]
+        fixed_required = [item for item in pricing_validation.get("fixed_required_variables", []) if _clean_text(item)] or minimum_required
+        dynamic_pool = [item for item in pricing_validation.get("adaptive_dynamic_variables", []) if _clean_text(item)]
+        dynamic_required_count = max(
+            0,
+            min(
+                len(dynamic_pool),
+                _safe_int(pricing_validation.get("minimum_dynamic_signals_before_price", 0), 0),
+            ),
+        )
+        preferred_sequence = [item for item in pricing_validation.get("preferred_question_sequence", []) if _clean_text(item)]
+        optional_variables = [item for item in pricing_validation.get("optional_but_relevant_variables", []) if _clean_text(item)]
+
+        if not adaptive_enabled:
+            validation_missing = [item for item in minimum_required if not known_variables.get(item, False)]
+            validation_missing_all = validation_missing + [item for item in optional_variables if not known_variables.get(item, False)]
+            selected_variable = ""
+            for variable in preferred_sequence:
+                if variable in validation_missing_all:
+                    selected_variable = variable
+                    break
+            if not selected_variable and validation_missing_all:
+                selected_variable = validation_missing_all[0]
+            return {
+                "validation_missing": validation_missing,
+                "validation_missing_all": validation_missing_all,
+                "selected_variable": selected_variable,
+                "minimum_validation_required": minimum_required,
+                "minimum_validation_satisfied": not validation_missing,
+                "known_required_count": max(0, len(minimum_required) - len(validation_missing)),
+                "required_signal_count": len(minimum_required),
+                "adaptive_enabled": False,
+                "fixed_required": fixed_required,
+                "fixed_missing": validation_missing,
+                "dynamic_pool": dynamic_pool,
+                "dynamic_known": [],
+                "dynamic_missing": [],
+                "dynamic_required_count": dynamic_required_count,
+                "dynamic_requirement_satisfied": True,
+                "selection_reason": "fixed_sequence_contract",
+                "journey_hypothesis": "",
+                "open_uncertainty": "",
+                "candidate_functions": self._candidate_functions(state),
+                "case_anchor": _clean_text((state.lead_summary or {}).get("narrative_summary", "")),
+                "philosophy": adaptive_inference,
+            }
+
+        fixed_missing = [
+            item
+            for item in fixed_required
+            if item != approval_variable and not known_variables.get(item, False)
+        ]
+        dynamic_known = [item for item in dynamic_pool if known_variables.get(item, False)]
+        dynamic_missing = [item for item in dynamic_pool if not known_variables.get(item, False)]
+        required_dynamic_reference = dynamic_pool[:dynamic_required_count]
+        dynamic_requirement_satisfied = all(known_variables.get(item, False) for item in required_dynamic_reference)
+        approval_missing = not known_variables.get(approval_variable, False)
+
+        selected_variable = ""
+        selection_reason = "adaptive_no_gap"
+        journey_hypothesis = ""
+        open_uncertainty = ""
+        candidate_functions = self._candidate_functions(state)
+        case_anchor = _clean_text((state.lead_summary or {}).get("narrative_summary", ""))
+
+        if fixed_missing:
+            for variable in preferred_sequence:
+                if variable in fixed_missing:
+                    selected_variable = variable
+                    break
+            if not selected_variable:
+                selected_variable = fixed_missing[0]
+            selection_reason = "fixed_required_missing"
+            open_uncertainty = "ainda falta ancorar o caso no negocio real"
+            journey_hypothesis = "sem o que o cliente vende, o fluxo ainda fica abstrato demais"
+        elif not dynamic_requirement_satisfied and dynamic_missing:
+            selected_variable, selection_reason, open_uncertainty, journey_hypothesis = self._select_adaptive_dynamic_variable(
+                state=state,
+                known_variables=known_variables,
+                dynamic_missing=dynamic_missing,
+            )
+        elif approval_missing and bool(adaptive_inference.get("allow_flow_validation_after_dynamic_minimum", True)):
+            selected_variable = approval_variable
+            selection_reason = "flow_validation_after_dynamic_minimum"
+            open_uncertainty = "o fluxo provavel ja aparece; falta validar se ele encaixa de verdade"
+            journey_hypothesis = "ja existe contexto minimo para sair do abstrato e testar o fluxo"
+        elif approval_missing:
+            selected_variable = approval_variable
+            selection_reason = "approval_variable_missing"
+            open_uncertainty = "falta a confirmacao final do fluxo antes do valor"
+            journey_hypothesis = "o caso esta quase claro, mas ainda sem validacao final"
+
+        validation_missing = list(fixed_missing)
+        if not dynamic_requirement_satisfied:
+            validation_missing.extend(
+                [item for item in required_dynamic_reference if not known_variables.get(item, False)]
+            )
+        if approval_missing:
+            validation_missing.append(approval_variable)
+        validation_missing = _unique_list(validation_missing)
+        validation_missing_all = validation_missing + [
+            item for item in optional_variables if not known_variables.get(item, False)
+        ]
+
+        required_signal_count = len(fixed_required) + dynamic_required_count
+        known_required_count = sum(1 for item in fixed_required if known_variables.get(item, False)) + sum(
+            1 for item in required_dynamic_reference if known_variables.get(item, False)
+        )
+        minimum_validation_satisfied = required_signal_count == 0 or known_required_count >= required_signal_count
+
+        return {
+            "validation_missing": validation_missing,
+            "validation_missing_all": validation_missing_all,
+            "selected_variable": selected_variable,
+            "minimum_validation_required": fixed_required,
+            "minimum_validation_satisfied": minimum_validation_satisfied,
+            "known_required_count": known_required_count,
+            "required_signal_count": required_signal_count,
+            "adaptive_enabled": True,
+            "fixed_required": fixed_required,
+            "fixed_missing": fixed_missing,
+            "dynamic_pool": dynamic_pool,
+            "dynamic_known": dynamic_known,
+            "dynamic_missing": dynamic_missing,
+            "dynamic_required_count": dynamic_required_count,
+            "dynamic_requirement_satisfied": dynamic_requirement_satisfied,
+            "selection_reason": selection_reason,
+            "journey_hypothesis": journey_hypothesis,
+            "open_uncertainty": open_uncertainty,
+            "candidate_functions": candidate_functions,
+            "case_anchor": case_anchor,
+            "philosophy": adaptive_inference,
+        }
 
     def _journey_mode(self, state: ConversationState) -> str:
         saga_mode = _clean_text((state.diagnostic_hypotheses or {}).get("saga_mode", ""))
@@ -215,21 +517,25 @@ class CommercialPricingPolicyEngine:
         pricing_validation = architecture.get("pricing_validation", {}) if isinstance(architecture.get("pricing_validation", {}), dict) else {}
         price_release_modes = pricing_validation.get("price_release_modes", {}) if isinstance(pricing_validation.get("price_release_modes", {}), dict) else {}
         variable_definitions = pricing_validation.get("variable_definitions", {}) if isinstance(pricing_validation.get("variable_definitions", {}), dict) else {}
+        tracked_checkpoint_variables = _unique_list(
+            [item for item in pricing_validation.get("fixed_required_variables", []) if _clean_text(item) and _clean_text(item) != approval_variable]
+            + [item for item in pricing_validation.get("adaptive_dynamic_variables", []) if _clean_text(item)]
+        )
+        self._sync_pricing_checkpoint_state(state, tracked_checkpoint_variables)
         known_variables = self._known_variables(state, approval_variable)
-
-        minimum_required = [item for item in pricing_validation.get("minimum_required_variables", []) if _clean_text(item)]
-        preferred_sequence = [item for item in pricing_validation.get("preferred_question_sequence", []) if _clean_text(item)]
-        optional_variables = [item for item in pricing_validation.get("optional_but_relevant_variables", []) if _clean_text(item)]
-
-        validation_missing = [item for item in minimum_required if not known_variables.get(item, False)]
-        validation_missing_all = validation_missing + [item for item in optional_variables if not known_variables.get(item, False)]
-        selected_variable = ""
-        for variable in preferred_sequence:
-            if variable in validation_missing_all:
-                selected_variable = variable
-                break
-        if not selected_variable and validation_missing_all:
-            selected_variable = validation_missing_all[0]
+        validation_contract = self._resolve_validation_contract(
+            state=state,
+            pricing_validation=pricing_validation,
+            known_variables=known_variables,
+            approval_variable=approval_variable,
+        )
+        validation_missing = list(validation_contract.get("validation_missing", []) or [])
+        validation_missing_all = list(validation_contract.get("validation_missing_all", []) or [])
+        selected_variable = _clean_text(validation_contract.get("selected_variable", ""))
+        minimum_required = list(validation_contract.get("minimum_validation_required", []) or [])
+        minimum_validation_satisfied = bool(validation_contract.get("minimum_validation_satisfied", False))
+        known_required_count = _safe_int(validation_contract.get("known_required_count", 0), 0)
+        required_signal_count = _safe_int(validation_contract.get("required_signal_count", len(minimum_required)), len(minimum_required))
 
         selected_contract = variable_definitions.get(selected_variable, {}) if selected_variable else {}
         focus = _clean_text(selected_contract.get("focus", "")) or selected_variable
@@ -239,14 +545,27 @@ class CommercialPricingPolicyEngine:
             for item in selected_contract.get("constraints", [])
             if _clean_text(item)
         ] or ["single_question", "avoid_menu", "avoid_taxonomy"]
+        question_style, question_context_hint = self._adaptive_question_style(
+            state=state,
+            selected_variable=selected_variable,
+        )
 
-        scope_confidence = self._scope_confidence(minimum_required, known_variables, lead_summary)
+        if required_signal_count <= 0:
+            scope_confidence = "alta"
+        else:
+            ratio = known_required_count / max(required_signal_count, 1)
+            if lead_summary.get("commercial_scope_ready", False) and ratio >= 0.75:
+                scope_confidence = "alta"
+            elif ratio >= 0.5:
+                scope_confidence = "media"
+            else:
+                scope_confidence = "baixa"
         journey_mode = self._journey_mode(state)
         project_complexity = self._project_complexity(known_variables, scope_confidence)
 
-        if not validation_missing and lead_summary.get("commercial_scope_ready", False):
+        if minimum_validation_satisfied and lead_summary.get("commercial_scope_ready", False):
             readiness_stage = READINESS_STAGE_C
-        elif not validation_missing:
+        elif minimum_validation_satisfied:
             readiness_stage = READINESS_STAGE_B
         else:
             readiness_stage = READINESS_STAGE_A
@@ -263,7 +582,8 @@ class CommercialPricingPolicyEngine:
             and _clean_text(neural_state.get("topic_domain", "")) == "commercial_explicit"
         )
         direct_pricing = (
-            bool(response_policy.get("commercial_direct_question_detected", False))
+            _has_explicit_price_request(state)
+            or bool(response_policy.get("commercial_direct_question_detected", False))
             or _clean_text(neural_state.get("communicative_intent", "")) == "price_check"
             or explicit_commercial_need
             or _clean_text(counterparty.get("counterparty_intent", "")) == "test_price"
@@ -285,7 +605,7 @@ class CommercialPricingPolicyEngine:
             price_response_mode = "precise_ok"
         elif allow_range_quote and readiness_stage in {READINESS_STAGE_B, READINESS_STAGE_C}:
             price_response_mode = "range_ok"
-        elif direct_pricing and not validation_missing and bool(architecture.get("price_strategy", {}).get("floor_allowed_early", False)):
+        elif direct_pricing and minimum_validation_satisfied and bool(architecture.get("price_strategy", {}).get("floor_allowed_early", False)):
             price_response_mode = "floor_only"
         elif direct_pricing:
             price_response_mode = "block_price"
@@ -299,7 +619,7 @@ class CommercialPricingPolicyEngine:
         )
         pricing_contract = architecture.get("pricing_contract", {}) if isinstance(architecture.get("pricing_contract", {}), dict) else {}
         readiness_blockers = _unique_list(
-            ["missing_minimum_context"] * bool(validation_missing)
+            ["missing_minimum_context"] * bool(not minimum_validation_satisfied)
             + ["commercial_scope_incomplete"] * bool(not lead_summary.get("commercial_scope_ready", False))
             + ["scope_confidence_low"] * bool(scope_confidence == "baixa")
         )
@@ -313,7 +633,7 @@ class CommercialPricingPolicyEngine:
         pricing_policy = {
             "pricing_validation": pricing_validation,
             "pricing_contract": pricing_contract,
-            "pricing_readiness_score": max(0, len(minimum_required) - len(validation_missing)),
+            "pricing_readiness_score": max(0, known_required_count),
             "pricing_readiness_stage": readiness_stage,
             "pricing_readiness_label": {
                 READINESS_STAGE_A: "contexto_inicial",
@@ -329,9 +649,11 @@ class CommercialPricingPolicyEngine:
             "minimum_pricing_question_shape": shape,
             "minimum_pricing_question_constraints": tuple(constraints),
             "minimum_pricing_question_reason": _clean_text(selected_contract.get("reason", "")),
+            "minimum_pricing_question_context_hint": question_context_hint,
+            "minimum_pricing_question_style": question_style,
             "minimum_pricing_question": focus,
             "minimum_validation_required": minimum_required,
-            "minimum_validation_satisfied": not validation_missing,
+            "minimum_validation_satisfied": minimum_validation_satisfied,
             "question_will_change_what": _clean_text(selected_contract.get("changes", "")),
             "price_response_mode": price_response_mode,
             "project_complexity": project_complexity,
@@ -392,6 +714,36 @@ class CommercialPricingPolicyEngine:
             "known_variables": known_variables,
             "flow_example_approved": bool(known_variables.get(approval_variable, False)),
             "flow_example_just_approved": flow_example_just_approved,
+            "adaptive_inference_enabled": bool(validation_contract.get("adaptive_enabled", False)),
+            "adaptive_fixed_required_variables": list(validation_contract.get("fixed_required", []) or []),
+            "adaptive_fixed_missing": list(validation_contract.get("fixed_missing", []) or []),
+            "adaptive_dynamic_variable_pool": list(validation_contract.get("dynamic_pool", []) or []),
+            "adaptive_dynamic_required_count": _safe_int(validation_contract.get("dynamic_required_count", 0), 0),
+            "adaptive_dynamic_known": list(validation_contract.get("dynamic_known", []) or []),
+            "adaptive_dynamic_missing": list(validation_contract.get("dynamic_missing", []) or []),
+            "adaptive_dynamic_requirement_satisfied": bool(validation_contract.get("dynamic_requirement_satisfied", True)),
+            "adaptive_known_required_count": known_required_count,
+            "adaptive_required_signal_count": required_signal_count,
+            "adaptive_selected_variable": selected_variable,
+            "adaptive_selected_uncertainty": _clean_text(validation_contract.get("open_uncertainty", "")),
+            "adaptive_selection_reason": _clean_text(validation_contract.get("selection_reason", "")),
+            "adaptive_question_style": question_style,
+            "adaptive_question_context_hint": question_context_hint,
+            "adaptive_journey_hypothesis": _clean_text(validation_contract.get("journey_hypothesis", "")),
+            "adaptive_candidate_functions": list(validation_contract.get("candidate_functions", []) or []),
+            "adaptive_case_anchor": _clean_text(validation_contract.get("case_anchor", "")),
+            "adaptive_philosophy_inferencia_do_fluxo": _clean_text(
+                (validation_contract.get("philosophy", {}) or {}).get("filosofia_de_inferencia_do_fluxo", "")
+            ),
+            "adaptive_philosophy_selecao_da_pergunta": _clean_text(
+                (validation_contract.get("philosophy", {}) or {}).get("filosofia_de_selecao_da_proxima_pergunta", "")
+            ),
+            "adaptive_philosophy_validacao_antes_do_preco": _clean_text(
+                (validation_contract.get("philosophy", {}) or {}).get("filosofia_de_validacao_antes_do_preco", "")
+            ),
+            "adaptive_philosophy_pergunta_obrigatoria_forma_flexivel": _clean_text(
+                (validation_contract.get("philosophy", {}) or {}).get("filosofia_de_pergunta_obrigatoria_com_forma_flexivel", "")
+            ),
         }
         state.pricing_policy = pricing_policy
         return pricing_policy

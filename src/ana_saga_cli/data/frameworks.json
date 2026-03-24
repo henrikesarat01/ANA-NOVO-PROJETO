@@ -1,0 +1,116 @@
+{
+  "processo_de_vendas": [
+    {
+      "etapa": "etapa_01_abertura",
+      "framework_principal": "Rapport",
+      "o_que_e": "Criação de abertura e receptividade.",
+      "breve_explicacao": "Serve para iniciar a conversa de forma leve, natural e segura, sem parecer abordagem comercial.",
+      "conceito_filosofico": "A abertura não é só o começo técnico da conversa; ela é o momento em que a outra pessoa decide, quase sempre de forma silenciosa, se aquela interação é segura ou se já precisa levantar defesa. Rapport parte da ideia de que nenhuma influência relevante acontece antes da aceitação relacional mínima. Antes de alguém aceitar uma pergunta, uma proposta ou uma direção, precisa aceitar a presença de quem está falando. Isso significa que a conversa não começa pelo conteúdo, mas pela sensação de ausência de ameaça. Quando essa base não existe, qualquer inteligência posterior soa invasiva, oportunista ou artificial. O fundamento filosófico aqui é que a receptividade precede a profundidade: primeiro a pessoa sente que pode permanecer, depois ela aceita continuar, e só então ela se abre para ser conduzida."
+    },
+    {
+      "etapa": "etapa_02_conexao_inicial",
+      "framework_principal": "Mirroring + Labeling",
+      "o_que_e": "Conexão por espelhamento e validação leve.",
+      "breve_explicacao": "Acompanha o ritmo, o tom e o estado da outra pessoa sem parecer imitação ou performance.",
+      "conceito_filosofico": "O ser humano se abre mais quando se percebe lido do que quando se percebe analisado. Mirroring e labeling partem da filosofia do reconhecimento sutil: a pessoa quer sentir que sua forma de falar, seu humor, sua energia e seu modo de estar na conversa foram percebidos sem exagero e sem manipulação evidente. Existe uma diferença profunda entre ser compreendido e ser processado. Quem se sente processado tende a endurecer; quem se sente compreendido tende a continuar. Essa etapa sustenta a ideia de que conexão não nasce de performance social, mas de sintonia legítima. Filosoficamente, trata-se de reduzir a distância entre duas presenças sem fabricar intimidade. É um movimento de aproximação sem invasão, em que a conversa deixa de ser apenas contato e começa a se tornar relação mínima."
+    },
+    {
+      "etapa": "etapa_03_contextualizacao_permissao",
+      "framework_principal": "Up-Front Contract",
+      "o_que_e": "Alinhamento leve de direção e permissão.",
+      "breve_explicacao": "Cria uma passagem natural da conversa solta para uma conversa mais útil e orientada.",
+      "conceito_filosofico": "Toda conversa possui um território implícito. Mudar de nível, sair do casual, aprofundar ou conduzir não é neutro; é sempre uma intervenção na forma da relação. O Up-Front Contract parte da ideia de que profundidade legítima não nasce da pressa de conduzir, mas da aceitação da mudança de agenda. A pessoa resiste menos quando entende por que a conversa está mudando de nível e o que essa mudança pretende construir. Filosoficamente, essa etapa protege a reciprocidade e a legitimidade da condução. Ela impede que a transição para contexto, diagnóstico ou negociação pareça captura unilateral da conversa. O princípio aqui é simples: orientar sem sequestrar, aprofundar sem invadir, conduzir sem tornar a outra pessoa objeto de extração."
+    },
+    {
+      "etapa": "etapa_04_diagnostico_situacional",
+      "framework_principal": "SPIN Selling — Situation",
+      "o_que_e": "Entendimento da situação atual.",
+      "breve_explicacao": "Mapeia como a realidade funciona hoje antes de falar de problema, impacto ou solução.",
+      "conceito_filosofico": "Nenhuma negociação séria deve ser construída sobre abstrações. Antes de falar de dor, urgência, valor ou proposta, é preciso localizar a realidade concreta em que a outra pessoa opera. O diagnóstico situacional parte da filosofia de que a verdade do contexto vem antes da interpretação comercial. Se ainda não está claro como funciona, quem participa, como se distribui, onde acontece e o que depende de quê, qualquer leitura posterior será projeção, não diagnóstico. Essa etapa sustenta uma ética de aderência à realidade: a solução não tem direito de existir antes do mundo onde pretende entrar. Filosoficamente, ela organiza a inteligência comercial em torno do princípio de que funcionamento vem antes de problema e estrutura vem antes de intervenção."
+    },
+    {
+      "etapa": "etapa_05_diagnostico_impacto",
+      "framework_principal": "SPIN Selling — Problem + Implication",
+      "o_que_e": "Identificação do problema e aprofundamento do impacto.",
+      "breve_explicacao": "Mostra o que está travando e qual o peso prático disso na vida real.",
+      "conceito_filosofico": "Existe uma distância entre sentir um incômodo e compreender a gravidade dele. Muitas vezes a pessoa sabe que algo incomoda, mas ainda não enxergou extensão, recorrência, custo e consequência. O diagnóstico de impacto parte da ideia de que a consciência humana costuma ser superficial sobre o próprio sofrimento operacional, decisório ou estrutural. Essa etapa não existe para fabricar dor, mas para tirar a dor da névoa. Problema sem implicação permanece desconforto difuso; problema com implicação passa a ter peso, forma e urgência. Filosoficamente, o que se faz aqui é transformar sensação em realidade inteligível. O objetivo não é dramatizar, mas revelar: tornar visível o que já é real, porém ainda não foi mentalmente organizado como algo que pede mudança."
+    },
+    {
+      "etapa": "etapa_06_qualificacao_fit",
+      "framework_principal": "MEDDICC",
+      "o_que_e": "Validação de aderência e viabilidade.",
+      "breve_explicacao": "Verifica se existe base real para seguir avançando.",
+      "conceito_filosofico": "Nem toda conversa deve virar avanço, e nem todo avanço deve virar proposta. A qualificação parte da filosofia do discernimento: negociar bem não é apenas saber conduzir para frente, mas saber quando ainda não existe legitimidade suficiente para isso. Existe uma diferença entre abertura e prontidão, entre dor e aderência, entre interesse e viabilidade. Qualificar não é burocratizar; é proteger a coerência da conversa e a integridade da oferta. Sem essa etapa, a negociação perde critério e vira empuxo cego. Filosoficamente, trata-se de afirmar que verdade e adequação importam mais do que velocidade. Avançar sem fit é uma forma elegante de violência comercial, porque força forma onde ainda falta base."
+    },
+    {
+      "etapa": "etapa_07_transicao_solucao",
+      "framework_principal": "Challenger Sale",
+      "o_que_e": "Mudança de perspectiva que prepara a solução.",
+      "breve_explicacao": "Faz a ponte entre o problema atual e uma nova forma de enxergar o que precisa ser resolvido.",
+      "conceito_filosofico": "Muita gente não compra porque ainda enxerga o próprio problema a partir dos limites do repertório atual. A transição para solução parte da filosofia de que uma boa negociação não apenas acompanha a consciência existente do cliente, mas eleva a qualidade dessa consciência. Isso não significa confrontar por vaidade nem corrigir por superioridade; significa introduzir uma leitura mais ampla, mais estrutural ou mais precisa da situação. Enquanto a pessoa vê o problema de forma pequena, localizada ou antiga, a solução parecerá opcional, complexa ou exagerada. Filosoficamente, essa etapa trabalha com ampliação de consciência. Ela desloca a conversa de uma percepção imediata para uma percepção mais organizada, tornando possível desejar algo que antes parecia desnecessário ou desproporcional."
+    },
+    {
+      "etapa": "etapa_08_mapeamento_solucao",
+      "framework_principal": "Solution Selling",
+      "o_que_e": "Conexão entre solução e caso real.",
+      "breve_explicacao": "Mostra como a solução entra especificamente naquela realidade.",
+      "conceito_filosofico": "Solução boa não é solução genérica; é solução percebida como compatível, inteligível e plausível dentro do mundo da outra pessoa. O mapeamento da solução parte da ideia de que a mente humana resiste menos ao que consegue encaixar na própria realidade. Quando a solução aparece como conceito distante, ela vira discurso. Quando aparece como algo que entra em pontos concretos da operação, da rotina, da decisão ou da estrutura, ela vira possibilidade legítima. Filosoficamente, essa etapa é a travessia entre abstração e aplicabilidade. O que ela faz não é só explicar; é tornar a solução habitável no imaginário do outro. Uma solução só começa a existir de verdade quando a outra pessoa consegue vê-la funcionando dentro do seu contexto."
+    },
+    {
+      "etapa": "etapa_09_ancoragem_valor",
+      "framework_principal": "Value Selling",
+      "o_que_e": "Construção e ancoragem de valor.",
+      "breve_explicacao": "Organiza a percepção do que está sendo ganho, protegido ou evitado antes do preço.",
+      "conceito_filosofico": "Preço nunca é só preço; ele é sempre comparação. A pergunta filosófica central aqui é: comparação com o quê? A ancoragem de valor parte da ideia de que a mente humana não avalia custo no vazio, mas em relação a ganho esperado, perda evitada, esforço poupado, segurança adquirida, risco reduzido ou controle recuperado. Quando não existe valor bem organizado, o preço vira número solto, choque e defesa. Essa etapa existe para construir a balança interna da decisão antes que o custo a capture sozinho. Filosoficamente, ancorar valor é educar o campo de comparação. Antes do número, a mente precisa saber o que está medindo. Sem esse enquadramento, toda negociação econômica se empobrece e tende a colapsar em desconto, objeção rasa ou rejeição prematura."
+    },
+    {
+      "etapa": "etapa_10_checagem_aderencia",
+      "framework_principal": "Trial Close",
+      "o_que_e": "Confirmação leve de sentido e encaixe.",
+      "breve_explicacao": "Verifica se o que foi construído até aqui realmente faz sentido para a outra pessoa.",
+      "conceito_filosofico": "Checar aderência não é pedir decisão; é verificar correspondência. Muitas conversas comerciais avançam rápido demais e confundem participação com assimilação. A pessoa pode estar respondendo, concordando e até seguindo o fluxo, sem ter integrado de verdade o que está sendo construído. A checagem de aderência parte da filosofia da coerência compartilhada: antes do compromisso, é preciso saber se existe realidade comum suficiente para sustentá-lo. Essa etapa protege a negociação contra o avanço cego. Filosoficamente, ela afirma que entendimento presumido é uma das maiores fontes de artificialidade, erro e resistência futura. Verificar sentido é uma forma de respeitar a consciência do outro antes de pedir consequência dela."
+    },
+    {
+      "etapa": "etapa_11_oferta",
+      "framework_principal": "FAB",
+      "o_que_e": "Recurso, vantagem e benefício.",
+      "breve_explicacao": "Apresenta a oferta de forma compreensível, ligando o que é ao que muda na prática.",
+      "conceito_filosofico": "A oferta não é o momento de despejar características; é o momento de condensar a lógica inteira da conversa em uma forma proposta. A filosofia dessa etapa parte da ideia de que a oferta só é forte quando parece consequência natural do caminho anterior. Se surge como catálogo técnico, ela interrompe a coerência. Se surge como tradução final do que foi entendido, ela parece legítima. O FAB organiza isso ao unir estrutura, superioridade e impacto prático. Filosoficamente, trata-se de responder três perguntas fundamentais da mente: o que é isso, por que isso importa e o que isso muda para mim. Ofertar bem é tornar concreta a forma assumida do valor construído, sem deixar a proposta escorregar para abstração, excesso técnico ou promessa solta."
+    },
+    {
+      "etapa": "etapa_12_negociacao_condicoes",
+      "framework_principal": "Harvard Negotiation",
+      "o_que_e": "Negociação por interesse e estrutura, não por confronto.",
+      "breve_explicacao": "Busca condição viável sem transformar a conversa em disputa de força.",
+      "conceito_filosofico": "Negociar não é vencer; é reorganizar condições para tornar o acordo possível sem destruir o valor que o sustenta. A filosofia dessa etapa parte da percepção de que o conflito aparente quase sempre esconde um desalinhamento mais profundo de interesse, limite, prioridade, percepção de risco ou estrutura de decisão. Quando a negociação vira combate de posição, ela degrada a inteligência da conversa e infla ego, defesa e rigidez. O modelo de Harvard sustenta uma visão mais madura: separar pessoa de problema, interesse de posição e condição de identidade. Filosoficamente, essa etapa existe para preservar racionalidade sem desumanizar a relação. Ela trata o acordo como construção de viabilidade, não como espetáculo de força."
+    },
+    {
+      "etapa": "etapa_13_objecoes",
+      "framework_principal": "LAER",
+      "o_que_e": "Ouvir, reconhecer, explorar e responder.",
+      "breve_explicacao": "Trata objeções sem rebater de forma rasa ou defensiva.",
+      "conceito_filosofico": "Objeção não é sinônimo de recusa; muitas vezes é a forma pela qual a mente expressa dúvida, medo, proteção, custo percebido ou falta de integração do que ouviu. A filosofia dessa etapa parte da ideia de que rebater rápido costuma ser uma forma de não escutar de verdade. Quando a objeção aparece, ela está mostrando uma estrutura interna: o que a pessoa quer preservar, o que ainda não compreendeu, o que ainda não conseguiu justificar para si mesma. O LAER funciona porque organiza a escuta como ato estratégico e ético. Primeiro se ouve para ver, depois se reconhece para reduzir defesa, então se explora para localizar a raiz e só depois se responde com precisão. Filosoficamente, essa etapa afirma que a resistência não deve ser combatida como inimiga, mas decifrada como linguagem de proteção."
+    },
+    {
+      "etapa": "etapa_14_fechamento",
+      "framework_principal": "Direct Close / Trial Close",
+      "o_que_e": "Condução para decisão.",
+      "breve_explicacao": "Transforma intenção em compromisso concreto.",
+      "conceito_filosofico": "Fechar não é apertar; é reconhecer o momento em que a decisão já adquiriu sustentação suficiente para assumir forma. A filosofia do fechamento parte da ideia de que compromisso não deve ser arrancado nem adiado artificialmente. Se falta clareza, segurança, aderência ou valor, o fechamento vira pressão. Mas se esses elementos já estão maduros, não pedir decisão também é erro: vira fuga, insegurança ou desperdício do momento. Filosoficamente, essa etapa organiza a passagem entre compreensão e compromisso. Ela pergunta quando a conversa já construiu realidade suficiente para que a decisão deixe de ser uma hipótese e passe a ser um ato. O fechamento maduro é consequência lógica, não violência performática."
+    },
+    {
+      "etapa": "etapa_15_onboarding_confirmacao",
+      "framework_principal": "Mutual Action Plan",
+      "o_que_e": "Alinhamento claro dos próximos passos.",
+      "breve_explicacao": "Transforma o 'sim' em sequência concreta de movimento.",
+      "conceito_filosofico": "A decisão só se sustenta quando encontra forma prática. Sem transição organizada, o fechamento corre o risco de virar intenção frágil, entusiasmo momentâneo ou promessa sem trilha. A filosofia dessa etapa parte da ideia de que compromisso verdadeiro precisa se transformar em caminho concreto, visível e habitável. O 'sim' precisa virar passo, ordem, cronologia, responsabilidade e clareza do que vem depois. Filosoficamente, trata-se de impedir que o acordo permaneça no campo abstrato da aceitação verbal. Essa etapa dá corpo ao compromisso. Ela afirma que a continuidade não nasce sozinha; ela precisa ser organizada para existir de fato."
+    },
+    {
+      "etapa": "etapa_16_pos_venda_expansao",
+      "framework_principal": "Land and Expand",
+      "o_que_e": "Retenção, consolidação e expansão.",
+      "breve_explicacao": "Mantém valor no pós-venda e abre espaço para continuidade e crescimento.",
+      "conceito_filosofico": "A venda não termina no fechamento; ela muda de natureza. Depois da decisão, o que passa a sustentar a relação já não é mais persuasão, mas experiência. A filosofia dessa etapa parte da ideia de que valor entregue reorganiza confiança, e confiança reorganiza abertura futura. Sem entrega consistente, a expansão é oportunismo. Sem acompanhamento, a permanência enfraquece. Essa etapa trabalha com a lógica de continuidade: primeiro a promessa precisa ser confirmada na prática, depois a relação amadurece, e só então novas possibilidades se tornam legítimas. Filosoficamente, o pós-venda deixa de ser fim do processo e passa a ser continuação inteligente da relação comercial. Permanência antes de expansão, confiança antes de nova proposta."
+    }
+  ]
+}

@@ -130,6 +130,15 @@ class ConversationService:
         response: str,
         debug_trace: list[str],
         llm_calls: list[dict[str, Any]],
+        state_before_turn: dict[str, Any],
+        state_after_user_turn: dict[str, Any],
+        state_after_state_update: dict[str, Any],
+        state_after_semantic: dict[str, Any],
+        state_after_decision: dict[str, Any],
+        state_after_capability: dict[str, Any],
+        state_after_response: dict[str, Any],
+        raw_response: str,
+        repair_debug: dict[str, Any],
     ) -> dict[str, Any]:
         return self.debug_bundle_builder.build_markdown_debug_bundle(
             entry_stage=entry_stage,
@@ -158,6 +167,15 @@ class ConversationService:
             response=response,
             debug_trace=debug_trace,
             llm_calls=llm_calls,
+            state_before_turn=state_before_turn,
+            state_after_user_turn=state_after_user_turn,
+            state_after_state_update=state_after_state_update,
+            state_after_semantic=state_after_semantic,
+            state_after_decision=state_after_decision,
+            state_after_capability=state_after_capability,
+            state_after_response=state_after_response,
+            raw_response=raw_response,
+            repair_debug=repair_debug,
         )
 
     def _hit_names(self, hits: list[object], limit: int = 4) -> list[str]:

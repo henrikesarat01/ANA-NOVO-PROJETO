@@ -12,13 +12,6 @@ def _compact_items(items: object, limit: int = 3) -> str:
     return " | ".join(selected[:limit])
 
 
-def _question_reason_line(intent: TurnIntent) -> str:
-    reason = clean_text(intent.question_reason)
-    if not reason:
-        return ""
-    return f"se precisar contextualizar a pergunta, faça isso de forma simples: {reason}"
-
-
 def _needs_negotiation_grounding(state: ConversationState, intent: TurnIntent) -> bool:
     if intent.response_mode != "pricing_answer":
         return False
@@ -27,24 +20,19 @@ def _needs_negotiation_grounding(state: ConversationState, intent: TurnIntent) -
     decision_stage = clean_text((state.counterparty_model or {}).get("decision_stage", ""))
     resistance = clean_text((state.counterparty_model or {}).get("resistance_level", ""))
     return (
-        semantic_intent in {"compare", "price_check"}
-        or question_priority in {"comparison_question", "pricing_question", "operational_mapping_question"}
-        or decision_stage in {"comparison", "objection", "negotiation"}
-        or resistance in {"medium", "high"}
+        semantic_intent in {"compare"}
+        or question_priority in {"comparison_question", "operational_mapping_question"}
+        or decision_stage in {"comparison", "negotiation"}
+        or resistance in {"high"}
     )
 
 
 def _pricing_lines(state: ConversationState, intent: TurnIntent) -> list[str]:
     pricing_policy = state.pricing_policy or {}
     if intent.pricing_posture == "block":
-        lines = [
-            "não abra preço ainda",
-            "se precisar perguntar antes de falar valor, peça só o recorte concreto que falta",
-        ]
+        lines: list[str] = []
         if clean_text(intent.question_shape) == "approval_check":
-            lines.append("se for validar antes do valor, proponha um fluxo completo do SAGA nesse caso e confirme se faria sentido aí")
-        if intent.pricing_change_hint:
-            lines.append("se contextualizar a pergunta, ligue isso à precisão do valor sem soar defesa")
+            lines.append("antes do valor, só falta validar um fluxo plausível da oferta nesse caso")
         return lines
     if intent.pricing_posture == "floor_only":
         return [
@@ -79,33 +67,19 @@ def _offer_context_lines(state: ConversationState, intent: TurnIntent) -> list[s
         and bool(offer_context.get("capability_negotiation_ready", False))
         and _needs_negotiation_grounding(state, intent)
     ):
-        lines.append("se ajudar a sustentar a negociação, use no máximo 1 capacidade concreta que faça sentido no caso")
-        if bool(offer_context.get("require_characteristic_translation", False)) or bool(
-            offer_context.get("require_operational_gain_translation", False)
-        ):
-            lines.append("traduza isso pela rotina do cliente, sem nome interno e sem discurso de apresentação")
-        if isinstance(function_characteristics, list):
-            for item in function_characteristics[:1]:
-                if not isinstance(item, dict):
-                    continue
-                characteristic = clean_text(item.get("characteristic", ""))
-                if characteristic:
-                    lines.append(f"se precisar ancorar, pense neste recorte da solução: {characteristic}")
+        lines.append("se precisar sustentar valor, amarre em uma única mudança concreta da rotina")
+        lines.append("não recite a característica bruta da feature nem transforme isso em mini-demo")
 
     if (
         clean_text(intent.question_shape) == "approval_check"
         and bool(offer_context.get("flow_validation_pending", False))
     ):
-        lines.append("antes de avançar para valor, proponha um exemplo completo do fluxo do SAGA para esse caso")
-        lines.append("esse fluxo deve mostrar entrada, organização inicial, avanço útil e desfecho claro, como produto, pedido, pagamento ou handoff")
-        if clean_text(offer_context.get("flow_model_style", "")) in {"operational_minimum", "complete_saga_flow"}:
-            lines.append("descreva esse fluxo em 3 a 5 movimentos concretos, como conversa corrida, sem virar lista técnica")
-        concrete_actions = _compact_items(offer_context.get("concrete_actions", []), limit=4)
+        lines.append("na validação final, imagine um fluxo completo, curto e plausível")
+        lines.append("esse fluxo precisa sair do início e chegar a um desfecho claro")
+        concrete_actions = _compact_items(offer_context.get("concrete_actions", []), limit=2)
         if concrete_actions:
-            lines.append(f"use só as ações que fizerem sentido nesse fluxo: {concrete_actions}")
-        lines.append("depois confirme em uma pergunta curta se é esse tipo de fluxo que faria sentido aí")
-        lines.append("não peça o processo atual inteiro e não troque para outra lacuna")
-        lines.append("não use nome interno de validação nem rótulo técnico")
+            lines.append(f"se isso ajudar, pense em 1 ou 2 movimentos concretos: {concrete_actions}")
+        lines.append("não abra outra frente nem peça o processo inteiro atual")
 
     product_knowledge_ready = bool(offer_context.get("product_knowledge_ready", False))
     if product_knowledge_ready and intent.response_mode == "explain" and explain_scope in {"product_identity_short", "product_identity_full"}:
@@ -115,22 +89,25 @@ def _offer_context_lines(state: ConversationState, intent: TurnIntent) -> list[s
         product_scene = clean_text(offer_context.get("product_scene", ""))
         product_proof = clean_text(offer_context.get("product_proof", ""))
 
-        lines.append("explique o produto de forma concreta, simples e sem virar apresentação")
+        lines.append("se explicar o produto, explique pela rotina e escolha só o pedaço útil deste turno")
+        lines.append("não despeje interface, feature e funcionalidade em sequência")
         if product_essence:
-            lines.append(f"o que ele é, em poucas palavras: {product_essence}")
-        if manual_truths:
-            lines.append(f"aterre no que hoje costuma ficar no braço: {manual_truths}")
+            lines.append(f"fato central do produto: {product_essence}")
+        if manual_truths and explain_scope == "product_identity_full":
+            lines.append(f"onde a rotina ainda depende de repetição manual: {manual_truths}")
         if concrete_actions:
-            lines.append(f"use 1 ou 2 ações concretas do que ele faz: {concrete_actions}")
-        if (product_proof or product_scene) and explain_scope == "product_identity_full":
-            lines.append(f"se ajudar, use só uma cena simples para visualizar: {product_proof or product_scene}")
+            lines.append(f"se precisar concretizar, escolha 1 ou 2 movimentos reais: {concrete_actions}")
+        if product_proof and explain_scope == "product_identity_full":
+            lines.append(f"se ajudar, pense numa cena simples: {product_proof}")
+        elif product_scene and explain_scope == "product_identity_full":
+            lines.append(f"se ajudar, pense numa cena simples: {product_scene}")
     if product_knowledge_ready and clean_text((state.neural_state or {}).get("communicative_intent", "")) == "compare":
         architecture_explanation = clean_text(offer_context.get("architecture_explanation", ""))
         integration_summary = clean_text(offer_context.get("integration_summary", ""))
         if architecture_explanation:
-            lines.append(f"se houver comparação de base técnica, deixe clara a diferença prática: {architecture_explanation}")
+            lines.append(f"diferença prática para apoiar a comparação: {architecture_explanation}")
         if integration_summary:
-            lines.append(f"se comparação tocar integração, traduza pela rotina e não por jargão: {integration_summary}")
+            lines.append(f"se entrar integração, traduza pela rotina: {integration_summary}")
 
     return lines
 
@@ -158,44 +135,43 @@ def build_context_section(
 
     lines = [f"contexto do cliente: {intent.client_context or 'contexto ainda incompleto'}"]
 
-    if (
+    if intent.response_mode == "ask":
+        label = _surface_question_focus(intent)
+        if label:
+            lines.append(f"falta entender só: {label}")
+        if clean_text(intent.question_context_hint):
+            lines.append(f"jeito desta pergunta: {clean_text(intent.question_context_hint)}")
+    elif (
         intent.response_mode == "explain"
         and not bool(lead_summary.get("pain_known", False))
         and product_ready
         and explain_scope == "product_identity_full"
     ):
         lines.append(
-            f"rotina que o produto pega na mão: {clean_text(offer_context.get('product_before', '')) or 'mostre a rotina atual antes de abstrair'}"
+            f"rotina que o produto reorganiza: {clean_text(offer_context.get('product_before', '')) or 'mostre a rotina atual antes de abstrair'}"
         )
     else:
         lines.append(f"dor principal: {intent.main_pain or 'dor ainda pouco definida'}")
         lines.append(f"cena operacional: {intent.operational_scene or 'traga uma cena concreta antes de abstrair'}")
 
     if intent.response_mode == "ask":
-        label = _surface_question_focus(intent)
-        if label:
-            lines.append(f"ponto que precisa ficar claro: {label}")
-        if intent.question_reason:
-            lines.append(_question_reason_line(intent))
-        elif intent.pricing_change_hint and intent.pricing_posture == "block":
-            lines.append("só vale perguntar se isso realmente mudar a precisão do valor")
-        lines.append("não repita a fala do cliente; avance pelo ponto novo e pergunte do jeito mais simples possível")
+        pass
     elif intent.question_budget <= 0:
-        lines.append("este turno se resolve respondendo; não puxe qualificação no mesmo fôlego")
+        lines.append("este turno se resolve respondendo; não cave outra pergunta")
 
     last_reply = clean_text(state.last_assistant_message)
-    if last_reply and len(last_reply.split()) >= 8:
-        lines.append("não reuse o mesmo esqueleto do turno anterior; responda só o que muda agora")
+    if intent.response_mode == "pricing_answer" and last_reply and len(last_reply.split()) >= 8:
+        lines.append("se vier parecido com a última fala, mude a formulação e responda só o delta")
 
     semantic_intent = clean_text((state.neural_state or {}).get("communicative_intent", ""))
     question_priority = clean_text((state.counterparty_model or {}).get("question_priority", ""))
     resistance = clean_text((state.counterparty_model or {}).get("resistance_level", ""))
-    if intent.response_mode in {"ask", "pricing_answer"} and (
+    if intent.response_mode == "pricing_answer" and (
         semantic_intent in {"compare", "price_check"}
         or question_priority in {"comparison_question", "pricing_question"}
         or resistance in {"medium", "high"}
     ):
-        lines.append("negocie pelo caso real; não transforme a resposta em pitch, apresentação nem defesa longa")
+        lines.append("negocie pelo caso real; sem pitch, apresentação, ROI ou defesa longa")
 
     lines.extend(_capability_lines(intent, useful_hits))
     lines.extend(_offer_context_lines(state, intent))
@@ -205,14 +181,5 @@ def build_context_section(
 
     if intent.response_mode == "pricing_answer" and bool((state.pricing_policy or {}).get("flow_example_just_approved", False)):
         lines.append("a última validação acabou de fechar; responda o preço direto e pare de cavar contexto")
-
-    counterparty_tension = clean_text((state.counterparty_model or {}).get("conversation_tension", ""))
-    if counterparty_tension:
-        lines.append(f"dinâmica relacional: {counterparty_tension}")
-
-    if simple_context:
-        lines.append("fale curto e sem acabamento bonito demais")
-
-    lines.append("prefira português brasileiro natural, sem gíria marcada nem caricatura")
 
     return f"CONTEXTO\n{join_lines(lines)}"

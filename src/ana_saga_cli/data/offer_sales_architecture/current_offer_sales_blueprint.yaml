@@ -38,80 +38,111 @@ pricing_validation:
   avoid_dry_questioning: true
   avoid_question_stack: true
   minimum_required_variables:
-    - nicho_ou_segmento
-    - tipo_de_operacao
-    - uso_atual_do_whatsapp
-    - principal_trava_operacional
+    - nicho_ou_segmento_produto_que_o_cliente_vende
     - exemplo_minimo_de_fluxo_aprovado
+  fixed_required_variables:
+    - nicho_ou_segmento_produto_que_o_cliente_vende
+    - exemplo_minimo_de_fluxo_aprovado
+  adaptive_dynamic_variables:
+    - como_as_vendas_acontecem_hoje
+    - como_o_cliente_compra_hoje
+  minimum_dynamic_signals_before_price: 2
+  dynamic_checkpoints_are_mandatory: true
+  confidence_modulates_question_style_not_requirement: true
   optional_but_relevant_variables:
-    - principal_trava_operacional
+    - como_as_vendas_acontecem_hoje
+    - como_o_cliente_compra_hoje
     - quantidade_de_fluxos
     - necessidade_de_integracao
     - fechamento_no_whatsapp_ou_triagem
   variables_that_change_price:
-    - nicho_ou_segmento
-    - tipo_de_operacao
-    - uso_atual_do_whatsapp
+    - nicho_ou_segmento_produto_que_o_cliente_vende
+    - como_as_vendas_acontecem_hoje
+    - como_o_cliente_compra_hoje
     - exemplo_minimo_de_fluxo_aprovado
     - complexidade_do_fluxo
     - integracao
     - quantidade_de_jornadas
   preferred_question_sequence:
-    - nicho_ou_segmento
-    - tipo_de_operacao
-    - uso_atual_do_whatsapp
-    - principal_trava_operacional
+    - nicho_ou_segmento_produto_que_o_cliente_vende
+    - como_as_vendas_acontecem_hoje
+    - como_o_cliente_compra_hoje
     - exemplo_minimo_de_fluxo_aprovado
     - fator_estrutural_de_complexidade
+  adaptive_inference:
+    enabled: true
+    infer_from_niche_before_asking: true
+    choose_next_question_from_case_not_fixed_sequence: true
+    allow_flow_validation_after_dynamic_minimum: true
+    log_detailed_reasoning: true
+    filosofia_de_inferencia_do_fluxo: >
+      Depois de entender o que o cliente vende, não trate a conversa como coleta de
+      campos. Imagine como essa venda provavelmente acontece na vida real: como a
+      pessoa chega, como entende a oferta, como escolhe, onde pede ajuda e o que
+      precisa acontecer para a compra sair. A partir disso, aproxime-se da menor
+      dúvida que ainda muda materialmente o desenho do fluxo. Não pergunte para
+      mapear tudo; pergunte só para reduzir a incerteza mais decisiva. Se o caso já
+      estiver claro, avance sem voltar para perguntas de base.
+    filosofia_de_selecao_da_proxima_pergunta: >
+      A próxima pergunta nunca deve nascer de uma sequência fixa. Ela deve nascer do
+      encontro entre o que esse negócio parece vender, a forma provável dessa jornada
+      e a parte da experiência que ainda está nebulosa. A boa pergunta não é a mais
+      completa; é a que mais ajuda a transformar um caso genérico em um fluxo
+      plausível. Se duas dúvidas forem possíveis, escolha a que mais muda o fluxo e
+      o valor. Se nenhuma mudar muito, não pergunte.
+    filosofia_de_validacao_antes_do_preco: >
+      Antes de preço, a ANA não precisa esgotar o diagnóstico. Ela precisa apenas
+      sair do abstrato e chegar a um fluxo mínimo crível para aquele negócio. Isso
+      acontece quando já está claro o que o cliente vende e quando a conversa permite
+      visualizar, com alguma nitidez, como a venda acontece ou pode acontecer. A
+      validação final não é burocracia: é a confirmação de que o fluxo proposto
+      conversa com a rotina real do cliente.
+    filosofia_de_pergunta_obrigatoria_com_forma_flexivel: >
+      Os pontos obrigatórios do pré-preço continuam existindo, mas a forma da
+      pergunta não deve ser fixa. A ANA não pula esses pontos só porque sente que
+      já entendeu; ela usa a leitura do caso para decidir como perguntar. Quando a
+      hipótese ainda está aberta, pergunta de forma exploratória. Quando já existe
+      uma hipótese forte, pergunta por confirmação curta, recorte ou mini-cena.
+      A consistência está nos pontos que precisam ser atravessados; a naturalidade
+      está no jeito de atravessá-los.
   variable_definitions:
-    nicho_ou_segmento:
+    nicho_ou_segmento_produto_que_o_cliente_vende:
       known_fields:
         - niche_known
-      focus: nicho_ou_segmento
-      label: segmento e tipo de negócio
+      focus: nicho_ou_segmento_produto_que_o_cliente_vende
+      label: o que voce vende hoje
       shape: open_context
       constraints:
         - single_question
         - avoid_menu
         - avoid_taxonomy
-      reason: enquadrar o caso real antes de situar valor
-      changes: segmento do cliente, porte e trilho inicial de escopo
-    tipo_de_operacao:
+      reason: sair do abstrato e ancorar a conversa no tipo real de produto, nicho ou segmento
+      changes: leitura do caso, jornada provavel e filtro do fluxo
+    como_as_vendas_acontecem_hoje:
       known_fields:
         - operation_model_known
-      focus: tipo_de_operacao
-      label: tipo de operação
+        - customer_type_known
+      focus: como_as_vendas_acontecem_hoje
+      label: como as vendas acontecem hoje
       shape: open_context
       constraints:
         - single_question
         - avoid_menu
         - avoid_taxonomy
-      reason: identificar como a operação acontece no dia a dia
-      changes: desenho de rotina, tamanho do caso e esforço inicial
-    uso_atual_do_whatsapp:
+      reason: entender como a venda sai do interesse e vira conversa, pedido ou fechamento
+      changes: desenho provavel do fluxo e nivel de intervencao humana
+    como_o_cliente_compra_hoje:
       known_fields:
         - channel_usage_known
-      focus: uso_atual_do_whatsapp
-      label: uso atual do WhatsApp
+      focus: como_o_cliente_compra_hoje
+      label: como o cliente compra hoje
       shape: open_context
       constraints:
         - single_question
         - avoid_menu
         - avoid_taxonomy
-      reason: entender o papel atual do canal
-      changes: profundidade do fluxo e nível de automação
-    principal_trava_operacional:
-      known_fields:
-        - pain_known
-      focus: principal_trava_operacional
-      label: principal trava operacional
-      shape: open_pain
-      constraints:
-        - single_question
-        - avoid_menu
-        - avoid_taxonomy
-      reason: identificar o gargalo dominante
-      changes: prioridade da solução e complexidade percebida
+      reason: entender como o cliente avanca hoje ate escolher, pedir ou fechar
+      changes: papel do WhatsApp, autonomia do cliente e profundidade do fluxo
     exemplo_minimo_de_fluxo_aprovado:
       known_fields: []
       focus: exemplo_minimo_de_fluxo_aprovado

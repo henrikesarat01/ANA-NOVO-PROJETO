@@ -273,6 +273,7 @@ class ConversationMarkdownLogger:
             ("Surface Guidance", payload.get("surface_guidance", {})),
             ("Offer Context", payload.get("offer_context", {})),
             ("Channel Context", payload.get("channel_context", {})),
+            ("Forensic", payload.get("forensic", {})),
             ("LLM Calls", payload.get("llm_calls", [])),
             ("Prompt", payload.get("prompt", {})),
             ("Pipeline Trace", payload.get("pipeline_trace", [])),

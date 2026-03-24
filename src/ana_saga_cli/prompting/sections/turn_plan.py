@@ -28,10 +28,10 @@ _OPENING_DESCRIPTIONS = {
 }
 
 _QUESTION_SHAPES = {
-    "open_context": "traga um recorte real da operação",
-    "open_pain": "faça aparecer o ponto que mais trava",
-    "fit_check": "teste encaixe real sem parecer checklist",
-    "approval_check": "proponha um fluxo exemplo completo do SAGA e confirme se é esse tipo de fluxo que faria sentido",
+    "open_context": "traga a conversa para um ponto concreto do caso",
+    "open_pain": "puxe o gargalo que mais pesa agora",
+    "fit_check": "teste encaixe sem soar formulário",
+    "approval_check": "valide por uma cena completa, não por descrição solta",
 }
 
 
@@ -52,28 +52,33 @@ def _question_target(intent: TurnIntent) -> str:
 
 def _describe_question(intent: TurnIntent) -> str:
     if intent.question_budget <= 0 or intent.response_mode == "social_hold":
-        return "não faça pergunta nem convite escondido; responda e pare nesse ponto"
+        return "não termine perguntando; responda e pare nesse ponto"
 
-    pieces = ["faça uma pergunta natural, uma só"]
-    if clean_text(intent.question_reason) or clean_text(intent.pricing_posture) == "block":
-        pieces.append("se precisar dar contexto, faça isso em meia frase")
-    shape = _QUESTION_SHAPES.get(clean_text(intent.question_shape), "")
-    if shape:
-        pieces.append(shape)
+    if clean_text(intent.question_intent) == "pricing" and clean_text(intent.question_shape) != "approval_check":
+        pieces = ["uma pergunta só, curta e concreta"]
+    else:
+        pieces = ["uma pergunta só, do jeito mais natural possível"]
+        shape = _QUESTION_SHAPES.get(clean_text(intent.question_shape), "")
+        if shape:
+            pieces.append(shape)
     if clean_text(intent.question_shape) == "approval_check" and clean_text(intent.opening_shape) == "mini_scenario":
-        pieces.append("esse fluxo deve ter começo, meio e desfecho claro")
-    target = _question_target(intent)
-    if target:
-        pieces.append(f"mantenha o foco em {target}")
+        pieces.append("se validar fluxo, dê começo, avanço e desfecho claro")
     if "avoid_menu" in intent.question_constraints or "avoid_taxonomy" in intent.question_constraints:
         pieces.append("sem menu nem lista")
     return "; ".join(pieces)
 
 
 def build_turn_plan_section(intent: TurnIntent, strategy_avoid: str = "") -> str:
+    opening = _describe_opening(intent.opening_shape)
+    if (
+        intent.response_mode == "ask"
+        and clean_text(intent.question_intent) == "pricing"
+        and clean_text(intent.opening_shape) == "answer_first"
+    ):
+        opening = "responda curto e chegue logo no ponto que falta"
     lines = [
         f"tom: {_describe_style(intent.style_posture)}",
-        f"abertura: {_describe_opening(intent.opening_shape)}",
+        f"abertura: {opening}",
         f"pergunta: {_describe_question(intent)}",
     ]
     if strategy_avoid:

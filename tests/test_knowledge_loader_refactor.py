@@ -8,11 +8,13 @@ from ana_saga_cli.knowledge.loader import (
     get_product_arsenal_path,
     get_product_identity_path,
     get_product_inventory_path,
+    get_sales_frameworks_path,
     load_arsenal_entries,
     load_bpcf_framework,
     load_humanization_framework,
     load_product_identity,
     load_product_inventory,
+    load_sales_frameworks,
 )
 
 
@@ -22,6 +24,7 @@ ROOT = Path(__file__).resolve().parents[1]
 def test_knowledge_paths_point_to_refactored_structure() -> None:
     assert get_bpcf_framework_path() == ROOT / "src/ana_saga_cli/data/knowledge/frameworks/bpcf_bidirectional_problem_cause_framework.json"
     assert get_humanization_framework_path() == ROOT / "src/ana_saga_cli/data/knowledge/frameworks/humanizacao.md"
+    assert get_sales_frameworks_path() == ROOT / "src/ana_saga_cli/data/frameworks.json"
     assert get_product_identity_path("saga") == ROOT / "src/ana_saga_cli/data/knowledge/products/saga/identidade_do_produto.json"
     assert get_product_arsenal_path("saga") == ROOT / "src/ana_saga_cli/data/knowledge/products/saga/arsenal_comercial.json"
     assert get_product_inventory_path("saga") == ROOT / "src/ana_saga_cli/data/knowledge/products/saga/inventario_de_funcionalidades.json"
@@ -29,12 +32,15 @@ def test_knowledge_paths_point_to_refactored_structure() -> None:
 
 def test_knowledge_loader_reads_identity_inventory_and_arsenal_from_refactored_tree() -> None:
     framework = load_bpcf_framework()
+    sales_frameworks = load_sales_frameworks()
     humanization = load_humanization_framework()
     identity = load_product_identity("saga")
     inventory = load_product_inventory("saga")
     arsenal_entries = load_arsenal_entries("saga")
 
     assert framework["framework_id"] == "BPCF-BIDIRECTIONAL-PROBLEM-CAUSE-FRAMEWORK"
+    assert sales_frameworks["processo_de_vendas"]
+    assert any(item["framework_principal"] == "Up-Front Contract" for item in sales_frameworks["processo_de_vendas"])
     assert "Conversa primeiro; condução depois." in humanization
 
     assert identity["identidade_do_produto"]["nome"] == "SAGA"
