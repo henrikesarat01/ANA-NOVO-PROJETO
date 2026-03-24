@@ -92,6 +92,17 @@ class MockLLMClient(LLMClient):
             return "self_contained"
         return "case_dependent"
 
+    def _mock_self_contained_goal(self, message: str) -> str:
+        if any(token in message for token in ("ta pronto", "tá pronto", "ja da pra usar", "já dá pra usar", "ja esta pronto", "já está pronto")):
+            return "availability_check"
+        if any(token in message for token in ("é voce", "e voce", "é você", "voce que ta criando", "você que tá criando", "sou eu", "é tu")):
+            return "ownership_check"
+        if any(token in message for token in ("como funciona", "o que é", "oque é", "me explica", "queria entender")):
+            return "offer_explanation"
+        if any(token in message for token in ("diferença", "diferenca", "compar")):
+            return "comparison_check"
+        return "none"
+
     def _mock_lead_analysis(self, user_input: str) -> str:
         message = self._normalize_message(self._extract_current_message(user_input))
         payload = {
@@ -185,6 +196,7 @@ class MockLLMClient(LLMClient):
         message = self._normalize_message(self._extract_current_message(user_input)).lower()
         topic_domain, transition_permission, transition_reason = self._mock_topic_domain(message)
         answer_scope = self._mock_answer_scope(message)
+        self_contained_goal = self._mock_self_contained_goal(message)
         emotional_state = "neutral"
         if any(token in message for token in ("urgente", "agora", "logo", "quanto antes")):
             emotional_state = "urgent"
@@ -226,6 +238,7 @@ class MockLLMClient(LLMClient):
             "openness_level": "high" if emotional_state in {"open", "neutral"} else "medium",
             "emotional_temperature": "high" if emotional_state in {"urgent", "frustrated"} else "medium",
             "communicative_intent": communicative_intent,
+            "self_contained_goal": self_contained_goal,
             "decision_style": decision_style,
             "topic_domain": topic_domain,
             "transition_permission": transition_permission,
@@ -471,7 +484,12 @@ class MockLLMClient(LLMClient):
             return ""
         if "não termine" in pergunta or "nao termine" in pergunta:
             return "sem_pergunta"
-        if "faça só" in pergunta or "faca so" in pergunta:
+        if (
+            "faça só" in pergunta
+            or "faca so" in pergunta
+            or "faça uma pergunta natural, uma só" in pergunta
+            or "faca uma pergunta natural, uma so" in pergunta
+        ):
             return "1_pergunta_necessaria"
         return "1_pergunta_opcional"
 

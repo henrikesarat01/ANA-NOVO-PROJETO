@@ -81,6 +81,18 @@ class PromptAssembler:
             return fallback
         return []
 
+    @staticmethod
+    def _task_lines(intent: TurnIntent) -> list[str]:
+        lines = [
+            "TAREFA",
+            "Responda ao cliente em português do Brasil, com linguagem simples, naturalidade alta e tom de WhatsApp.",
+        ]
+        if intent.pricing_posture in {"floor_only", "range_ok", "precise_ok"}:
+            lines.append("Se citar valores, preserve exatamente o formato BRL do brief: R$ 1.500 e faixas como R$ 1.500 a R$ 2.600.")
+        elif intent.pricing_posture == "block":
+            lines.append("Neste turno, não cite preço, faixa ou condição comercial antes da pergunta necessária.")
+        return lines
+
     # -------------------------------------------------------------- build
     def build(
         self,
@@ -143,8 +155,6 @@ class PromptAssembler:
 MENSAGEM ATUAL DO CLIENTE
 {user_message}
 
-TAREFA
-Responda ao cliente em português do Brasil, com linguagem simples, naturalidade alta e tom de WhatsApp.
-Se citar valores, preserve exatamente o formato BRL do brief: R$ 1.500 e faixas como R$ 1.500 a R$ 2.600.
+{chr(10).join(self._task_lines(intent))}
 """
         return instructions, user_input

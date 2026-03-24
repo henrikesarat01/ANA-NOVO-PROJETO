@@ -18,6 +18,13 @@ _COMMUNICATIVE_INTENTS = {
     "validate_fit",
     "advance",
 }
+_SELF_CONTAINED_GOALS = {
+    "none",
+    "availability_check",
+    "ownership_check",
+    "offer_explanation",
+    "comparison_check",
+}
 _DECISION_STYLES = {"pragmatic", "analytical", "relational", "cautious"}
 _LEVELS = {"low", "medium", "high"}
 _ANSWER_SCOPES = {"self_contained", "case_dependent", "commercial_dependent"}
@@ -65,6 +72,7 @@ Formato:
   "transition_reason": "frase curta",
   "emotional_state": "neutral | open | guarded | urgent | skeptical | frustrated",
   "communicative_intent": "explore | clarify | compare | price_check | implementation | validate_fit | advance",
+  "self_contained_goal": "none | availability_check | ownership_check | offer_explanation | comparison_check",
   "decision_style": "pragmatic | analytical | relational | cautious",
   "resistance_level": "low | medium | high",
   "trust_signal": "low | medium | high",
@@ -122,6 +130,11 @@ MENSAGEM NOVA DO CLIENTE
                 payload.get("communicative_intent"),
                 _COMMUNICATIVE_INTENTS,
                 "explore",
+            ),
+            "self_contained_goal": _normalize_choice(
+                payload.get("self_contained_goal"),
+                _SELF_CONTAINED_GOALS,
+                "none",
             ),
             "decision_style": _normalize_choice(payload.get("decision_style"), _DECISION_STYLES, "pragmatic"),
             "resistance_level": _normalize_choice(payload.get("resistance_level"), _LEVELS, "medium"),

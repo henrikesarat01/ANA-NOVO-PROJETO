@@ -1,4 +1,5 @@
 offer_name: SAGA
+knowledge_product_slug: saga
 offer_type: software_whatsapp_automation
 offer_summary: software que organiza atendimento, triagem, jornada comercial e operação no WhatsApp
 primary_sale_motion: consultiva
@@ -40,6 +41,7 @@ pricing_validation:
     - nicho_ou_segmento
     - tipo_de_operacao
     - uso_atual_do_whatsapp
+    - principal_trava_operacional
     - exemplo_minimo_de_fluxo_aprovado
   optional_but_relevant_variables:
     - principal_trava_operacional
@@ -58,8 +60,8 @@ pricing_validation:
     - nicho_ou_segmento
     - tipo_de_operacao
     - uso_atual_do_whatsapp
-    - exemplo_minimo_de_fluxo_aprovado
     - principal_trava_operacional
+    - exemplo_minimo_de_fluxo_aprovado
     - fator_estrutural_de_complexidade
   variable_definitions:
     nicho_ou_segmento:
@@ -111,18 +113,16 @@ pricing_validation:
       reason: identificar o gargalo dominante
       changes: prioridade da solução e complexidade percebida
     exemplo_minimo_de_fluxo_aprovado:
-      known_fields:
-        - operation_model_known
-        - channel_usage_known
+      known_fields: []
       focus: exemplo_minimo_de_fluxo_aprovado
-      label: exemplo mínimo de fluxo validado
+      label: confirmação do fluxo proposto
       shape: approval_check
       constraints:
         - single_question
         - avoid_menu
         - avoid_taxonomy
-      reason: validar uma cena mínima antes de abrir valor
-      changes: confiança para sair do piso e abrir faixa
+      reason: validar um fluxo exemplo completo do SAGA no caso real, como último passo antes de abrir valor
+      changes: segurança para abrir faixa com base no fluxo que realmente será implantado
   price_release_modes:
     floor_only_after_minimum_validation: true
     range_only_after_context: true
@@ -147,6 +147,32 @@ pricing_contract:
     A: 1.0
     B: 1.2
     C: 1.5
+capability_mapping:
+  require_contextual_function_mapping_before_value: true
+  require_characteristic_translation: true
+  require_operational_gain_translation: true
+  prefer_dual_function_frame: true
+  max_functions_in_negotiation_frame: 2
+flow_validation:
+  require_minimal_flow_before_price: true
+  approval_variable: exemplo_minimo_de_fluxo_aprovado
+  require_capability_snapshot_before_flow_validation: true
+  flow_model_style: complete_saga_flow
+capability_runtime:
+  catalog_kind: capability_registry
+  primary_surface_keys:
+    - hero_capability
+    - primary_capability
+    - hero_saga_function
+    - primary_saga_function
+  secondary_surface_keys:
+    - support_capability
+    - secondary_capability
+    - support_saga_function
+    - secondary_saga_function
+  suggested_surface_keys:
+    - suggested_capability
+    - suggested_saga_function
 questioning_strategy:
   every_question_must_have_visible_reason: true
   reason_must_be_customer_facing: true

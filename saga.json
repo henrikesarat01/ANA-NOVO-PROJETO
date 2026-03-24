@@ -1,0 +1,355 @@
+{
+  "arsenal_id": "BPCF-ARSENAL-SAGA",
+  "identidade_do_produto": {
+    "nome": "SAGA",
+    "categoria": "sistema de atendimento, venda e acompanhamento no WhatsApp",
+    "o_que_e": "o SAGA é um sistema que transforma o WhatsApp da empresa numa operação organizada — ele atende o cliente com menus, botões e catálogos, monta pedidos, cobra pagamento, e mostra pra empresa tudo que está acontecendo num painel de controle",
+    "o_que_o_cliente_compra_de_verdade": "parar de depender de gente fazendo tudo na mão no WhatsApp e ter um sistema que atende, vende, cobra e mostra onde está cada conversa",
+    "o_que_nao_e": [
+      "não é só um chatbot que responde sim ou não",
+      "não é só disparo de mensagem em massa",
+      "não é só resposta automática solta sem contexto",
+      "não é um CRM genérico que não entende de WhatsApp",
+      "não é um sistema que substitui o humano — ele organiza o trabalho do humano"
+    ]
+  },
+  "verdade_operacional": {
+    "o_que_hoje_e_feito_na_mao": [
+      "responder as mesmas perguntas de preço, disponibilidade e condições o dia inteiro",
+      "mandar foto, vídeo e preço um por um em cada conversa",
+      "perguntar nome, endereço e dados do cliente tudo no texto",
+      "montar o pedido lendo mensagem por mensagem",
+      "gerar cobrança e ficar esperando o cliente confirmar se pagou",
+      "tentar lembrar quem mandou mensagem e não respondeu",
+      "não saber quantas pessoas desistiram no meio do caminho",
+      "não ter ideia de quanto dinheiro perdeu ou deixou de ganhar por falta de acompanhamento"
+    ],
+    "o_que_o_produto_faz_concretamente": [
+      "mostra um menu de botões pro cliente escolher o que quer logo de cara",
+      "exibe os produtos ou serviços em carrossel deslizável com foto, nome, preço e botão",
+      "mostra o catálogo inteiro organizado por categoria",
+      "coleta nome, endereço, preferências e dados do cliente em formulário estruturado",
+      "monta o pedido automaticamente conforme o cliente vai escolhendo",
+      "oferece as formas de pagamento e gera o PIX na hora",
+      "verifica sozinho se o pagamento caiu e avisa cliente e empresa",
+      "mostra o resumo do pedido pro cliente confirmar antes de fechar",
+      "quando o cliente para no meio, manda um áudio de voz automático pra trazer ele de volta",
+      "rastreia em qual etapa cada pessoa parou e lista os telefones pra recuperação",
+      "pontua e classifica cada lead como quente, morno ou frio",
+      "sugere o produto ou serviço certo pro perfil de cada cliente",
+      "direciona pra um atendente humano quando o automático não resolve",
+      "mostra tudo num painel com números, gráficos, funil e quadro de acompanhamento"
+    ],
+    "o_que_fica_visivel": [
+      "em que etapa cada conversa está (começou, viu produto, escolheu, pagou ou desistiu)",
+      "quem abandonou e em que momento exato parou",
+      "quem avançou e está perto de fechar",
+      "o que virou venda de verdade e quanto entrou de dinheiro",
+      "onde a operação trava (etapa que mais perde gente)",
+      "quais produtos ou serviços vendem mais e quais não saem",
+      "quais clientes estão sumindo e podem não voltar",
+      "quanto dinheiro a empresa está perdendo por abandono em cada etapa",
+      "a jornada completa de cada cliente do início ao fim"
+    ]
+  },
+  "explicacao_humana": {
+    "cena_simples": "a empresa recebe dezenas ou centenas de mensagens por dia no WhatsApp e hoje uma pessoa fica respondendo tudo na mão — mesmas perguntas, mesmos preços, mesmas fotos, pedido por pedido",
+    "antes": "conversa espalhada sem controle, atendente repetindo as mesmas respostas, cliente esperando, pedido montado na base da conversa, pagamento cobrado no improviso, sem saber quem desistiu nem por quê, sem números nenhum sobre o que está funcionando ou não",
+    "depois": "o cliente abre o WhatsApp, vê um menu organizado, escolhe o que quer num carrossel com fotos, preenche os dados, paga pelo PIX que aparece na hora, recebe confirmação automática — e se desistir no meio, recebe um áudio puxando ele de volta. A empresa vê tudo isso num painel: quantos entraram, quantos compraram, quem parou onde, quanto faturou, qual produto vende mais",
+    "prova_simples": "o cliente entra no WhatsApp, escolhe o produto deslizando cards com foto e preço, paga pelo PIX que aparece ali mesmo, recebe confirmação na hora — e a empresa acompanha tudo num painel sem precisar perguntar nada pra ninguém"
+  },
+  "promessa_central": {
+    "frase_curta": "o SAGA faz o WhatsApp da empresa deixar de ser improviso e virar operação",
+    "frase_comercial": "o SAGA transforma o WhatsApp em um canal organizado de atendimento, venda e acompanhamento — com catálogo visual, pagamento integrado, recuperação automática de desistentes e painel completo de controle"
+  },
+  "categorias": {
+    "mensagens": {
+      "titulo": "tipos de mensagem que o sistema sabe enviar",
+      "descricao": "tudo que o sistema consegue mandar dentro do WhatsApp, desde texto simples até carrossel de produtos",
+      "itens": [
+        {
+          "nome": "texto",
+          "explicacao": "manda uma mensagem de texto normal, como qualquer pessoa mandaria"
+        },
+        {
+          "nome": "imagem",
+          "explicacao": "manda uma foto com uma legenda embaixo se quiser"
+        },
+        {
+          "nome": "vídeo",
+          "explicacao": "manda um vídeo com legenda se quiser"
+        },
+        {
+          "nome": "áudio",
+          "explicacao": "manda um áudio de voz (aquela bolinha verde) ou um arquivo de som"
+        },
+        {
+          "nome": "documento",
+          "explicacao": "manda um arquivo tipo PDF, planilha ou documento"
+        },
+        {
+          "nome": "localização",
+          "explicacao": "manda um ponto no mapa com o endereço do lugar"
+        },
+        {
+          "nome": "contato",
+          "explicacao": "manda um cartão de contato com nome e telefone pronto pra salvar"
+        },
+        {
+          "nome": "lista",
+          "explicacao": "manda uma lista onde o cliente toca pra abrir e escolhe entre várias opções organizadas"
+        },
+        {
+          "nome": "botões",
+          "explicacao": "manda até 3 botões clicáveis embaixo da mensagem pro cliente escolher tocando"
+        },
+        {
+          "nome": "carrossel",
+          "explicacao": "manda vários cards lado a lado que o cliente desliza pro lado, cada card tem foto, título, preço e botão"
+        },
+        {
+          "nome": "formulário",
+          "explicacao": "manda um formulário dentro do WhatsApp onde o cliente preenche campos como nome, endereço e o que precisa"
+        },
+        {
+          "nome": "reação",
+          "explicacao": "coloca um emoji em cima de uma mensagem que já foi enviada"
+        },
+        {
+          "nome": "figurinha",
+          "explicacao": "manda uma figurinha animada ou parada"
+        }
+      ]
+    },
+    "atendimento_automatico": {
+      "titulo": "o que o sistema faz sozinho no atendimento",
+      "descricao": "tudo que acontece automaticamente quando o cliente manda mensagem, sem precisar de uma pessoa fazendo na mão",
+      "itens": [
+        {
+          "nome": "menu de entrada",
+          "explicacao": "quando o cliente manda a primeira mensagem, já aparece um menu com as opções do que ele pode fazer"
+        },
+        {
+          "nome": "catálogo de produtos ou serviços",
+          "explicacao": "mostra tudo que a empresa oferece organizado por categoria, com foto e preço, pro cliente escolher"
+        },
+        {
+          "nome": "detalhes do item",
+          "explicacao": "quando o cliente se interessa por algo, mostra a ficha completa: fotos, descrição, preço e especificações"
+        },
+        {
+          "nome": "coleta de dados",
+          "explicacao": "faz as perguntas certas pro cliente e guarda as respostas organizadas"
+        },
+        {
+          "nome": "montagem do pedido",
+          "explicacao": "conforme o cliente vai escolhendo, o sistema monta o pedido com todos os itens, quantidades e valores"
+        },
+        {
+          "nome": "confirmação do pedido",
+          "explicacao": "antes de fechar, mostra um resumo com tudo que o cliente escolheu, o valor total e pede pra ele confirmar"
+        },
+        {
+          "nome": "direcionamento pra humano",
+          "explicacao": "quando o automático não resolve, passa a conversa pra uma pessoa real atender"
+        }
+      ]
+    },
+    "pagamento": {
+      "titulo": "cobrança e pagamento pelo WhatsApp",
+      "descricao": "o cliente paga sem sair do WhatsApp e a empresa sabe na hora se o dinheiro caiu",
+      "itens": [
+        {
+          "nome": "seleção de pagamento",
+          "explicacao": "mostra as formas de pagamento disponíveis pro cliente escolher"
+        },
+        {
+          "nome": "geração de PIX",
+          "explicacao": "gera o QR Code do PIX automaticamente dentro do WhatsApp pro cliente pagar ali mesmo"
+        },
+        {
+          "nome": "verificação automática",
+          "explicacao": "confere sozinho se o pagamento caiu e avisa o cliente e a empresa quando o dinheiro entrou — sem precisar ficar perguntando"
+        }
+      ]
+    },
+    "recuperacao": {
+      "titulo": "recuperação de clientes que desistiram",
+      "descricao": "quando alguém começa mas não termina, o sistema tenta trazer de volta automaticamente",
+      "itens": [
+        {
+          "nome": "follow-up por áudio",
+          "explicacao": "quando o cliente para no meio do caminho, o sistema manda um áudio de voz automaticamente pra tentar trazer ele de volta"
+        },
+        {
+          "nome": "acompanhamento de abandono",
+          "explicacao": "o sistema sabe exatamente em qual etapa cada pessoa parou e mostra a lista de telefones pra empresa poder recuperar"
+        },
+        {
+          "nome": "nutrição de funil",
+          "explicacao": "envia conteúdos automáticos pro lead ao longo dos dias de acordo com o momento dele"
+        }
+      ]
+    },
+    "qualificacao": {
+      "titulo": "entender quem é o cliente e o que ele quer",
+      "descricao": "o sistema faz perguntas, analisa as respostas e classifica cada pessoa pra empresa saber em quem focar",
+      "itens": [
+        {
+          "nome": "qualificação por quiz",
+          "explicacao": "faz perguntas interativas pro cliente pra entender o perfil dele automaticamente"
+        },
+        {
+          "nome": "classificação de lead",
+          "explicacao": "com base nas respostas e no comportamento, pontua cada pessoa e classifica como quente, morno ou frio"
+        },
+        {
+          "nome": "recomendação inteligente",
+          "explicacao": "olha o perfil do cliente e sugere automaticamente o produto ou serviço que mais combina com o que ele precisa"
+        }
+      ]
+    },
+    "agendamento": {
+      "titulo": "agendamentos e reservas pelo WhatsApp",
+      "descricao": "o cliente marca horário ou faz reserva direto pela conversa no WhatsApp",
+      "itens": [
+        {
+          "nome": "agendamento",
+          "explicacao": "o cliente escolhe uma data e horário pra agendar um compromisso, tudo dentro da conversa do WhatsApp"
+        },
+        {
+          "nome": "reserva",
+          "explicacao": "o cliente faz uma reserva informando data, horário e detalhes — sem precisar ligar"
+        },
+        {
+          "nome": "inscrição em eventos",
+          "explicacao": "mostra os eventos disponíveis e o cliente se inscreve ali mesmo pelo WhatsApp"
+        }
+      ]
+    },
+    "painel_de_controle": {
+      "titulo": "painel de controle e acompanhamento",
+      "descricao": "tela onde a empresa vê tudo que está acontecendo: números, gráficos, funil, vendas, clientes, abandonos — tudo em tempo real",
+      "itens": [
+        {
+          "nome": "números em tempo real",
+          "explicacao": "cards mostrando os números principais na hora: total de pedidos, faturamento, ticket médio, taxa de conversão, leads, abandonos, clientes"
+        },
+        {
+          "nome": "filtro por período",
+          "explicacao": "botão pra escolher o período que quer ver: hoje, ontem, últimos 7 dias, mês, ou datas específicas"
+        },
+        {
+          "nome": "lista de pedidos",
+          "explicacao": "lista atualizada em tempo real com todos os pedidos feitos, mostrando itens, valor e status"
+        },
+        {
+          "nome": "funil de conversão",
+          "explicacao": "gráfico de funil que mostra quantas pessoas entraram, quantas avançaram em cada etapa e quantas compraram — fica claro onde o pessoal desiste"
+        },
+        {
+          "nome": "quadro kanban",
+          "explicacao": "quadro onde cada lead é um card e a empresa arrasta ele entre colunas conforme avança: novo → interessado → negociando → fechou"
+        },
+        {
+          "nome": "jornada do cliente",
+          "explicacao": "mostra passo a passo tudo que um cliente fez: que botão clicou, que texto mandou, que tela viu, em que horário — do começo ao fim"
+        },
+        {
+          "nome": "abandonos por etapa",
+          "explicacao": "mostra quantas pessoas desistiram em cada etapa e lista os telefones — pra empresa tentar recuperar"
+        },
+        {
+          "nome": "disparos em massa",
+          "explicacao": "envia mensagem pro WhatsApp de vários clientes de uma vez, podendo filtrar: todos, quem não compra há X dias, quem já comprou 2+ vezes, quem nunca comprou"
+        },
+        {
+          "nome": "ranking de produtos",
+          "explicacao": "mostra quais produtos ou serviços vendem mais, quanto cada um faturou e se estão subindo ou caindo"
+        },
+        {
+          "nome": "análise de pagamentos",
+          "explicacao": "mostra quanto entrou por cada forma de pagamento e a proporção entre elas"
+        },
+        {
+          "nome": "evolução de faturamento",
+          "explicacao": "gráfico mostrando como o faturamento evoluiu por dia, semana e mês — dá pra ver se está crescendo ou caindo"
+        },
+        {
+          "nome": "horários de pico",
+          "explicacao": "mostra em quais horários e dias da semana a empresa mais vende — ajuda a saber quando concentrar esforço"
+        },
+        {
+          "nome": "curva ABC",
+          "explicacao": "separa os produtos ou serviços em 3 grupos: os que mais faturam (A), os medianos (B) e os que quase não vendem (C)"
+        },
+        {
+          "nome": "análise de venda adicional",
+          "explicacao": "mostra quando um cliente compra algo a mais junto e qual combinação é mais comum"
+        },
+        {
+          "nome": "clientes novos vs recorrentes",
+          "explicacao": "separa quem é novo de quem já voltou, mostra quantas vezes cada um comprou e quanto cada cliente vale ao longo do tempo"
+        },
+        {
+          "nome": "dinheiro perdido por abandono",
+          "explicacao": "calcula em reais quanto a empresa deixou de faturar por causa de gente que desistiu em cada etapa"
+        },
+        {
+          "nome": "comparativo de período",
+          "explicacao": "compara os números de um período com o anterior — dá pra ver se está melhor ou pior"
+        },
+        {
+          "nome": "análise por região",
+          "explicacao": "mostra de quais regiões vêm mais pedidos, quanto cada uma fatura e qual o ticket médio"
+        },
+        {
+          "nome": "retenção de clientes",
+          "explicacao": "mostra quantos clientes continuaram comprando ao longo do tempo — dá pra ver se o pessoal volta ou some"
+        },
+        {
+          "nome": "evolução diária de conversões",
+          "explicacao": "gráfico dia a dia mostrando: quantos leads entraram → quantos avançaram → quantos compraram"
+        },
+        {
+          "nome": "sazonalidade",
+          "explicacao": "mostra quais dias vendem mais e se existe um padrão que se repete"
+        },
+        {
+          "nome": "clientes em risco",
+          "explicacao": "lista os clientes que não compram há muito tempo e marca o risco de perder cada um: baixo, médio ou alto"
+        },
+        {
+          "nome": "análise de margem",
+          "explicacao": "calcula o custo, a margem de lucro e quanto a empresa precisa vender pra pagar as contas"
+        },
+        {
+          "nome": "pareto de clientes",
+          "explicacao": "mostra que os 20% melhores clientes são responsáveis pela maior parte do faturamento total"
+        }
+      ]
+    },
+    "rastreamento": {
+      "titulo": "rastreamento de tudo que acontece",
+      "descricao": "o sistema registra cada ação de cada pessoa em cada conversa — nada se perde",
+      "itens": [
+        {
+          "nome": "rastreamento de sessão",
+          "explicacao": "registra automaticamente quando uma pessoa começou a conversar, o que fez e quando terminou ou desistiu"
+        },
+        {
+          "nome": "histórico de ações",
+          "explicacao": "grava tudo que a pessoa fez: que botão clicou, que texto mandou, que tela visitou, em que horário"
+        },
+        {
+          "nome": "registro de venda",
+          "explicacao": "marca quando um lead virou cliente e quanto pagou"
+        },
+        {
+          "nome": "registro de abandono",
+          "explicacao": "marca exatamente em qual etapa a pessoa parou e saiu"
+        }
+      ]
+    }
+  }
+}

@@ -21,8 +21,21 @@ _STAGE_DEFINITION_KEYS = {
     "response_contract",
 }
 
+_KNOWLEDGE_ROOT = DATA_DIR / "knowledge"
+_FRAMEWORKS_DIR = _KNOWLEDGE_ROOT / "frameworks"
+_PRODUCTS_DIR = _KNOWLEDGE_ROOT / "products"
+_DEFAULT_PRODUCT_SLUG = "saga"
 
-def load_json(path: Path) -> dict[str, Any]:
+_LEGACY_FRAMEWORK_PATH = _KNOWLEDGE_ROOT / "BPCF-BIDIRECTIONAL-PROBLEM-CAUSE-FRAMEWORK.json"
+_LEGACY_ARSENAL_PATHS = {
+    "saga": _KNOWLEDGE_ROOT / "BPCF-ARSENAL-SAGA.json",
+}
+_LEGACY_INVENTORY_PATHS = {
+    "saga": _KNOWLEDGE_ROOT / "saga_funcionalidades_inventario.md",
+}
+
+
+def load_json(path: Path) -> Any:
     return json.loads(path.read_text(encoding="utf-8"))
 
 
@@ -33,6 +46,55 @@ def load_yaml(path: Path) -> dict[str, Any]:
         return {}
     if not isinstance(payload, dict):
         raise ValueError(f"YAML invalido em {path}: esperado objeto no topo.")
+    return payload
+
+
+def _resolve_existing_path(primary: Path, fallback: Path | None = None) -> Path:
+    if primary.exists():
+        return primary
+    if fallback and fallback.exists():
+        return fallback
+    if fallback:
+        raise FileNotFoundError(f"arquivo de knowledge ausente: {primary} (fallback legado: {fallback})")
+    raise FileNotFoundError(f"arquivo de knowledge ausente: {primary}")
+
+
+def _product_dir(product_slug: str = _DEFAULT_PRODUCT_SLUG) -> Path:
+    return _PRODUCTS_DIR / product_slug.strip().lower()
+
+
+def get_bpcf_framework_path() -> Path:
+    primary = _FRAMEWORKS_DIR / "bpcf_bidirectional_problem_cause_framework.json"
+    return _resolve_existing_path(primary, _LEGACY_FRAMEWORK_PATH)
+
+
+def get_humanization_framework_path() -> Path:
+    primary = _FRAMEWORKS_DIR / "humanizacao.md"
+    return _resolve_existing_path(primary)
+
+
+def get_product_identity_path(product_slug: str = _DEFAULT_PRODUCT_SLUG) -> Path:
+    primary = _product_dir(product_slug) / "identidade_do_produto.json"
+    return _resolve_existing_path(primary)
+
+
+def get_product_arsenal_path(product_slug: str = _DEFAULT_PRODUCT_SLUG) -> Path:
+    slug = product_slug.strip().lower()
+    primary = _product_dir(slug) / "arsenal_comercial.json"
+    return _resolve_existing_path(primary, _LEGACY_ARSENAL_PATHS.get(slug))
+
+
+def get_product_inventory_path(product_slug: str = _DEFAULT_PRODUCT_SLUG) -> Path:
+    slug = product_slug.strip().lower()
+    primary = _product_dir(slug) / "inventario_de_funcionalidades.json"
+    return _resolve_existing_path(primary, _LEGACY_INVENTORY_PATHS.get(slug))
+
+
+@lru_cache(maxsize=16)
+def load_product_identity(product_slug: str = _DEFAULT_PRODUCT_SLUG) -> dict[str, Any]:
+    payload = load_json(get_product_identity_path(product_slug))
+    if not isinstance(payload, dict):
+        raise ValueError("identidade do produto invalida: esperado objeto JSON no topo")
     return payload
 
 
@@ -49,11 +111,21 @@ def load_stage_definitions() -> dict[str, StageDefinition]:
 
 
 def load_bpcf_framework() -> dict[str, Any]:
-    return load_json(DATA_DIR / "knowledge" / "BPCF-BIDIRECTIONAL-PROBLEM-CAUSE-FRAMEWORK.json")
+    payload = load_json(get_bpcf_framework_path())
+    if not isinstance(payload, dict):
+        raise ValueError("framework BPCF invalido: esperado objeto JSON no topo")
+    return payload
 
 
-def load_arsenal_entries() -> list[ArsenalEntry]:
-    payload = load_json(DATA_DIR / "knowledge" / "BPCF-ARSENAL-SAGA.json")
+@lru_cache(maxsize=1)
+def load_humanization_framework() -> str:
+    return get_humanization_framework_path().read_text(encoding="utf-8").strip()
+
+
+def load_arsenal_entries(product_slug: str = _DEFAULT_PRODUCT_SLUG) -> list[ArsenalEntry]:
+    payload = load_json(get_product_arsenal_path(product_slug))
+    if not isinstance(payload, dict):
+        raise ValueError("arsenal comercial invalido: esperado objeto JSON no topo")
     items: list[ArsenalEntry] = []
     categories = payload.get("categorias", {})
     for category_name, blocks in categories.items():
@@ -74,8 +146,7 @@ def load_arsenal_entries() -> list[ArsenalEntry]:
     return items
 
 
-def load_product_inventory() -> list[ProductFact]:
-    path = DATA_DIR / "knowledge" / "saga_funcionalidades_inventario.md"
+def _load_inventory_from_markdown(path: Path) -> list[ProductFact]:
     section = "geral"
     facts: list[ProductFact] = []
     for raw_line in path.read_text(encoding="utf-8").splitlines():
@@ -90,3 +161,39 @@ def load_product_inventory() -> list[ProductFact]:
             name = title_part.replace("**", "").strip()
             facts.append(ProductFact(section=section, name=name, description=desc.strip()))
     return facts
+
+
+def _load_inventory_from_json(path: Path) -> list[ProductFact]:
+    payload = load_json(path)
+    if not isinstance(payload, dict):
+        raise ValueError("inventario de funcionalidades invalido: esperado objeto JSON no topo")
+    categories = payload.get("categorias", {})
+    facts: list[ProductFact] = []
+    for section, block in categories.items():
+        if not isinstance(block, dict):
+            continue
+        section_hint = " ".join(
+            part.strip()
+            for part in [
+                str(block.get("titulo", "") or "").strip(),
+                str(block.get("descricao", "") or "").strip(),
+            ]
+            if part and part.strip()
+        )
+        for item in block.get("itens", []):
+            if not isinstance(item, dict):
+                continue
+            name = str(item.get("nome", "") or "").strip()
+            description = str(item.get("explicacao", "") or "").strip()
+            if not name or not description:
+                continue
+            full_description = " ".join(part for part in [section_hint, description] if part)
+            facts.append(ProductFact(section=section, name=name, description=full_description))
+    return facts
+
+
+def load_product_inventory(product_slug: str = _DEFAULT_PRODUCT_SLUG) -> list[ProductFact]:
+    path = get_product_inventory_path(product_slug)
+    if path.suffix.lower() == ".md":
+        return _load_inventory_from_markdown(path)
+    return _load_inventory_from_json(path)

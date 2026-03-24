@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from difflib import SequenceMatcher
 import re
 from typing import Any
 
@@ -36,7 +37,7 @@ class ResponseEnforcer:
         cleaned = _clean_text(segment)
         if not cleaned:
             return False
-        return "?" in cleaned
+        return bool(re.search(r"\?\s*[\"'”’)\]]*$", cleaned))
 
     def _question_segments(self, response: str) -> list[str]:
         return [segment for segment in self.split_response_segments(response) if self.looks_like_question_segment(segment)]
@@ -97,9 +98,46 @@ class ResponseEnforcer:
         policy = self.service.state.response_policy or {}
         return bool(policy.get("must_ask", False))
 
+    def _price_response_mode(self) -> str:
+        pricing_policy = self.service.state.pricing_policy or {}
+        return _clean_text(pricing_policy.get("price_response_mode", ""))
+
     def _social_hold(self) -> bool:
         policy = self.service.state.response_policy or {}
         return bool(policy.get("social_opening_only", False))
+
+    def _last_assistant_message(self) -> str:
+        return _clean_text(getattr(self.service.state, "last_assistant_message", ""))
+
+    @staticmethod
+    def _similarity_text(value: str) -> str:
+        cleaned = _clean_text(value).lower()
+        cleaned = re.sub(r"[^\w\s]", " ", cleaned)
+        return re.sub(r"\s+", " ", cleaned).strip()
+
+    def _looks_repetitive_against_last_assistant(self, response: str) -> bool:
+        previous = self._last_assistant_message()
+        current = _clean_text(response)
+        if not previous or not current:
+            return False
+        if len(previous.split()) < 12 or len(current.split()) < 12:
+            return False
+        previous_norm = self._similarity_text(previous)
+        current_norm = self._similarity_text(current)
+        if not previous_norm or not current_norm:
+            return False
+        ratio = SequenceMatcher(None, previous_norm, current_norm).ratio()
+        previous_tokens = set(previous_norm.split())
+        current_tokens = set(current_norm.split())
+        if not previous_tokens or not current_tokens:
+            return ratio >= 0.72
+        overlap_prev = len(previous_tokens & current_tokens) / max(1, len(previous_tokens))
+        overlap_cur = len(previous_tokens & current_tokens) / max(1, len(current_tokens))
+        return ratio >= 0.72 or (overlap_prev >= 0.5 and overlap_cur >= 0.68)
+
+    @staticmethod
+    def _contains_explicit_price(text: str) -> bool:
+        return bool(re.search(r"\bR\$\s*\d", text))
 
     def enforce(self, response: str) -> str:
         return self.enforce_with_trace(response).response
@@ -108,6 +146,22 @@ class ResponseEnforcer:
         text = _clean_text(response)
         if not text:
             return EnforcementDecision(response="", reason="empty", needs_repair=False)
+
+        if self._price_response_mode() == "block_price" and self._contains_explicit_price(text):
+            return EnforcementDecision(
+                response=text,
+                reason="needs_repair_blocked_price_leak",
+                needs_repair=True,
+                violation_type="blocked_price_leak",
+            )
+
+        if not self._social_hold() and self._looks_repetitive_against_last_assistant(text):
+            return EnforcementDecision(
+                response=text,
+                reason="needs_repair_repetitive_response",
+                needs_repair=True,
+                violation_type="repetition",
+            )
 
         question_budget = self._question_budget()
         must_ask = self._must_ask()

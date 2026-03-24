@@ -184,6 +184,7 @@ class ConversationPolicyEngine:
             "complementary_saga_functions": [],
             "response_tone_hint": "",
             "explanation_style_hint": "",
+            "explain_scope": "",
         }
         return policy
 
@@ -242,6 +243,88 @@ class ConversationPolicyEngine:
                 "question_will_change_what": "",
                 "response_tone_hint": "direto, presente e sem puxar trilho comercial",
                 "explanation_style_hint": "responda o ponto do cliente antes de aprofundar o caso",
+                "explain_scope": "reply_only",
+            }
+        )
+        self_contained_goal = _clean_text(neural_state.get("self_contained_goal", ""))
+        if self_contained_goal == "offer_explanation":
+            policy.update(
+                {
+                    "response_tone_hint": "explique curto, concreto e sem apresentação",
+                    "explanation_style_hint": "explique em poucas linhas o que é e como aparece na rotina",
+                    "explain_scope": "product_identity_short",
+                }
+            )
+        elif self_contained_goal == "ownership_check":
+            policy.update(
+                {
+                    "response_tone_hint": "confirme de forma simples e siga leve",
+                    "explanation_style_hint": "se precisar, acrescente no máximo uma linha simples do que é",
+                    "explain_scope": "product_identity_short",
+                }
+            )
+        elif self_contained_goal == "availability_check":
+            policy.update(
+                {
+                    "response_tone_hint": "responda disponibilidade de forma direta",
+                    "explanation_style_hint": "responda só se está pronto e pare",
+                    "explain_scope": "reply_only",
+                }
+            )
+        return policy
+
+    def _should_explain_offer_first(self, state: ConversationState, policy: dict[str, Any]) -> bool:
+        if policy.get("commercial_direct_question_detected", False):
+            return False
+        neural_state = state.neural_state or {}
+        lead_summary = state.lead_summary or {}
+        architecture = state.offer_sales_architecture or {}
+        explanation_strategy = architecture.get("explanation_strategy", {}) if isinstance(architecture.get("explanation_strategy", {}), dict) else {}
+
+        if not bool(explanation_strategy.get("explain_what_it_is_early", False)):
+            return False
+        if self._answer_scope(state) == "self_contained":
+            return False
+        if bool(lead_summary.get("pain_known", False)) or bool(lead_summary.get("impact_known", False)):
+            return False
+
+        communicative_intent = _clean_text(neural_state.get("communicative_intent", ""))
+        if communicative_intent not in {"explore", "clarify", "validate_fit", "compare", "implementation"}:
+            return False
+
+        transition_permission = _clean_text(neural_state.get("transition_permission", ""))
+        if transition_permission == "hold":
+            return False
+
+        return True
+
+    def _offer_explanation_policy(self, state: ConversationState, policy: dict[str, Any]) -> dict[str, Any]:
+        neural_state = state.neural_state or {}
+        transition_reason = _clean_text(neural_state.get("transition_reason", ""))
+        policy.update(
+            {
+                "response_mode": "explain",
+                "main_intention": "advance_solution",
+                "question_goal": "none",
+                "question_type": "none",
+                "question_budget": 0,
+                "question_variable": "",
+                "question_shape": "",
+                "question_constraints": (),
+                "question_focus": "",
+                "question_anchor": "",
+                "question_label": "",
+                "must_ask": False,
+                "optional_ask": False,
+                "answer_now_instead_of_asking": True,
+                "enough_context_to_move": False,
+                "enough_context_for_pricing_response": False,
+                "ask_reason": transition_reason,
+                "question_context_hint": "",
+                "question_will_change_what": "",
+                "response_tone_hint": "explique com clareza concreta antes de abrir discovery",
+                "explanation_style_hint": "diga o que o produto é, o que ele faz na rotina e o que muda na prática, sem abstracao vazia",
+                "explain_scope": "product_identity_full",
             }
         )
         return policy
@@ -385,6 +468,13 @@ class ConversationPolicyEngine:
                     "enough_context_for_pricing_response": True,
                 }
             )
+            if bool(pricing_policy.get("flow_example_just_approved", False)):
+                policy.update(
+                    {
+                        "response_tone_hint": "a ultima lacuna acabou de fechar; responda valor sem dar outra volta",
+                        "explanation_style_hint": "abra a faixa agora e, no maximo, uma linha curta do que mais muda o valor",
+                    }
+                )
         return policy
 
     def _context_contract(self, state: ConversationState) -> dict[str, Any]:
@@ -526,6 +616,8 @@ class ConversationPolicyEngine:
             and not policy.get("policy_used_pricing_gate", False)
         ):
             policy = self._self_contained_answer_policy(state, policy)
+        elif self._should_explain_offer_first(state, policy):
+            policy = self._offer_explanation_policy(state, policy)
         elif policy.get("response_mode") not in {"pricing_answer", "ask"} or not policy.get("policy_used_pricing_gate", False):
             policy = self._default_question_policy(state, policy)
 

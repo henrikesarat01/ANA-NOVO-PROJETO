@@ -4,6 +4,16 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from ana_saga_cli.domain.stage_ids import STAGE_ORDER
+from ana_saga_cli.knowledge.loader import (
+    load_humanization_framework,
+    load_product_identity,
+    load_product_inventory,
+)
+from ana_saga_cli.knowledge.retriever import InventoryRetriever
+from ana_saga_cli.sales.capability_contract import (
+    read_primary_capability,
+    read_secondary_capability,
+)
 
 
 def _clean_text(value: object) -> str:
@@ -64,27 +74,48 @@ class ConversationTurnRunner:
         self.service = service
 
     def _repair_instructions(self) -> str:
-        return """REPAIR DE SUPERFÍCIE
+        humanization = load_humanization_framework()
+        base = """REPAIR DE SUPERFÍCIE
 Reescreva a resposta mantendo os mesmos fatos, o mesmo sentido central e o mesmo idioma.
 Corrija apenas forma.
 Não invente contexto.
 Não explique bastidor.
 Se houver pergunta, faça no máximo uma e deixe natural.
 Se a restrição do turno proibir pergunta, remova a pergunta sem substituir por formulário.
+Se o contrato do turno bloquear preço, remova número, faixa, moeda e condição comercial; mantenha no máximo uma frase curta de contexto e a pergunta necessária.
+Se o turno estiver validando um fluxo, mantenha o exemplo completo do fluxo já descrito e encurte só a pergunta final; não mude para outra lacuna.
+Se a nova resposta estiver parecida demais com a fala anterior da ANA, responda só o ponto novo do turno e mude a formulação.
+Nunca use rótulo interno, nome de variável ou linguagem de bastidor.
 """
+        if humanization:
+            return f"{base}\nCONTRATO DE HUMANIZAÇÃO\n{humanization}"
+        return base
 
     def _repair_input(self, raw_response: str, violation_type: str) -> str:
         policy = self.service.state.response_policy or {}
+        pricing_policy = self.service.state.pricing_policy or {}
+        question_shape = _clean_text(policy.get("question_shape", ""))
+        if question_shape == "approval_check":
+            surface_focus = "validar se o fluxo exemplo completo do SAGA faz sentido no caso do cliente"
+        else:
+            surface_focus = _clean_text(policy.get("question_variable", ""))
         lines = [
+            "MENSAGEM ATUAL DO CLIENTE",
+            _clean_text(self.service.state.turns[-1].content if self.service.state.turns else ""),
+            "",
+            "ÚLTIMA RESPOSTA DA ANA",
+            _clean_text(self.service.state.last_assistant_message),
+            "",
             "RESPOSTA ORIGINAL",
             raw_response,
             "",
             "CONTRATO DO TURNO",
             f"- response_mode={policy.get('response_mode', '')}",
+            f"- price_response_mode={pricing_policy.get('price_response_mode', '')}",
             f"- question_budget={policy.get('question_budget', 0)}",
             f"- must_ask={bool(policy.get('must_ask', False))}",
             f"- question_goal={policy.get('question_goal', '')}",
-            f"- question_variable={policy.get('question_variable', '')}",
+            f"- question_focus={surface_focus}",
             f"- question_shape={policy.get('question_shape', '')}",
             f"- question_constraints={' | '.join(policy.get('question_constraints', ()) or ())}",
             f"- violation_type={violation_type}",
@@ -317,25 +348,84 @@ Se a restrição do turno proibir pergunta, remova a pergunta sem substituir por
             return f"{narrative}. {user_message}"
         return user_message
 
+    def _knowledge_product_slug(self) -> str:
+        architecture = self.service.state.offer_sales_architecture or {}
+        slug = _clean_text(architecture.get("knowledge_product_slug", ""))
+        if slug:
+            return slug
+        return _clean_text(architecture.get("offer_name", "")).lower().replace(" ", "_") or "saga"
+
+    def _load_product_knowledge(self) -> tuple[dict[str, Any], list[Any]]:
+        slug = self._knowledge_product_slug()
+        identity: dict[str, Any] = {}
+        inventory: list[Any] = []
+        try:
+            identity = load_product_identity(slug)
+        except FileNotFoundError:
+            identity = {}
+        try:
+            inventory = load_product_inventory(slug)
+        except FileNotFoundError:
+            inventory = []
+        return identity, inventory
+
+    def _allow_capability_grounding(self) -> bool:
+        state = self.service.state
+        response_policy = state.response_policy or {}
+        pricing_policy = state.pricing_policy or {}
+        lead_summary = state.lead_summary or {}
+
+        if _clean_text(response_policy.get("response_mode", "")) == "pricing_answer":
+            return True
+        if _clean_text(response_policy.get("question_goal", "")) in {"pricing", "fit"}:
+            return True
+        if bool(lead_summary.get("pain_known", False)) or bool(lead_summary.get("impact_known", False)):
+            return True
+        if _clean_text(pricing_policy.get("price_response_mode", "")) == "block_price" and bool(
+            lead_summary.get("minimum_context_ready", False)
+        ):
+            return True
+        return False
+
     def _run_capability_pricing_phase(self, start: _TurnStart) -> dict[str, Any]:
         service = self.service
         query = self._build_capability_query(start.user_message)
-        arsenal_hits = service.arsenal_retriever.top_hits(query, limit=service.config.max_arsenal_hits)
-        surface_guidance = service.surface_response_planner.update_state(service.state, start.user_message, arsenal_hits)
+        product_identity, inventory_facts = self._load_product_knowledge()
+        inventory_hits = InventoryRetriever(inventory_facts).top_facts(query, limit=6) if inventory_facts else []
+        arsenal_hits = service.arsenal_retriever.top_hits(
+            query,
+            limit=max(int(service.config.max_arsenal_hits or 0), 12),
+        )
+        grounding_hits = arsenal_hits if self._allow_capability_grounding() else []
+        surface_guidance = service.surface_response_planner.update_state(service.state, start.user_message, grounding_hits)
+        offer_context = service.offer_sales_architecture_resolver.build_offer_context(
+            service.state,
+            grounding_hits,
+            product_identity=product_identity,
+            inventory_hits=inventory_hits,
+        )
+        primary_capability = read_primary_capability(surface_guidance, service.state.offer_sales_architecture or {})
+        secondary_capability = read_secondary_capability(surface_guidance, service.state.offer_sales_architecture or {})
         service._add_trace(
             start.debug_trace,
             "pipeline.capability_pricing",
             hits=service._hit_names(arsenal_hits),
             count=len(arsenal_hits),
-            hero_function=surface_guidance.get("hero_saga_function", "-"),
-            support_function=surface_guidance.get("support_saga_function", "-"),
+            hero_function=primary_capability or "-",
+            support_function=secondary_capability or "-",
+            selected_capabilities=offer_context.get("selected_capabilities", []),
+            inventory_hits=[getattr(fact, "name", "") for fact in inventory_hits[:4]],
+            product_grounding_ready=offer_context.get("product_knowledge_ready", False),
+            flow_validation_status=offer_context.get("flow_validation_status", "-"),
+            flow_validation_pending=offer_context.get("flow_validation_pending", False),
             opening=surface_guidance.get("response_opening", "-"),
             brevity=surface_guidance.get("brevity_mode", "-"),
         )
         return {
             "arsenal_hits": arsenal_hits,
             "surface_guidance": surface_guidance,
-            "inventory_hits": [],
+            "offer_context": offer_context,
+            "inventory_hits": inventory_hits,
             "inventory_query": query,
         }
 

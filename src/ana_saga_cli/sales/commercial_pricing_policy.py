@@ -45,9 +45,68 @@ class CommercialPricingPolicyEngine:
                 return contract
         return {}
 
-    def _known_variables(self, state: ConversationState) -> dict[str, bool]:
+    def _approval_variable(self, state: ConversationState) -> str:
+        architecture = state.offer_sales_architecture or {}
+        flow_validation = architecture.get("flow_validation", {}) if isinstance(architecture.get("flow_validation", {}), dict) else {}
+        return _clean_text(flow_validation.get("approval_variable", "exemplo_minimo_de_fluxo_aprovado")) or "exemplo_minimo_de_fluxo_aprovado"
+
+    def _flow_example_confirmed_from_previous_turn(
+        self,
+        state: ConversationState,
+        approval_variable: str,
+    ) -> bool:
+        previous_policy = state.response_policy or {}
+        neural_state = state.neural_state or {}
+        lead_summary = state.lead_summary or {}
+        if _clean_text(previous_policy.get("response_mode", "")) != "ask":
+            return False
+        if _clean_text(previous_policy.get("question_variable", "")) != approval_variable:
+            return False
+        if _clean_text(previous_policy.get("question_shape", "")) != "approval_check":
+            return False
+        latest_user_message = _clean_text(state.turns[-1].content if state.turns else "")
+        latest_user_has_question = "?" in latest_user_message
+        latest_user_is_short_confirmation = bool(latest_user_message) and len(latest_user_message.split()) <= 6
+        communicative_intent = _clean_text(neural_state.get("communicative_intent", ""))
+        semantic_confirmation = communicative_intent in {"validate_fit", "advance"}
+        practical_confirmation = (
+            communicative_intent in {"price_check", "implementation", "clarify"}
+            and latest_user_is_short_confirmation
+            and not latest_user_has_question
+            and bool(lead_summary.get("pain_known", False))
+            and bool(lead_summary.get("impact_known", False))
+        )
+        if not (semantic_confirmation or practical_confirmation):
+            return False
+        return bool(
+            lead_summary.get("operation_model_known", False)
+            and lead_summary.get("channel_usage_known", False)
+        )
+
+    def _sync_flow_validation_state(self, state: ConversationState, approval_variable: str) -> bool:
+        hypotheses = dict(state.diagnostic_hypotheses or {})
+        offer_context = dict(state.offer_context or {})
+        flow_already_approved = _safe_bool(
+            hypotheses.get("exemplo_minimo_fluxo_aprovado"),
+            hypotheses.get("flow_example_approved"),
+            _clean_text(offer_context.get("flow_validation_status", "")) == "approved",
+        )
+        if not flow_already_approved and self._flow_example_confirmed_from_previous_turn(state, approval_variable):
+            hypotheses["exemplo_minimo_fluxo_aprovado"] = True
+            hypotheses["flow_example_approved"] = True
+            state.diagnostic_hypotheses = hypotheses
+            offer_context["flow_validation_variable"] = approval_variable
+            offer_context["flow_validation_status"] = "approved"
+            offer_context["flow_validation_pending"] = False
+            offer_context["flow_validation_ready"] = True
+            state.offer_context = offer_context
+            return True
+        return False
+
+    def _known_variables(self, state: ConversationState, approval_variable: str) -> dict[str, bool]:
         lead_summary = state.lead_summary or {}
         hypotheses = state.diagnostic_hypotheses or {}
+        offer_context = state.offer_context or {}
         flows_known = _safe_bool(
             hypotheses.get("quantidade_fluxos_known"),
             hypotheses.get("flows_known"),
@@ -62,19 +121,17 @@ class CommercialPricingPolicyEngine:
             hypotheses.get("fechamento_no_whatsapp_ou_triagem_known"),
             hypotheses.get("closing_channel_known"),
         )
-        return {
+        known_variables = {
             "nicho_ou_segmento": bool(lead_summary.get("niche_known", False)),
-            "tipo_de_operacao": _safe_bool(
-                lead_summary.get("operation_model_known", False),
-                lead_summary.get("offer_known", False),
+            "tipo_de_operacao": bool(lead_summary.get("operation_model_known", False)),
+            "uso_atual_do_whatsapp": bool(
+                lead_summary.get("channel_usage_known", False)
+                and (
+                    lead_summary.get("operation_model_known", False)
+                    or lead_summary.get("customer_type_known", False)
+                )
             ),
-            "uso_atual_do_whatsapp": bool(lead_summary.get("channel_usage_known", False)),
             "principal_trava_operacional": bool(lead_summary.get("pain_known", False)),
-            "exemplo_minimo_de_fluxo_aprovado": _safe_bool(
-                hypotheses.get("exemplo_minimo_fluxo_aprovado", False),
-                hypotheses.get("flow_example_approved", False),
-                lead_summary.get("operation_model_known", False) and lead_summary.get("channel_usage_known", False),
-            ),
             "quantidade_de_fluxos": bool(flows_known),
             "necessidade_de_integracao": bool(integration_known),
             "fechamento_no_whatsapp_ou_triagem": bool(closing_known),
@@ -83,6 +140,12 @@ class CommercialPricingPolicyEngine:
             "quantidade_de_jornadas": bool(flows_known),
             "fator_estrutural_de_complexidade": bool(integration_known or flows_known),
         }
+        known_variables[approval_variable] = _safe_bool(
+            hypotheses.get("exemplo_minimo_fluxo_aprovado", False),
+            hypotheses.get("flow_example_approved", False),
+            _clean_text(offer_context.get("flow_validation_status", "")) == "approved",
+        )
+        return known_variables
 
     def _journey_mode(self, state: ConversationState) -> str:
         saga_mode = _clean_text((state.diagnostic_hypotheses or {}).get("saga_mode", ""))
@@ -147,10 +210,12 @@ class CommercialPricingPolicyEngine:
         lead_summary = state.lead_summary or {}
         counterparty = state.counterparty_model or {}
         response_policy = state.response_policy or {}
+        approval_variable = self._approval_variable(state)
+        flow_example_just_approved = self._sync_flow_validation_state(state, approval_variable)
         pricing_validation = architecture.get("pricing_validation", {}) if isinstance(architecture.get("pricing_validation", {}), dict) else {}
         price_release_modes = pricing_validation.get("price_release_modes", {}) if isinstance(pricing_validation.get("price_release_modes", {}), dict) else {}
         variable_definitions = pricing_validation.get("variable_definitions", {}) if isinstance(pricing_validation.get("variable_definitions", {}), dict) else {}
-        known_variables = self._known_variables(state)
+        known_variables = self._known_variables(state, approval_variable)
 
         minimum_required = [item for item in pricing_validation.get("minimum_required_variables", []) if _clean_text(item)]
         preferred_sequence = [item for item in pricing_validation.get("preferred_question_sequence", []) if _clean_text(item)]
@@ -244,6 +309,7 @@ class CommercialPricingPolicyEngine:
         if question_contract:
             constraints = _unique_list(constraints + [item for item in question_contract.get("constraints", []) if _clean_text(item)])
 
+        offer_context = state.offer_context or {}
         pricing_policy = {
             "pricing_validation": pricing_validation,
             "pricing_contract": pricing_contract,
@@ -317,9 +383,15 @@ class CommercialPricingPolicyEngine:
                 if _clean_text(item)
             ],
             "monthly_billing_starts": _clean_text(pricing_contract.get("monthly_billing_starts", "")),
-            "capability_statuses": {},
+            "capability_statuses": {
+                "selected_capabilities": list(offer_context.get("selected_capabilities", []) or []),
+                "capability_snapshot_ready": bool(offer_context.get("capability_snapshot_ready", False)),
+                "capability_negotiation_ready": bool(offer_context.get("capability_negotiation_ready", False)),
+                "flow_validation_status": _clean_text(offer_context.get("flow_validation_status", "")),
+            },
             "known_variables": known_variables,
-            "flow_example_approved": bool(known_variables.get("exemplo_minimo_de_fluxo_aprovado", False)),
+            "flow_example_approved": bool(known_variables.get(approval_variable, False)),
+            "flow_example_just_approved": flow_example_just_approved,
         }
         state.pricing_policy = pricing_policy
         return pricing_policy

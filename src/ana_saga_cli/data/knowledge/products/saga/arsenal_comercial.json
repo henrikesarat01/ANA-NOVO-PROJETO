@@ -1,0 +1,1069 @@
+{
+  "arsenal_id": "BPCF-ARSENAL-SAGA",
+  "arsenal_name": "Arsenal BPCF — Mapa Completo de Funcionalidades SAGA",
+  "version": "1.0",
+  "description": "Mapeamento bidirecional RAIZ ← CAUSA ← [PROBLEMA] → CARACTERÍSTICA → PRODUTO para TODAS as funcionalidades da plataforma SAGA. Cada funcionalidade é uma CARACTERÍSTICA QUE RESOLVE, com problemas universais (sem nicho específico) escritos em linguagem visceral e profissional.",
+  "regras_de_uso": {
+    "1_lookup_por_segmento": "O motor _atualizar_mapa_bpcf consulta este arsenal como lookup — seleciona APENAS os problemas relevantes ao segmento detectado do cliente",
+    "2_nunca_carregar_tudo": "NUNCA injetar o arsenal inteiro no prompt. Selecionar no máximo 5-8 entradas por turno, priorizando as mais relevantes ao contexto da conversa",
+    "3_adaptar_linguagem": "Os problemas aqui são templates universais — o motor deve ADAPTAR ao segmento real do cliente (ex: 'produto' → 'furadeira' se for loja de ferramentas)",
+    "4_escavacao_interna": "CAUSA e RAIZ são INTERNAS — NUNCA verbalizar ao cliente. Usar apenas para guiar perguntas e construir narrativa",
+    "5_acumular_mapa": "Cada problema identificado na conversa é comparado com este arsenal para encontrar a conexão CARACTERÍSTICA → PRODUTO mais precisa"
+  },
+  "categorias_de_comparacao": [
+    {
+      "id": "ferramenta_generica",
+      "descricao": "cliente compara o produto com uma ferramenta ampla, base técnica ou solução genérica que exige montagem por cima",
+      "intencao_real_do_cliente": "entender se está vendo um produto pronto ou uma base que precisa ser montada",
+      "tipo_de_duvida": "natureza_da_solucao",
+      "o_que_precisa_ficar_claro": [
+        "se o produto é proprio ou depende de motor terceiro",
+        "se entrega operação pronta ou exige montagem",
+        "se integra com sistemas externos",
+        "do que a integração depende"
+      ],
+      "limites_de_resposta": [
+        "não desmerecer a outra categoria",
+        "não responder com jargão técnico",
+        "explicar a diferença pela rotina"
+      ],
+      "eixos_de_diferenciacao": [
+        "produto_pronto_vs_ferramenta_base",
+        "operacao_pronta_vs_montagem",
+        "uso_direto_vs_dependencia_tecnica"
+      ]
+    },
+    {
+      "id": "concorrente_direto",
+      "descricao": "cliente compara com outro produto que resolve o mesmo problema final",
+      "intencao_real_do_cliente": "entender diferença de escopo, resultado e valor",
+      "tipo_de_duvida": "diferenciacao_de_oferta",
+      "o_que_precisa_ficar_claro": [
+        "diferença de escopo",
+        "diferença de profundidade da solução",
+        "diferença de resultado operacional"
+      ],
+      "limites_de_resposta": [
+        "não atacar concorrente",
+        "não responder só por preço",
+        "trazer diferença concreta de rotina"
+      ],
+      "eixos_de_diferenciacao": [
+        "escopo",
+        "profundidade",
+        "resultado"
+      ]
+    },
+    {
+      "id": "alternativa_manual",
+      "descricao": "cliente compara com o jeito atual de fazer na mão, no improviso ou em planilha",
+      "intencao_real_do_cliente": "medir se vale a pena trocar o atual pelo produto",
+      "tipo_de_duvida": "substituicao_de_rotina",
+      "o_que_precisa_ficar_claro": [
+        "o que hoje é manual",
+        "o que o produto reduz ou assume",
+        "o que fica visível depois"
+      ],
+      "limites_de_resposta": [
+        "não humilhar a operação atual",
+        "não soar aula de gestão",
+        "falar do antes e depois de forma simples"
+      ],
+      "eixos_de_diferenciacao": [
+        "manual_vs_estruturado",
+        "memoria_humana_vs_sistema",
+        "improviso_vs_visibilidade"
+      ]
+    },
+    {
+      "id": "sistema_legado",
+      "descricao": "cliente compara com o sistema atual que já usa, mas que está limitado ou mal encaixado",
+      "intencao_real_do_cliente": "entender se vale migrar do que já existe",
+      "tipo_de_duvida": "migracao",
+      "o_que_precisa_ficar_claro": [
+        "onde o atual trava",
+        "o que o novo resolve melhor",
+        "como a transição impacta a rotina"
+      ],
+      "limites_de_resposta": [
+        "não presumir desastre no sistema atual",
+        "não prometer migração sem custo",
+        "explicar ganho prático"
+      ],
+      "eixos_de_diferenciacao": [
+        "limite_atual_vs_flexibilidade",
+        "processo_quebrado_vs_fluxo_continuo",
+        "opacidade_vs_visibilidade"
+      ]
+    },
+    {
+      "id": "modulo_isolado",
+      "descricao": "cliente compara com uma ferramenta que resolve só uma parte do problema",
+      "intencao_real_do_cliente": "entender se precisa de algo maior que um módulo pontual",
+      "tipo_de_duvida": "escopo_da_solucao",
+      "o_que_precisa_ficar_claro": [
+        "que parte a alternativa cobre",
+        "que parte continua descoberta",
+        "qual diferença entre resolver pedaço e resolver operação"
+      ],
+      "limites_de_resposta": [
+        "não diminuir solução parcial",
+        "não exagerar o problema",
+        "mostrar lacuna operacional real"
+      ],
+      "eixos_de_diferenciacao": [
+        "parte_vs_operacao_inteira",
+        "ferramenta_pontual_vs_fluxo_completo",
+        "efeito_local_vs_resultado_global"
+      ]
+    },
+    {
+      "id": "servico_humano",
+      "descricao": "cliente compara com contratar pessoa, agência, freelancer ou time interno",
+      "intencao_real_do_cliente": "entender o que o produto substitui, reduz ou organiza no trabalho humano",
+      "tipo_de_duvida": "papel_do_humano",
+      "o_que_precisa_ficar_claro": [
+        "o que continua humano",
+        "o que sai do trabalho repetitivo",
+        "como o produto organiza o trabalho do time"
+      ],
+      "limites_de_resposta": [
+        "não vender substituição total do humano",
+        "não tratar equipe como custo descartável",
+        "explicar apoio e estrutura"
+      ],
+      "eixos_de_diferenciacao": [
+        "repeticao_vs_trabalho_qualificado",
+        "desorganizado_vs_orquestrado",
+        "esforco_manual_vs_apoio_sistemico"
+      ]
+    },
+    {
+      "id": "solucao_barata",
+      "descricao": "cliente compara com algo mais barato e quer entender a diferença prática",
+      "intencao_real_do_cliente": "saber se a diferença de preço tem base real",
+      "tipo_de_duvida": "justificativa_de_valor",
+      "o_que_precisa_ficar_claro": [
+        "o que a alternativa barata cobre",
+        "o que fica de fora",
+        "o que muda no resultado"
+      ],
+      "limites_de_resposta": [
+        "não desqualificar o barato por reflexo",
+        "não responder só com defesa de preço",
+        "traduzir diferença em operação e resultado"
+      ],
+      "eixos_de_diferenciacao": [
+        "preco_vs_escopo",
+        "barato_agora_vs_custo_operacional_depois",
+        "aparencia_de_solucao_vs_solucao_completa"
+      ]
+    },
+    {
+      "id": "solucao_customizada",
+      "descricao": "cliente compara com sistema sob medida, projeto custom ou desenvolvimento próprio",
+      "intencao_real_do_cliente": "entender diferença entre produto pronto e construção dedicada",
+      "tipo_de_duvida": "produto_vs_projeto",
+      "o_que_precisa_ficar_claro": [
+        "velocidade de entrada",
+        "grau de adaptação",
+        "dependência de desenvolvimento"
+      ],
+      "limites_de_resposta": [
+        "não prometer customização infinita",
+        "não tratar projeto sob medida como errado",
+        "explicar trade-off real"
+      ],
+      "eixos_de_diferenciacao": [
+        "produto_pronto_vs_projeto",
+        "agilidade_vs_construcao",
+        "uso_imediato_vs_dependencia_de_time_tecnico"
+      ]
+    },
+    {
+      "id": "canal_alternativo",
+      "descricao": "cliente compara com outro canal ou meio de operação, não exatamente com outro produto",
+      "intencao_real_do_cliente": "entender por que faria isso nesse canal",
+      "tipo_de_duvida": "encaixe_de_canal",
+      "o_que_precisa_ficar_claro": [
+        "quando esse canal faz sentido",
+        "o que ele resolve melhor",
+        "o que muda na experiência e na operação"
+      ],
+      "limites_de_resposta": [
+        "não tratar um canal como melhor sempre",
+        "não responder com tese genérica",
+        "ancorar na rotina real do cliente"
+      ],
+      "eixos_de_diferenciacao": [
+        "canal_atual_vs_canal_proposto",
+        "friccao_vs_facilidade",
+        "uso_real_vs_teoria"
+      ]
+    }
+  ],
+  "comparacoes_recorrentes": [
+    {
+      "id": "produto_proprio_vs_ferramenta_generica",
+      "categoria_de_comparacao": "ferramenta_generica",
+      "quando_aparece": "cliente tenta entender se está vendo produto pronto ou ferramenta base para montar solução",
+      "intencao_real_do_cliente": "entender a natureza da solução e a flexibilidade de integração",
+      "o_que_precisa_ficar_claro": [
+        "o produto é próprio",
+        "não depende de motor terceiro para existir",
+        "pode integrar com sistemas externos",
+        "a integração depende da abertura técnica do outro sistema"
+      ],
+      "traducao_comercial": {
+        "o_que_o_cliente_quer_saber_de_verdade": "se isso é uma estrutura genérica ou um produto pronto com mais controle",
+        "diferenca_pratica": "ser produto próprio muda o nível de controle, adaptação e integração da operação"
+      }
+    },
+    {
+      "id": "produto_vs_jeito_manual",
+      "categoria_de_comparacao": "alternativa_manual",
+      "quando_aparece": "cliente compara com fazer tudo no braço, por pessoa, conversa por conversa",
+      "intencao_real_do_cliente": "medir se vale trocar o improviso atual por um sistema",
+      "o_que_precisa_ficar_claro": [
+        "o que hoje fica repetitivo e manual",
+        "o que o produto passa a assumir",
+        "o que a empresa passa a enxergar"
+      ],
+      "traducao_comercial": {
+        "o_que_o_cliente_quer_saber_de_verdade": "se isso realmente tira peso do time e organiza a rotina",
+        "diferenca_pratica": "o trabalho repetitivo diminui e a operação deixa de depender de memória e improviso"
+      }
+    },
+    {
+      "id": "produto_vs_modulo_isolado",
+      "categoria_de_comparacao": "modulo_isolado",
+      "quando_aparece": "cliente compara com solução que cobre só mensagem, só crm, só pagamento ou só disparo",
+      "intencao_real_do_cliente": "entender se precisa de algo pontual ou de uma estrutura mais completa",
+      "o_que_precisa_ficar_claro": [
+        "que parte a solução parcial resolve",
+        "que parte da operação continua sem cobertura",
+        "que ganho vem de juntar atendimento, venda e acompanhamento"
+      ],
+      "traducao_comercial": {
+        "o_que_o_cliente_quer_saber_de_verdade": "se vale juntar as peças numa operação só",
+        "diferenca_pratica": "resolver o fluxo inteiro evita quebra entre atendimento, venda, pagamento e acompanhamento"
+      }
+    }
+  ],
+
+  "categorias": {
+
+    "mensagens_whatsapp": [
+      {
+        "funcao": "Mensagens Multimídia Automatizadas",
+        "funcoes_saga": ["Texto", "Imagem", "Vídeo", "Áudio", "Documento"],
+        "problemas": [
+          {
+            "problema": "cliente pede informação, você digita a resposta inteira na mão, enquanto isso outros 4 clientes mandam msg e quando você termina de responder o primeiro, os outros 4 já saíram",
+            "causa": "cada resposta é fabricada do zero, digitada letra por letra — você produz conteúdo sob demanda como se fosse a primeira vez, toda vez, o dia inteiro",
+            "raiz": "seu atendimento não tem memória nem automação — você repete o mesmo trabalho centenas de vezes sem que nenhum esforço anterior sirva pro próximo cliente"
+          },
+          {
+            "problema": "você grava áudio explicando o produto, manda foto, monta o preço em texto separado — são 3 mensagens que levam 4 minutos pra montar, e o cliente só queria saber se tem e quanto custa",
+            "causa": "a apresentação do seu produto está fragmentada em pedaços espalhados (foto num lugar, preço na cabeça, descrição na ponta da língua) e você precisa montar tudo manualmente a cada pedido",
+            "raiz": "você não tem um sistema de apresentação — você É o sistema, e quando você para, a apresentação para junto"
+          }
+        ],
+        "caracteristica": "Envio automatizado de texto, foto, vídeo, áudio e documento em sequência programada — a apresentação completa chega pro cliente em segundos, sem você digitar nada",
+        "produto": "SAGA"
+      },
+      {
+        "funcao": "Localização",
+        "funcoes_saga": ["Localização"],
+        "problemas": [
+          {
+            "problema": "cliente pergunta 'onde fica?', você digita o endereço, ele não acha, liga pedindo referência, você explica, ele se perde de novo — 15 minutos gastos pra uma informação que deveria levar 2 segundos",
+            "causa": "endereço em texto é ambíguo — 'próximo ao posto' não funciona pra quem não é da região, e cada cliente precisa da mesma explicação individual",
+            "raiz": "você está gastando tempo de vendedor fazendo trabalho de GPS — e enquanto explica endereço pro cliente 1, perde a atenção do cliente 2 que ia comprar"
+          }
+        ],
+        "caracteristica": "Envia pin no mapa com nome e endereço exato — o cliente clica e o GPS leva direto, sem precisar perguntar nada",
+        "produto": "SAGA"
+      },
+      {
+        "funcao": "Contato",
+        "funcoes_saga": ["Contato"],
+        "problemas": [
+          {
+            "problema": "cliente pede o contato do responsável, você digita o número na mão, ele salva errado, liga pro número errado, volta bravo achando que você passou trote",
+            "causa": "número digitado em texto vira uma sequência de dígitos que o cliente precisa copiar, salvar e digitar — cada passo é uma chance de erro que gera retrabalho e desgaste",
+            "raiz": "uma informação simples como um telefone, quando transmitida manualmente, vira fonte de atrito que queima a confiança que você levou turnos inteiros construindo"
+          }
+        ],
+        "caracteristica": "Envia cartão de contato pronto com nome e telefone — o cliente toca e salva direto na agenda, sem chance de erro",
+        "produto": "SAGA"
+      },
+      {
+        "funcao": "Lista Interativa",
+        "funcoes_saga": ["Lista"],
+        "problemas": [
+          {
+            "problema": "você manda 'temos opção A, B, C, D, E e F' em texto corrido, o cliente lê por cima, responde 'quero a terceira', você não sabe se é C ou D porque ele contou errado — vai e volta que irrita os dois",
+            "causa": "opções jogadas em texto viram uma parede de palavras que ninguém lê com atenção — o cliente chuta, você interpreta errado, e o atendimento que era simples vira uma novela de 10 mensagens",
+            "raiz": "sem um formato visual estruturado, cada escolha simples se transforma em uma negociação de esclarecimento que consome tempo dos dois lados e empurra o cliente pra desistência"
+          },
+          {
+            "problema": "você tem 15 opções de serviço, tenta organizar em texto com tracinhos e números, o cliente ignora metade, escolhe algo que nem existe e você precisa corrigir sem parecer grosso",
+            "causa": "texto corrido no WhatsApp tem limite de atenção de segundos — passando de 5 linhas, o cliente já está lendo em diagonal e decidindo com base no que entendeu (que quase nunca é o que você escreveu)",
+            "raiz": "você está usando uma ferramenta de CONVERSA pra fazer trabalho de CATÁLOGO — e o resultado é um atendimento que parece amador mesmo quando o produto é profissional"
+          }
+        ],
+        "caracteristica": "Lista interativa com seções organizadas — o cliente abre, vê as opções estruturadas e escolhe com um toque, sem ambiguidade",
+        "produto": "SAGA"
+      },
+      {
+        "funcao": "Botões Clicáveis",
+        "funcoes_saga": ["Botões"],
+        "problemas": [
+          {
+            "problema": "você pergunta 'quer agendar ou tirar dúvida?', o cliente responde 'isso', você não sabe qual das duas, pergunta de novo, ele demora 20 minutos pra responder a segunda vez — se responder",
+            "causa": "perguntas abertas geram respostas ambíguas — e cada ambiguidade cria um turno extra de esclarecimento que dobra o tempo do atendimento e divide a paciência do cliente por dois",
+            "raiz": "você está pedindo pro cliente pensar e digitar quando ele só quer tocar e resolver — cada letra que ele precisa digitar é uma barreira entre ele e a compra"
+          }
+        ],
+        "caracteristica": "Até 3 botões clicáveis abaixo da mensagem — o cliente toca na opção e a resposta é instantânea, clara e sem margem pra erro",
+        "produto": "SAGA"
+      },
+      {
+        "funcao": "Carrossel de Produtos",
+        "funcoes_saga": ["Carrossel", "Carousel Cards"],
+        "problemas": [
+          {
+            "problema": "cliente manda msg pedindo produto, você demora 3 minutos pra achar a foto certa no celular, quando manda ele já visualizou e não respondeu mais — foi comprar de quem mandou primeiro",
+            "causa": "cada atendimento depende de você parar tudo, abrir galeria, procurar entre centenas de fotos, montar preço na mão e enviar — enquanto isso os outros clientes na fila vão embora em silêncio",
+            "raiz": "seu processo de apresentação de produto é 100% manual — você é o gargalo, e cada segundo que você gasta com um cliente é um segundo que outro cliente está decidindo comprar do concorrente"
+          },
+          {
+            "problema": "você atende 30 pessoas por dia, 25 perguntam a mesma coisa ('tem? quanto custa?'), você digita a mesma resposta 25 vezes e no fim do dia vendeu pra 3",
+            "causa": "92% do seu tempo de atendimento é gasto repetindo informação básica que poderia estar pronta — você virou um robô humano que trabalha 12h pra converter 10%",
+            "raiz": "você está trocando HORAS do seu dia por trabalho repetitivo que uma vitrine automática faz em 0 segundos — e enquanto digita pro cliente 12, os clientes 13, 14 e 15 já desistiram sem você nem saber"
+          },
+          {
+            "problema": "você manda a foto errada, o preço desatualizado, ou esquece de mandar o link de pagamento — o cliente perde a confiança e some",
+            "causa": "suas informações estão espalhadas em 5 lugares diferentes (galeria, planilha, caderno, cabeça) e você precisa juntar tudo na hora sob pressão de tempo",
+            "raiz": "cada atendimento é uma operação manual com risco de erro humano — e cada erro custa um cliente que nunca mais volta e ainda fala mal pra outros"
+          }
+        ],
+        "caracteristica": "Vitrine visual automática com foto, nome, preço e botão de compra — cliente navega sozinho, 24h, sem depender de ninguém",
+        "produto": "SAGA"
+      },
+      {
+        "funcao": "Formulários Interativos",
+        "funcoes_saga": ["Formulário", "Native Flow"],
+        "problemas": [
+          {
+            "problema": "você precisa de 5 informações do cliente (nome, endereço, produto, tamanho, pagamento) e faz UMA pergunta por vez — são 10 mensagens de ida e volta que levam 20 minutos e o cliente desiste na terceira",
+            "causa": "coleta de dados por conversa livre é lenta, desestruturada e depende do cliente ter paciência pra responder tudo na ordem certa — qualquer interrupção reinicia o processo",
+            "raiz": "você está usando chat como formulário — e chat não foi feito pra isso, então cada campo que falta é uma chance do cliente abandonar e nunca mais voltar"
+          },
+          {
+            "problema": "o cliente manda as informações fora de ordem, esquece metade, você precisa re-perguntar — no final ele fala 'depois eu vejo' e some",
+            "causa": "sem estrutura visual, o cliente não sabe o que falta preencher, não tem noção de progresso e não sente que está avançando — só sente que está sendo interrogado",
+            "raiz": "o atendimento parece uma entrevista burocrática e não uma compra — e ninguém gosta de ser interrogado quando quer comprar"
+          }
+        ],
+        "caracteristica": "Formulário nativo do WhatsApp com campos organizados — o cliente preenche tudo de uma vez numa tela estruturada, sem vai-e-volta",
+        "produto": "SAGA"
+      },
+      {
+        "funcao": "Engajamento Humanizado",
+        "funcoes_saga": ["Reação", "Figurinha"],
+        "problemas": [
+          {
+            "problema": "o cliente manda uma mensagem importante e recebe silêncio por 5 minutos — quando você finalmente responde, o tom da conversa já esfriou e ele está respondendo com monossílabos",
+            "causa": "entre ler a mensagem e conseguir formular a resposta completa, passa um tempo morto em que o cliente não sabe se foi ignorado, se você está ocupado ou se não ligou",
+            "raiz": "sem sinais imediatos de que a mensagem foi recebida e valorizada, cada segundo de silêncio é interpretado pelo cliente como descaso — e descaso mata venda mais rápido que preço alto"
+          }
+        ],
+        "caracteristica": "Reações automáticas com emoji e figurinhas no momento certo — o cliente sente que está sendo ouvido instantaneamente enquanto a resposta completa é preparada",
+        "produto": "SAGA"
+      }
+    ],
+
+    "gerenciamento_mensagens": [
+      {
+        "funcao": "Marcar como Lida",
+        "funcoes_saga": ["Marcar como lida"],
+        "problemas": [
+          {
+            "problema": "cliente manda mensagem, vê que ficou com um check só por horas, acha que foi ignorado e manda pro concorrente — quando você finalmente vê, ele já comprou lá",
+            "causa": "mensagem sem confirmação de leitura é mensagem no vazio — o cliente não sabe se chegou, se foi vista, se alguém se importa",
+            "raiz": "a ausência de feedback visual destrói a percepção de profissionalismo — o cliente conclui que se você não consegue nem ler a mensagem dele, não vai conseguir entregar o produto"
+          }
+        ],
+        "caracteristica": "Marca automaticamente como lida (check azul) no momento certo — o cliente sabe que foi visto e está sendo atendido",
+        "produto": "SAGA"
+      },
+      {
+        "funcao": "Correção de Mensagens",
+        "funcoes_saga": ["Apagar mensagem", "Editar mensagem"],
+        "problemas": [
+          {
+            "problema": "você manda o preço errado pro cliente, ele faz print, mostra pro amigo, os dois vêm cobrar o preço antigo — e agora você perde dinheiro ou perde o cliente",
+            "causa": "mensagem enviada com erro vira documento permanente na mão do cliente — e você não tem como corrigir sem parecer que está tentando enganar",
+            "raiz": "sem controle sobre o que já foi enviado, cada erro de digitação é uma bomba relógio que pode explodir como objeção, reclamação ou até processo"
+          }
+        ],
+        "caracteristica": "Apaga ou edita mensagens já enviadas — corrige erros antes que virem problemas",
+        "produto": "SAGA"
+      }
+    ],
+
+    "gestao_instancias": [
+      {
+        "funcao": "Conexão e Integração",
+        "funcoes_saga": ["QR Code", "Webhooks"],
+        "problemas": [
+          {
+            "problema": "você contrata uma ferramenta nova, leva 3 dias tentando configurar, chama suporte, eles pedem dados técnicos que você não tem, e no final desiste e volta a fazer tudo na mão",
+            "causa": "ferramentas que exigem configuração técnica foram feitas pra programadores — e quem vende no WhatsApp é comerciante, não desenvolvedor",
+            "raiz": "a barreira técnica de entrada impede que a automação comece — e enquanto você tenta configurar, está deixando de vender, o que confirma a crença de que 'tecnologia não é pra mim'"
+          }
+        ],
+        "caracteristica": "Escaneia um QR Code e pronto — conecta em segundos sem configuração técnica, e webhooks integram com qualquer sistema automaticamente",
+        "produto": "SAGA"
+      }
+    ],
+
+    "funcionalidades_fluxos": [
+      {
+        "funcao": "Menu de Entrada (Botões Iniciais)",
+        "funcoes_saga": ["Botões Iniciais"],
+        "problemas": [
+          {
+            "problema": "cliente manda 'oi' e você responde 'oi, como posso ajudar?', ele responde 'quero saber sobre', você pergunta 'sobre o quê?', ele demora 10 minutos — 4 mensagens desperdiçadas antes de começar a vender",
+            "causa": "sem direcionamento inicial, a conversa vira pingue-pongue de cortesia que consome tempo sem gerar nenhum avanço comercial",
+            "raiz": "o primeiro contato define a percepção do negócio inteiro — e se começa com 'oi, como posso ajudar?', começa parecendo amador, indeciso e sem estrutura"
+          },
+          {
+            "problema": "você recebe mensagens de todo tipo (quer comprar, quer reclamar, quer saber horário, quer emprego) e trata todas igual — perde 40% do tempo com quem nunca ia comprar",
+            "causa": "sem triagem na entrada, leads quentes esperam na mesma fila que curiosos, e quando chega a vez deles, a paciência já acabou",
+            "raiz": "seu atendimento trata todos os contatos como iguais — mas quem está pronto pra comprar AGORA tem urgência, e se você não prioriza, o concorrente que prioriza leva"
+          }
+        ],
+        "caracteristica": "Menu de entrada com botões que direcionam o cliente instantaneamente — comprar, agendar, dúvidas, suporte — sem 'oi, como posso ajudar?'",
+        "produto": "SAGA"
+      },
+      {
+        "funcao": "Cardápio Digital",
+        "funcoes_saga": ["Cardápio"],
+        "problemas": [
+          {
+            "problema": "cliente pergunta 'o que vocês têm?', você começa a listar, ele interrompe, pergunta preço de um, você responde, ele pergunta de outro, no fim pediu 1 item que poderia ter escolhido sozinho em 30 segundos",
+            "causa": "apresentação verbal de catálogo é linear e lenta — você só consegue mostrar um item por vez, enquanto o cliente quer ver tudo de uma vez pra comparar",
+            "raiz": "você está sendo o cardápio humano — e enquanto recita opções pro cliente 1, os clientes 2, 3 e 4 estão esperando pra ouvir a mesma recitação"
+          },
+          {
+            "problema": "você muda o preço de um item e esquece de avisar quem atende — vendem pelo preço antigo o dia inteiro, no fim do mês o faturamento não fecha e você não sabe por quê",
+            "causa": "a informação de preço está na cabeça das pessoas e não num sistema centralizado — cada atendente tem uma versão diferente da verdade",
+            "raiz": "sem fonte única de informação, cada atendimento é uma roleta russa de dados desatualizados — e você só descobre o erro quando já perdeu dinheiro"
+          }
+        ],
+        "caracteristica": "Cardápio digital organizado por categoria com foto, descrição e preço atualizado em tempo real — o cliente navega e escolhe sozinho",
+        "produto": "SAGA"
+      },
+      {
+        "funcao": "Detalhes do Produto",
+        "funcoes_saga": ["Detalhes do Produto"],
+        "problemas": [
+          {
+            "problema": "cliente pergunta especificação técnica, você não lembra de cabeça, precisa abrir planilha, procurar, copiar e colar — demora 5 minutos, o cliente já mandou a mesma pergunta pro concorrente que respondeu na hora",
+            "causa": "informações detalhadas do produto estão espalhadas entre fornecedor, planilha, site e memória — e você precisa reunir tudo manualmente a cada pergunta",
+            "raiz": "cada pergunta técnica expõe que seu processo de informação é artesanal — e o cliente que faz pergunta técnica é justamente o mais criterioso, que compara 3 fornecedores ao mesmo tempo"
+          }
+        ],
+        "caracteristica": "Ficha completa do produto com fotos, descrição, preço e especificações — o cliente acessa tudo em um toque, sem precisar perguntar",
+        "produto": "SAGA"
+      },
+      {
+        "funcao": "Pagamento Integrado",
+        "funcoes_saga": ["Seleção de Pagamento", "Pagamento PIX", "Verificação de Pagamento"],
+        "problemas": [
+          {
+            "problema": "cliente fecha o pedido, você manda a chave PIX copiada, ele paga, manda o comprovante em foto, você precisa abrir o banco pra confirmar — enquanto isso ele fica ansioso achando que não caiu, e você tem mais 5 comprovantes pra conferir",
+            "causa": "o pagamento e a confirmação são processos manuais separados — o cliente paga num lugar, avisa noutro, e você confere num terceiro, com margem pra atraso e confusão",
+            "raiz": "o momento mais crítico da venda — quando o cliente DECIDIU PAGAR — depende de um processo arcaico que introduz fricção, dúvida e oportunidade de desistência"
+          },
+          {
+            "problema": "cliente paga o PIX mas manda o comprovante de outra transferência por engano, você dá baixa errada, entrega o produto, depois descobre que aquele pagamento era de outro cliente — e agora tem um furo no caixa que você não consegue rastrear",
+            "causa": "verificação manual de pagamento depende de cruzar dados visuais (print de comprovante) com dados bancários — e sob pressão de volume, erros são inevitáveis",
+            "raiz": "cada verificação manual é uma aposta — e quando o volume cresce, a probabilidade de erro não diminui, AUMENTA proporcionalmente, criando furos financeiros invisíveis"
+          },
+          {
+            "problema": "cliente diz que vai pagar 'daqui a pouco', some, você não cobra porque não quer parecer chato — 3 dias depois o pedido tá abandonado e o estoque ficou reservado pra ninguém",
+            "causa": "sem verificação automática, o acompanhamento de pagamento pendente depende de você lembrar de cobrar — e a maioria dos vendedores prefere perder a venda a parecer insistente",
+            "raiz": "você está DEIXANDO dinheiro na mesa porque não tem um sistema que cobre por você sem constrangimento — e cada pagamento pendente não cobrado é receita que evaporou por timidez"
+          }
+        ],
+        "caracteristica": "QR Code PIX gerado automaticamente no WhatsApp + verificação automática de pagamento — quando paga, confirma sozinho; quando não paga, cobra sozinho",
+        "produto": "SAGA"
+      },
+      {
+        "funcao": "Confirmação de Pedido",
+        "funcoes_saga": ["Confirmação de Pedido"],
+        "problemas": [
+          {
+            "problema": "você anota o pedido durante a conversa, monta na cabeça, entrega errado — o cliente reclamou, você releu a conversa e percebeu que VOCÊ entendeu errado o que ELE queria",
+            "causa": "pedido montado durante conversa livre depende da sua interpretação do que o cliente quis dizer — e 'aquele lá' pode ser qualquer coisa",
+            "raiz": "sem um momento formal de confirmação onde o cliente VÊ o que vai receber antes de confirmar, cada pedido é uma aposta na sua capacidade de ler mentes sob pressão"
+          },
+          {
+            "problema": "cliente fez pedido, você entregou, ele diz 'mas eu pedi diferente' — você não tem prova de nada porque tá tudo em texto corrido no meio de 200 mensagens",
+            "causa": "conversa de WhatsApp não foi feita pra ser registro de pedido — e quando vira disputa, achar a informação certa no meio do histórico é como procurar agulha no palheiro",
+            "raiz": "sem registro estruturado, sua palavra contra a do cliente é uma batalha que você SEMPRE perde — porque quem paga sempre tem razão quando não existe documento"
+          }
+        ],
+        "caracteristica": "Resumo automático do pedido (itens, valor, endereço, pagamento) que o cliente confirma com um toque antes de finalizar — registro claro, sem margem pra 'eu pedi diferente'",
+        "produto": "SAGA"
+      },
+      {
+        "funcao": "Follow-up por Áudio",
+        "funcoes_saga": ["Follow-up por Áudio"],
+        "problemas": [
+          {
+            "problema": "cliente veio até o ponto de quase comprar, sumiu no meio da conversa, você manda um 'oi, tudo bem?' em texto e ele nunca mais responde — adeus venda que estava 80% fechada",
+            "causa": "mensagem de texto de follow-up é fria, impessoal e fácil de ignorar — parece mais um spam numa lista de contatos do que alguém que se importa",
+            "raiz": "a reconexão com cliente que abandonou exige CALOR HUMANO que texto não transmite — e sem esse calor, cada tentativa de recuperação soa como cobrança e afasta mais"
+          },
+          {
+            "problema": "você sabe que deveria ir atrás dos clientes que não fecharam, mas não tem tempo, não sabe o que dizer, e no fundo tem medo de incomodar — então deixa o dinheiro ir embora calado",
+            "causa": "follow-up manual exige tempo, criatividade e coragem emocional — três recursos que já estão esgotados depois de 8 horas atendendo",
+            "raiz": "cada follow-up não feito é uma venda que estava PRONTA e morreu por omissão — e o pior é que o cliente queria comprar, só precisava de um empurrãozinho que nunca veio"
+          }
+        ],
+        "caracteristica": "Áudio de voz enviado automaticamente quando o cliente abandona — soa pessoal, humano e impossível de ignorar, recuperando vendas sem você precisar fazer nada",
+        "produto": "SAGA"
+      },
+      {
+        "funcao": "Acompanhamento de Abandono",
+        "funcoes_saga": ["Acompanhamento de Abandono"],
+        "problemas": [
+          {
+            "problema": "de cada 100 pessoas que iniciam conversa com você, 70 somem no meio do caminho — e você não sabe em qual momento exato elas desistiram, nem por quê",
+            "causa": "sem rastreamento por etapa, cada abandono é um mistério — você sabe que perdeu, mas não sabe onde, quando nem o que fez de errado",
+            "raiz": "você está SANGRANDO clientes todos os dias num ponto específico do seu atendimento e não sabe qual é — é como ter um vazamento no encanamento e não saber onde está o furo"
+          },
+          {
+            "problema": "você SABE que perdeu clientes hoje, mas não lembra quem são, não anotou os números, e mesmo se lembrar não sabe o que dizer porque não sabe onde pararam",
+            "causa": "sem registro centralizado de abandonos, a recuperação depende da sua memória — e sua memória está ocupada com os 20 atendimentos do momento",
+            "raiz": "cada cliente esquecido é receita perdida DUAS VEZES — primeiro na venda que não fechou, depois na recuperação que não aconteceu porque você nem sabia que tinha que fazer"
+          }
+        ],
+        "caracteristica": "Rastreia em qual etapa cada cliente parou, lista os contatos para recuperação e mostra onde está o gargalo do seu funil",
+        "produto": "SAGA"
+      },
+      {
+        "funcao": "Reserva e Gestão de Mesas",
+        "funcoes_saga": ["Reserva de Mesa", "Gestão de Mesas"],
+        "problemas": [
+          {
+            "problema": "cliente liga pra reservar, você anota num papel, outro cliente manda WhatsApp pra mesma mesa, você confirma os dois — na hora, 2 famílias chegam pro mesmo lugar e uma sai furiosa falando mal no Google",
+            "causa": "reserva em papel/caderno não tem trava de conflito — quando dois canais diferentes confirmam a mesma mesa, ninguém avisa até o desastre acontecer",
+            "raiz": "cada reserva manual é uma promessa sem garantia — e quando duas promessas colidem, quem paga é a reputação do negócio, que levou anos pra construir e destruiu em uma noite"
+          }
+        ],
+        "caracteristica": "Reserva de mesa pelo WhatsApp com controle de disponibilidade em tempo real — se está ocupada, não aparece como opção, impossível conflitar",
+        "produto": "SAGA"
+      },
+      {
+        "funcao": "Eventos",
+        "funcoes_saga": ["Eventos"],
+        "problemas": [
+          {
+            "problema": "você faz um evento, divulga no Instagram, as pessoas comentam 'vou!', no dia aparecem metade — porque curtir post não é confirmação e você não tem lista real de quem vai",
+            "causa": "intenção em rede social não é compromisso — e sem um sistema de inscrição real, você planeja logística baseado em reações de emoji, não em dados",
+            "raiz": "você está investindo dinheiro real (comida, espaço, staff) baseado em números fictícios — e a conta de quem não veio quem paga é você"
+          }
+        ],
+        "caracteristica": "Lista de eventos com inscrição formal pelo WhatsApp — nome, confirmação, dados de contato, com lista real de confirmados para planejar sem chute",
+        "produto": "SAGA"
+      },
+      {
+        "funcao": "Pedido Delivery",
+        "funcoes_saga": ["Pedido Delivery"],
+        "problemas": [
+          {
+            "problema": "cliente pede por WhatsApp, você anota endereço por texto, o entregador não acha, liga pro cliente, o cliente não atende, a entrega atrasa 40 minutos e chega com o produto frio/danificado",
+            "causa": "endereço por texto livre é cheio de ambiguidades ('a casa branca depois do mercado') e o entregador precisa interpretar literatura criativa do cliente enquanto dirige",
+            "raiz": "o processo de delivery que começa desorganizado na coleta de dados termina desorganizado na entrega — e o cliente culpa VOCÊ pelo atraso que foi causado pela falta de sistema"
+          },
+          {
+            "problema": "você recebe 15 pedidos em 30 minutos num pico, anota todos na mão, confunde os endereços, manda o pedido do cliente A pro B e vice-versa — dois clientes irritados ao mesmo tempo",
+            "causa": "sob pressão de volume, anotação manual se torna um campo minado de erros cruzados — e a probabilidade de troca cresce exponencialmente com cada pedido simultâneo",
+            "raiz": "seu sistema de delivery funciona quando tem 3 pedidos, colapsa quando tem 15 — e o problema é que você SÓ ganha dinheiro de verdade quando tem 15"
+          }
+        ],
+        "caracteristica": "Fluxo completo de pedido delivery com coleta estruturada de endereço, itens e pagamento — tudo organizado antes de sair pra entrega",
+        "produto": "SAGA"
+      },
+      {
+        "funcao": "Agendamento de Visita",
+        "funcoes_saga": ["Agendamento de Visita"],
+        "problemas": [
+          {
+            "problema": "cliente quer agendar uma visita, vocês trocam 12 mensagens tentando achar um horário que funciona pros dois — no final ele desiste e diz 'depois eu marco'",
+            "causa": "agendamento por conversa livre é um jogo de xadrez de disponibilidades — cada sugestão negada é uma rodada que esfria o interesse do cliente",
+            "raiz": "o processo de agendamento DEVERIA ser o momento mais simples da jornada, mas virou o mais demorado — e cada minuto gasto combinando horário é um minuto em que o interesse do cliente evapora"
+          }
+        ],
+        "caracteristica": "Agendamento com datas e horários disponíveis clicáveis — o cliente escolhe em 5 segundos sem trocar uma única mensagem",
+        "produto": "SAGA"
+      },
+      {
+        "funcao": "Falar com Atendente",
+        "funcoes_saga": ["Falar com Atendente"],
+        "problemas": [
+          {
+            "problema": "cliente tem uma situação complexa que o fluxo automático não resolve, fica preso num loop de opções, repete 'ATENDENTE' em caps lock 5 vezes e sai xingando — publica a print no Twitter",
+            "causa": "automação sem saída humana é uma prisão — e cliente preso é cliente furioso que não vai reclamar pra você, vai reclamar pra TODO MUNDO",
+            "raiz": "automação que não sabe quando parar e chamar um humano é pior que não ter automação nenhuma — porque gera a percepção de que a empresa prefere economizar com robô a resolver o problema"
+          }
+        ],
+        "caracteristica": "Escalona automaticamente para atendente humano quando o bot detecta que não consegue resolver — sem loop, sem frustração, transição transparente",
+        "produto": "SAGA"
+      },
+      {
+        "funcao": "Qualificação Inteligente",
+        "funcoes_saga": ["Qualificação por Quiz", "Qualificação de Lead"],
+        "problemas": [
+          {
+            "problema": "você passa 30 minutos atendendo um lead que parecia interessado, monta proposta, liga, manda follow-up — e descobre que ele não tem orçamento, não decide sozinho e não vai comprar nos próximos 6 meses",
+            "causa": "sem triagem prévia, TODO lead recebe o mesmo investimento de tempo — o que queima seu recurso mais escasso (atenção) com quem nunca ia converter",
+            "raiz": "você está tratando lead FRIO com energia de lead QUENTE — e o resultado é que quando o lead quente de verdade aparece, você já está exausto e dá um atendimento morno"
+          },
+          {
+            "problema": "você tem 50 conversas abertas e não sabe qual priorizar — atende por ordem de chegada, e o cara que ia fechar hoje (mas precisava de atenção AGORA) ficou na fila atrás de 12 curiosos",
+            "causa": "sem scoring, todas as conversas parecem iguais na tela — e a urgência de quem vai comprar HOJE é invisível no meio de quem está 'só olhando'",
+            "raiz": "a falta de priorização inteligente faz você perder os melhores clientes silenciosamente — porque eles não reclamam, eles simplesmente vão embora e compram de quem atendeu primeiro"
+          }
+        ],
+        "caracteristica": "Quiz interativo que qualifica automaticamente + lead scoring que classifica em quente/morno/frio — você sabe EXATAMENTE quem priorizar e por quê",
+        "produto": "SAGA"
+      },
+      {
+        "funcao": "Simulação de Financiamento",
+        "funcoes_saga": ["Simulação de Financiamento"],
+        "problemas": [
+          {
+            "problema": "cliente pergunta 'quanto fica a parcela?', você abre a calculadora, calcula, responde, ele pede com outra entrada, você calcula de novo, pede com outro prazo, você calcula de novo — 4 simulações manuais em 15 minutos",
+            "causa": "cada variação de entrada/prazo/taxa exige uma conta manual que consome tempo e atenção — e o cliente testa cenários porque pode, não porque é difícil",
+            "raiz": "você está fazendo TRABALHO DE CALCULADORA enquanto deveria estar VENDENDO — e o tempo gasto simulando parcelas é tempo roubado do fechamento"
+          }
+        ],
+        "caracteristica": "Calculadora de financiamento dentro do WhatsApp — o cliente simula parcelas, entrada e prazo sozinho, quantas vezes quiser, em segundos",
+        "produto": "SAGA"
+      },
+      {
+        "funcao": "Acompanhamento de Obra",
+        "funcoes_saga": ["Acompanhamento de Obra"],
+        "problemas": [
+          {
+            "problema": "cliente liga toda semana pedindo atualização da obra, você precisa ligar pro mestre de obras, tirar foto, mandar — gasta 30 minutos por cliente por semana, e tem 40 clientes",
+            "causa": "cada atualização é um circuito manual que passa por 3 pessoas antes de chegar no cliente — e qualquer demora gera ansiedade, desconfiança e ligação nervosa",
+            "raiz": "a falta de transparência no andamento transforma cada cliente em um auditor que consome seu tempo — e quanto mais demora a atualização, mais ligações de cobrança você recebe"
+          }
+        ],
+        "caracteristica": "Status da obra com fotos e percentual de conclusão atualizado automaticamente pelo WhatsApp — o cliente acompanha sozinho sem ligar",
+        "produto": "SAGA"
+      },
+      {
+        "funcao": "Nutrição de Funil",
+        "funcoes_saga": ["Nutrição de Funil"],
+        "problemas": [
+          {
+            "problema": "cliente demonstrou interesse semana passada mas não fechou — você não mandou mais nada, ficou esperando ele voltar, e ele não voltou porque esqueceu que seu negócio existe",
+            "causa": "sem envio automático de conteúdo, o follow-up depende de você lembrar — e depois de 48h sem contato, o cliente já está pensando em outra coisa",
+            "raiz": "o dinheiro que você gastou pra ATRAIR esse lead foi jogado fora porque não houve nutrição — é como plantar uma semente, regar uma vez e abandonar esperando que chova"
+          },
+          {
+            "problema": "você tem 200 contatos que demonstraram interesse nos últimos 3 meses e não comprou nenhum — estão lá, parados, enquanto você gasta dinheiro tentando atrair gente NOVA",
+            "causa": "sem automação de nutrição, sua base de leads antigos é um cemitério de oportunidades que ninguém revisita — e atrair lead novo custa 7x mais que converter um que já te conhece",
+            "raiz": "você está sentado em cima de uma mina de ouro de contatos quentes e gastando dinheiro pra cavar em terreno frio — porque não tem como nutrir 200 pessoas manualmente"
+          }
+        ],
+        "caracteristica": "Envio automático de conteúdos por estágio do funil — cada lead recebe o conteúdo certo na hora certa, sem você fazer nada, até estar pronto pra comprar",
+        "produto": "SAGA"
+      },
+      {
+        "funcao": "Recomendação Inteligente",
+        "funcoes_saga": ["Recomendação Inteligente"],
+        "problemas": [
+          {
+            "problema": "cliente chega sem saber o que quer, você faz 10 perguntas pra entender o perfil e sugere algo — mas se 5 clientes com o MESMO perfil aparecerem, você faz as mesmas 10 perguntas 5 vezes e sugere na mão 5 vezes",
+            "causa": "o mapeamento perfil → produto ideal está na SUA CABEÇA e precisa ser executado do zero a cada atendimento — nenhum conhecimento acumulado é reaproveitado",
+            "raiz": "toda a inteligência comercial do negócio mora na sua memória — e memória não escala, não se duplica e para de funcionar quando você está cansado"
+          }
+        ],
+        "caracteristica": "Recomenda automaticamente o produto mais adequado ao perfil do cliente baseado nas respostas — inteligência comercial que funciona sem depender da sua cabeça",
+        "produto": "SAGA"
+      }
+    ],
+
+    "editor_visual": [
+      {
+        "funcao": "Editor Visual de Fluxos",
+        "funcoes_saga": ["Editor drag-and-drop", "Nós de Mensagem", "Nós de Interação", "Nós de Lógica", "Preview em tempo real", "Exportação/Importação"],
+        "problemas": [
+          {
+            "problema": "você quer automatizar o atendimento mas não sabe programar — contrata um desenvolvedor, ele cobra R$5.000, demora 3 semanas, entrega algo que funciona mas que você não pode alterar sozinho",
+            "causa": "ferramentas técnicas criam dependência de programador — cada alteração simples (trocar um texto, adicionar uma opção) vira um chamado que custa dinheiro e tempo",
+            "raiz": "seu atendimento automatizado é refém de quem fez — se o desenvolvedor some, atrasa ou cobra caro demais, você fica preso num sistema que não pode tocar"
+          },
+          {
+            "problema": "você monta o fluxo, publica sem testar, o cliente cai num loop infinito ou recebe a mensagem errada — e você só descobre quando 30 clientes já passaram pelo erro e reclamaram",
+            "causa": "sem preview antes de publicar, cada botão, cada condição e cada desvio é um palpite que só se confirma ao vivo — e errar ao vivo custa clientes",
+            "raiz": "publicar sem testar é como abrir as portas da loja sem verificar se as prateleiras estão arrumadas — o primeiro cliente que entra já vê a bagunça e forma opinião definitiva"
+          }
+        ],
+        "caracteristica": "Editor visual drag-and-drop onde você cria fluxos arrastando blocos sem programar — com preview em tempo real que simula tudo antes de publicar, e export/import pra reaproveitar fluxos",
+        "produto": "SAGA"
+      }
+    ],
+
+    "dashboard": [
+      {
+        "funcao": "KPIs em Tempo Real",
+        "funcoes_saga": ["KPIs em tempo real", "Data Picker", "Lista de Pedidos"],
+        "problemas": [
+          {
+            "problema": "alguém pergunta 'quantos pedidos você teve essa semana?' e você responde 'acho que uns 40' — ACHA, porque não sabe o número real, e está tomando decisões de negócio baseado em ACHISMO",
+            "causa": "sem painel centralizado, os números do negócio estão em pedaços espalhados (WhatsApp, caderno, banco, planilha) e ninguém junta — porque juntar leva horas",
+            "raiz": "você está pilotando um negócio NO ESCURO — sem velocímetro, sem combustível visível, sem mapa — e só descobre que quebrou quando já bateu"
+          },
+          {
+            "problema": "você fechou o mês no vermelho e não sabe por quê — porque não soube que o ticket médio caiu 30% na segunda semana até ver o extrato bancário no dia 30",
+            "causa": "sem dados em tempo real, TODO problema financeiro só aparece DEPOIS que já causou o dano — e quando aparece, já é tarde demais pra corrigir",
+            "raiz": "gerenciar negócio sem KPIs é como dirigir olhando só pelo retrovisor — você vê onde já passou, mas não vê o muro que está na frente"
+          }
+        ],
+        "caracteristica": "Dashboard com KPIs atualizados em tempo real — pedidos, faturamento, ticket médio, conversão, abandonos — tudo num olhar, atualizado a cada segundo",
+        "produto": "SAGA"
+      },
+      {
+        "funcao": "Funil de Conversão e Abandonos",
+        "funcoes_saga": ["Funil de Conversão", "Abandonos por Etapa"],
+        "problemas": [
+          {
+            "problema": "você investe R$2.000 por mês em tráfego, gera 500 leads, converte 15 em vendas — e não faz ideia de onde os outros 485 sumiram, se no primeiro contato ou no pagamento",
+            "causa": "sem visão de funil por etapa, você sabe o começo (leads) e o fim (vendas), mas o meio é uma caixa preta onde causas de perda são invisíveis",
+            "raiz": "você está jogando dinheiro num balde furado e não sabe onde estão os furos — cada mês investe mais em tráfego achando que o problema é POUCO LEAD quando o problema é MUITA PERDA"
+          },
+          {
+            "problema": "você SABE que tem um problema de conversão mas não sabe se é no atendimento, no preço, no produto ou no pagamento — então muda tudo ao mesmo tempo e nada melhora",
+            "causa": "sem dados por etapa, otimização vira chute — e chute empresarial custa dinheiro, tempo e moral da equipe",
+            "raiz": "a falta de diagnóstico preciso transforma cada tentativa de melhoria numa loteria — e você está apostando o futuro do negócio em palpites"
+          }
+        ],
+        "caracteristica": "Funil visual mostrando quantas pessoas passaram por cada etapa e onde desistiram — com lista de telefones em cada etapa para recuperação direta",
+        "produto": "SAGA"
+      },
+      {
+        "funcao": "Kanban CRM",
+        "funcoes_saga": ["Kanban CRM"],
+        "problemas": [
+          {
+            "problema": "você tem 50 negociações em andamento e controla por memória — esquece de mandar proposta pro cliente que pediu ontem, e quando lembra ele já fechou com outro",
+            "causa": "negociações em andamento são objetos invisíveis na sua cabeça — e quando você tem mais de 10, começa a esquecer as que não gritam mais alto",
+            "raiz": "clientes silenciosos morrem silenciosamente — o que mais precisa de atenção é justamente o que não pede atenção, e sem sistema visual, ele desaparece no ruído"
+          },
+          {
+            "problema": "sua equipe atende junto e ninguém sabe o que o outro já falou — o cliente conta a mesma história 3 vezes pra 3 pessoas diferentes, fica irritado e diz 'vocês não se comunicam?'",
+            "causa": "sem CRM compartilhado, o histórico do cliente mora na cabeça de quem atendeu — quando troca de atendente, o cliente precisa recomeçar do zero",
+            "raiz": "a falta de histórico centralizado faz cada atendimento parecer desconectado do anterior — e o cliente conclui que se vocês não se organizam internamente, não vão se organizar pra entregar o pedido"
+          }
+        ],
+        "caracteristica": "Quadro Kanban com cards de cada lead arrastáveis entre estágios — toda a equipe vê o mesmo quadro, com histórico completo de cada negociação",
+        "produto": "SAGA"
+      },
+      {
+        "funcao": "User Journey",
+        "funcoes_saga": ["User Journey"],
+        "problemas": [
+          {
+            "problema": "cliente reclama 'eu já disse isso' e você não tem como verificar — não sabe se ele clicou no botão errado, se mandou mensagem que não chegou, ou se sua equipe que não leu",
+            "causa": "sem timeline de ações, a jornada do cliente é um quebra-cabeça que ninguém montou — e quando dá problema, cada lado tem uma versão diferente da história",
+            "raiz": "a ausência de rastro de interações transforma cada reclamação num caso de 'ele disse/ela disse' — e sem evidência, você sempre perde a discussão e a confiança do cliente"
+          }
+        ],
+        "caracteristica": "Timeline visual completa de tudo que o cliente fez — botões clicados, textos enviados, telas visitadas, com timestamp — a verdade documentada de cada interação",
+        "produto": "SAGA"
+      },
+      {
+        "funcao": "Disparos em Massa",
+        "funcoes_saga": ["Disparos em Massa"],
+        "problemas": [
+          {
+            "problema": "você quer avisar seus 500 clientes de uma promoção — manda um por um na mão, gasta 4 horas, na metade já errou de pessoa, mandou link errado e ainda não acabou",
+            "causa": "comunicação em massa por WhatsApp manual é insustentável — cada mensagem é um envio individual que consome o mesmo tempo da primeira até a última",
+            "raiz": "você tem uma BASE de clientes que é um ATIVO — mas não consegue ativá-la, porque falar com todos exige um esforço que só cabe no dia se você parar de atender, o que é parar de vender"
+          },
+          {
+            "problema": "você manda a mesma mensagem genérica pra todo mundo — o cliente fiel recebe o mesmo texto do curioso que nunca comprou — e o fiel se sente tratado como número, não como cliente",
+            "causa": "sem segmentação, comunicação em massa é spam disfarçado — e spam destrói relacionamento mais rápido do que constrói venda",
+            "raiz": "a incapacidade de segmentar transforma sua ferramenta mais poderosa (base de clientes) na sua maior ameaça (bloqueio em massa por falta de relevância)"
+          }
+        ],
+        "caracteristica": "Envio em massa segmentado — por perfil, histórico, produto e comportamento — cada grupo recebe a mensagem certa, sem enviar um por um",
+        "produto": "SAGA"
+      },
+      {
+        "funcao": "Inteligência de Produtos",
+        "funcoes_saga": ["Analytics de Produtos", "Curva ABC"],
+        "problemas": [
+          {
+            "problema": "você acha que seu produto mais vendido é o X, investe nele, compra estoque — aí olha os números reais e descobre que o mais vendido é o Y, que estava quase acabando no estoque",
+            "causa": "a percepção de 'mais vendido' é enviesada pelos últimos atendimentos e não pelo histórico real — e decisões de estoque baseadas em percepção viram excesso de um e falta de outro",
+            "raiz": "você está investindo dinheiro de estoque baseado em SENSAÇÃO e não em DADOS — e cada compra errada é capital empatado que não gira enquanto o produto certo está em falta"
+          },
+          {
+            "problema": "você tem 200 produtos no catálogo, dá a mesma atenção pra todos, e não percebe que 20% deles geram 80% do faturamento — os outros 80% ocupam espaço, capital e atenção de graça",
+            "causa": "sem classificação ABC, todo produto parece igualmente importante — e você distribui energia, estoque e marketing uniformemente quando deveria concentrar nos que pagam as contas",
+            "raiz": "tratar produtos iguais quando são desiguais é a receita pra mediocridade — os que sustentam o negócio não recebem atenção suficiente, e os que sugam recursos não são cortados"
+          }
+        ],
+        "caracteristica": "Ranking de produtos por vendas, faturamento e tendência + classificação ABC automática — você sabe exatamente onde investir e o que cortar",
+        "produto": "SAGA"
+      },
+      {
+        "funcao": "Analytics de Pagamentos",
+        "funcoes_saga": ["Analytics de Pagamentos"],
+        "problemas": [
+          {
+            "problema": "você oferece PIX e cartão mas não sabe qual método seus clientes preferem — continua forçando cartão sendo que 85% preferem PIX, e a cada cliente que não vê a opção preferida, você perde uma venda por fricção",
+            "causa": "sem dados comparativos de pagamento, a estratégia de cobrança é genérica — e genérica significa que agrada METADE e irrita a outra metade",
+            "raiz": "não entender como seu cliente quer PAGAR é tão grave quanto não entender o que ele quer COMPRAR — porque a decisão de compra morre no pagamento quando o método não é conveniente"
+          }
+        ],
+        "caracteristica": "Comparativo entre métodos de pagamento com valores, taxas e preferência do cliente — você sabe exatamente qual oferecer primeiro",
+        "produto": "SAGA"
+      },
+      {
+        "funcao": "Faturamento BI",
+        "funcoes_saga": ["Faturamento BI"],
+        "problemas": [
+          {
+            "problema": "você não sabe se o faturamento da segunda semana do mês está acima ou abaixo da primeira — só descobre no dia 30 quando abre o extrato e percebe que ficou 25% abaixo sem ter feito nada a respeito",
+            "causa": "sem gráfico de evolução, quedas de faturamento são invisíveis no dia-a-dia — e quando você percebe, já perdeu 2-3 semanas que poderiam ter sido corrigidas",
+            "raiz": "reagir ao faturamento no fim do mês é como apagar incêndio — o prejuízo já aconteceu, e a correção é sempre mais cara e mais desesperada do que a prevenção"
+          }
+        ],
+        "caracteristica": "Gráficos de evolução do faturamento por dia, semana e mês — tendências visíveis antes de virarem problemas",
+        "produto": "SAGA"
+      },
+      {
+        "funcao": "Análise Temporal e Sazonalidade",
+        "funcoes_saga": ["Análise Temporal", "Sazonalidade"],
+        "problemas": [
+          {
+            "problema": "você atende com a mesma equipe e o mesmo estoque de segunda a sábado — sendo que sexta vende 3x mais que terça, e às 19h vende mais que às 14h — resultado: falta gente no pico e sobra gente no vale",
+            "causa": "sem dados temporais, a operação é planejada de forma uniforme — e uniformidade é desperdício quando a demanda é desigual",
+            "raiz": "você está pagando equipe e estoque pra atender a MÉDIA quando deveria dimensionar pro PICO — e a diferença entre os dois é a margem de lucro que desaparece"
+          }
+        ],
+        "caracteristica": "Identifica horários de pico, dias quentes e padrões sazonais — você dimensiona equipe, estoque e promoções pra quando realmente importa",
+        "produto": "SAGA"
+      },
+      {
+        "funcao": "Análise de Clientes",
+        "funcoes_saga": ["Clientes Únicos/Recorrentes", "Cohort Analysis"],
+        "problemas": [
+          {
+            "problema": "você gasta R$2.000/mês pra trazer cliente novo e não sabe quantos dos que já comprou VOLTARAM — pode ser que 80% compra uma vez e nunca mais, e você nem percebeu porque está ocupado atraindo mais gente nova",
+            "causa": "sem separar novos de recorrentes, o número de 'clientes atendidos' parece saudável — mas esconde que a retenção é zero e você vive de primeira compra eterna",
+            "raiz": "negócio que não retém é uma esteira — você corre sem sair do lugar, porque cada cliente novo só está substituindo o anterior que foi embora, e o custo de aquisição nunca diminui"
+          },
+          {
+            "problema": "você não sabe o quanto cada cliente gasta ao longo do tempo (LTV) — trata o cliente de R$50 igual ao de R$5.000 e faz promoção genérica que dilui margem pra quem nunca ia gastar mais",
+            "causa": "sem análise de valor por cliente, a estratégia comercial é cega — e promoção cega atrai quem busca preço baixo e desvaloriza quem já estava disposto a pagar mais",
+            "raiz": "desconhecer o valor real dos seus clientes é desconhecer o valor real do seu negócio — e quem não sabe quanto vale cada cliente não consegue investir proporcionalmente pra retê-lo"
+          }
+        ],
+        "caracteristica": "Separação de clientes novos vs recorrentes, frequência de compra, LTV e análise de retenção por cohort — você vê quem volta, quem some e quanto cada um vale",
+        "produto": "SAGA"
+      },
+      {
+        "funcao": "Conversão Econômica",
+        "funcoes_saga": ["Conversão Econômica"],
+        "problemas": [
+          {
+            "problema": "você perde 70 leads por mês no funil e não sabe quanto dinheiro isso representa — se soubesse que são R$35.000 evaporando por mês, TALVEZ fizesse algo a respeito",
+            "causa": "sem traduzir abandono em REAIS, a perda é abstrata — '70 leads perdidos' não dói, mas 'R$35.000 perdidos' faz o estômago embrulhar",
+            "raiz": "quando a perda é invisível em dinheiro, ela é tolerada como 'normal do negócio' — e essa tolerância é o que impede você de resolver o que está matando seu lucro"
+          }
+        ],
+        "caracteristica": "Calcula automaticamente quanto dinheiro foi perdido em cada etapa do funil (abandono × ticket médio) — a dor traduzida em reais",
+        "produto": "SAGA"
+      },
+      {
+        "funcao": "Comparativo de Período",
+        "funcoes_saga": ["Comparativo de Período"],
+        "problemas": [
+          {
+            "problema": "você sentiu que 'essa semana foi fraca' mas não tem como comparar com a anterior — aí toma decisão emocional (muda preço, faz promoção desesperada) baseado em SENSAÇÃO e não em dados",
+            "causa": "sem comparativo direto, toda avaliação de performance é subjetiva — e subjetividade + pressão financeira = decisões ruins",
+            "raiz": "gerenciar por sensação é o caminho mais rápido pra destruir margem — porque as decisões tomadas em pânico quase sempre custam mais do que o problema que tentam resolver"
+          }
+        ],
+        "caracteristica": "Comparativo automático entre períodos (esta semana vs anterior, este mês vs anterior) — dados lado a lado pra decisões racionais",
+        "produto": "SAGA"
+      },
+      {
+        "funcao": "Análise por Bairro/Região",
+        "funcoes_saga": ["Análise por Bairro"],
+        "problemas": [
+          {
+            "problema": "você investe em tráfego pra cidade inteira mas 60% dos seus pedidos vêm de 3 bairros — os outros 30 bairros recebem o mesmo investimento e devolvem quase nada",
+            "causa": "sem dados geográficos, a verba de marketing é pulverizada uniformemente — e uniformidade geográfica é desperdício quando a demanda é concentrada",
+            "raiz": "você está pagando pra aparecer onde não vendem e deixando de investir onde já vendem — e a diferença entre os dois é o ROI que está sendo queimado todo mês"
+          }
+        ],
+        "caracteristica": "Pedidos, faturamento e ticket médio quebrados por bairro — você sabe exatamente onde seus clientes estão e onde investir",
+        "produto": "SAGA"
+      },
+      {
+        "funcao": "Timeline de Conversões",
+        "funcoes_saga": ["Timeline de Conversões"],
+        "problemas": [
+          {
+            "problema": "você fez uma ação de marketing na segunda e quer saber se funcionou — mas só vai ter o resultado quando contar os pedidos na mão no fim de semana, e aí já é tarde pra ajustar",
+            "causa": "sem timeline diária de conversões, o efeito de cada ação é impossível de isolar — tudo se mistura e nenhuma ação pode ser creditada ou descartada com certeza",
+            "raiz": "quando você não consegue medir o impacto de cada ação individualmente, não consegue APRENDER — e negócio que não aprende repete os mesmos erros todo mês"
+          }
+        ],
+        "caracteristica": "Gráfico diário mostrando evolução de leads → qualificados → carrinho → conversão — você vê o impacto de cada ação no mesmo dia",
+        "produto": "SAGA"
+      },
+      {
+        "funcao": "Clientes em Risco (Churn)",
+        "funcoes_saga": ["Clientes em Risco (Churn)"],
+        "problemas": [
+          {
+            "problema": "seu melhor cliente, que comprava todo mês, parou de comprar há 60 dias — e você não percebeu porque estava ocupado atendendo os novos, até que ele postou foto comprando do concorrente",
+            "causa": "sem alerta de inatividade, clientes que param de comprar desaparecem silenciosamente — e são justamente os mais valiosos que fazem mais falta",
+            "raiz": "perder um cliente recorrente custa 7x mais que reter — porque além da receita perdida, você precisa gastar pra adquirir um novo que vai demorar meses pra alcançar o mesmo valor"
+          },
+          {
+            "problema": "você não sabe quais clientes estão prestes a ir embora AGORA — só descobre quando já foram, e aí a chance de recuperar caiu de 60% pra menos de 5%",
+            "causa": "sem modelo preditivo de churn, a retenção é reativa (age depois que perdeu) em vez de proativa (age antes de perder) — e reativa quase nunca funciona",
+            "raiz": "cada cliente perdido sem aviso é um incêndio que começou pequeno e cresceu invisível — quando você vê a fumaça, a casa já queimou"
+          }
+        ],
+        "caracteristica": "Lista automática de clientes em risco com nível (baixo/médio/alto) e tempo de inatividade — você age ANTES de perder, não depois",
+        "produto": "SAGA"
+      },
+      {
+        "funcao": "Análise de Margem",
+        "funcoes_saga": ["Análise de Margem"],
+        "problemas": [
+          {
+            "problema": "você vende muito do produto A e acha que é o carro-chefe — mas quando calcula o custo real (compra, frete, embalagem, tempo de atendimento), descobre que a margem é 3% e ele está DRENANDO lucro",
+            "causa": "sem análise de margem por produto, o faturamento engana — produto que mais vende pode ser o que menos lucra, e você está trabalhando de graça sem saber",
+            "raiz": "faturamento alto com margem baixa é a armadilha mais perigosa do comércio — porque gera a ilusão de sucesso enquanto o negócio sangra por dentro"
+          }
+        ],
+        "caracteristica": "Cálculo automático de custo, margem bruta, ponto de equilíbrio e lucro por produto — você sabe exatamente QUANTO ganha em cada venda, não quanto COBRA",
+        "produto": "SAGA"
+      },
+      {
+        "funcao": "Pareto de Clientes",
+        "funcoes_saga": ["Pareto de Clientes"],
+        "problemas": [
+          {
+            "problema": "você trata todos os clientes iguais — o que gasta R$10.000/ano recebe o mesmo atendimento do que gasta R$50/ano — e quando o grande sai por falta de atenção, o impacto é catastrófico",
+            "causa": "sem identificar quem são os top 20%, é impossível dar tratamento diferenciado — e tratamento igual pra desiguais é injustiça que os melhores clientes percebem e punem",
+            "raiz": "os 20% que sustentam 80% do seu faturamento esperam ser tratados como parte dos 20% — e quando percebem que são tratados como parte dos 100%, vão pra quem os trata como VIP"
+          }
+        ],
+        "caracteristica": "Mostra que os top 20% dos clientes geram X% do faturamento — com nomes, valores e frequência — pra você saber exatamente quem proteger",
+        "produto": "SAGA"
+      },
+      {
+        "funcao": "Análise de Upsell",
+        "funcoes_saga": ["Análise de Bebidas/Upsell"],
+        "problemas": [
+          {
+            "problema": "seu ticket médio está parado em R$45 há 6 meses e você não sabe como aumentar — tenta oferecer 'mais alguma coisa?' no final e o cliente diz 'não, só isso'",
+            "causa": "upsell genérico não funciona porque o cliente não vê valor — e sem dados de combinação, você sugere o que VOCÊ acha que combina, não o que os dados mostram que VENDE",
+            "raiz": "a diferença entre ticket de R$45 e R$65 é uma sugestão inteligente no momento certo — e sem dados pra saber qual é essa sugestão, cada atendimento desperdiça R$20 de potencial"
+          }
+        ],
+        "caracteristica": "Mostra taxa de venda adicional e quais combinações mais funcionam — você sabe exatamente o que sugerir pra cada compra pra aumentar o ticket",
+        "produto": "SAGA"
+      }
+    ],
+
+    "tracking": [
+      {
+        "funcao": "Rastreamento Completo de Sessão",
+        "funcoes_saga": ["Rastreamento de Sessão", "Eventos de Interação"],
+        "problemas": [
+          {
+            "problema": "você sabe que 100 pessoas entraram no seu fluxo e 10 compraram — mas os outros 90 desapareceram como fantasmas, sem deixar rastro de onde foram ou o que os espantou",
+            "causa": "sem rastreamento de sessão, cada abandono é anônimo e sem contexto — você vê o resultado (perdeu), mas não a causa (por quê)",
+            "raiz": "otimizar sem dados é chutar no escuro — cada 'melhoria' que você faz pode estar resolvendo o problema errado enquanto o verdadeiro gargalo continua intocado"
+          },
+          {
+            "problema": "você mudou o fluxo semana passada e a conversão CAIU em vez de subir — mas não sabe qual mudança específica causou a queda porque não tem dados de antes vs depois",
+            "causa": "sem log de interações, testes são irreversíveis e inrastreáveis — você não pode comparar, não pode isolar e não pode reverter com certeza",
+            "raiz": "cada alteração sem medição é uma aposta cega — e apostas cegas num negócio real destroem mais do que constroem, porque o custo de errar é maior que o ganho de acertar por sorte"
+          }
+        ],
+        "caracteristica": "Registra automaticamente cada ação do usuário (início, interações, abandono) com timestamp — você sabe exatamente o que aconteceu, quando e onde",
+        "produto": "SAGA"
+      },
+      {
+        "funcao": "Registro de Eventos Críticos",
+        "funcoes_saga": ["Registro de Conversão", "Registro de Abandono"],
+        "problemas": [
+          {
+            "problema": "seu contador pergunta 'quantas vendas vocês fizeram esse mês?' e a resposta é contar mensagens de WhatsApp, cruzar com extrato bancário e torcer pra bater — nunca bate",
+            "causa": "sem registro formal de conversão, cada venda é um evento informal que depende de alguém anotar — e quando ninguém anota, o dado se perde",
+            "raiz": "um negócio sem registro confiável de vendas e abandonos é um negócio sem MEMÓRIA — e sem memória, está condenado a repetir os mesmos erros e nunca entender os acertos"
+          }
+        ],
+        "caracteristica": "Marca automaticamente cada conversão (com valor) e cada abandono (com etapa exata) — registros formais que não dependem de ninguém lembrar de anotar",
+        "produto": "SAGA"
+      },
+      {
+        "funcao": "Analytics por Fluxo",
+        "funcoes_saga": ["Analytics por Fluxo"],
+        "problemas": [
+          {
+            "problema": "você tem 5 fluxos diferentes rodando e não sabe qual performa melhor — investe tempo igual em todos e pode estar jogando energia no que não funciona",
+            "causa": "sem dados consolidados por fluxo, performance é percepção — e percepção favorece o que você GOSTA, não o que FUNCIONA",
+            "raiz": "manter fluxos sem medir é como manter funcionários sem avaliar — você paga o custo de todos mas só alguns geram resultado, e sem dados, não sabe quais são quais"
+          }
+        ],
+        "caracteristica": "Dados consolidados de funil, produtos vendidos e pagamentos para CADA fluxo separadamente — você compara, identifica o melhor e replica",
+        "produto": "SAGA"
+      }
+    ]
+  },
+
+  "total_funcoes_mapeadas": 74,
+  "total_entradas_arsenal": 50,
+  "total_problemas_mapeados": 82,
+
+  "instrucoes_motor_bpcf": {
+    "como_usar_no_atendimento": [
+      "1. Motor detecta segmento do cliente (ex: restaurante, loja, imobiliária)",
+      "2. Filtra do arsenal os problemas UNIVERSAIS mais relevantes para aquele segmento",
+      "3. ADAPTA a linguagem ao contexto real do cliente (ex: 'produto' → 'pizza', 'galeria' → 'fotos dos pratos')",
+      "4. Injeta no mapa BPCF da sessão como entradas pré-escavadas",
+      "5. Compositor usa as entradas para construir narrativa DOR→CENÁRIO→SOLUÇÃO→CONSEQUÊNCIA",
+      "6. NUNCA verbalizar CAUSA ou RAIZ ao cliente — são INTERNOS para guiar perguntas e narrativa"
+    ],
+    "limite_por_turno": "Máximo 5-8 entradas selecionadas por turno — priorizar as mais relevantes ao que o cliente expressou",
+    "prioridade_selecao": [
+      "1º — Problemas que o cliente ACABOU DE MENCIONAR (match direto)",
+      "2º — Problemas comuns do SEGMENTO detectado (proativo)",
+      "3º — Problemas conectados a entradas anteriores do mapa (padrões)",
+      "4º — Problemas universais de alta incidência (fallback)"
+    ]
+  }
+}

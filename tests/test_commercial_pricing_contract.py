@@ -92,7 +92,7 @@ def test_multiple_missing_variables_choose_smallest_decisive_one() -> None:
     assert pricing_policy["minimum_pricing_question_label"] == "segmento e tipo de negócio"
 
 
-def test_known_niche_alone_keeps_whatsapp_usage_as_next_decisive_variable() -> None:
+def test_known_niche_alone_keeps_operation_type_as_next_decisive_variable() -> None:
     engine = CommercialPricingPolicyEngine()
     state = _pricing_state(
         lead_summary={
@@ -114,10 +114,40 @@ def test_known_niche_alone_keeps_whatsapp_usage_as_next_decisive_variable() -> N
 
     assert pricing_policy["minimum_validation_satisfied"] is False
     assert pricing_policy["price_response_mode"] == "block_price"
-    assert pricing_policy["validation_missing"][0] == "exemplo_minimo_de_fluxo_aprovado"
+    assert pricing_policy["validation_missing"][0] == "tipo_de_operacao"
+    assert pricing_policy["minimum_pricing_question_variable"] == "tipo_de_operacao"
+    assert pricing_policy["minimum_pricing_question_focus"] == "tipo_de_operacao"
+    assert pricing_policy["minimum_pricing_question_label"] == "tipo de operação"
+
+
+def test_flow_validation_is_not_auto_approved_from_context_alone() -> None:
+    engine = CommercialPricingPolicyEngine()
+    state = _pricing_state(
+        lead_summary={
+            "known_context_count": 4,
+            "minimum_context_ready": True,
+            "business_context_ready_for_sizing": True,
+            "commercial_scope_ready": True,
+            "operation_model_known": True,
+            "channel_usage_known": True,
+            "niche_known": True,
+            "offer_known": True,
+            "pain_known": True,
+        },
+        diagnostic_hypotheses={
+            "contexto_simples": "autopeças com atendimento, orçamento e fechamento no WhatsApp",
+            "segmento": "autopeças",
+            "tipo_oferta": "varejo consultivo",
+            "modelo_operacao": "pedido e orçamento no WhatsApp",
+        },
+    )
+
+    pricing_policy = engine.update_state(state, "quanto custa isso ai?")
+
+    assert pricing_policy["minimum_validation_satisfied"] is False
+    assert pricing_policy["validation_missing"] == ["exemplo_minimo_de_fluxo_aprovado"]
     assert pricing_policy["minimum_pricing_question_variable"] == "exemplo_minimo_de_fluxo_aprovado"
-    assert pricing_policy["minimum_pricing_question_focus"] == "exemplo_minimo_de_fluxo_aprovado"
-    assert pricing_policy["minimum_pricing_question_label"] == "exemplo mínimo de fluxo validado"
+    assert pricing_policy["price_response_mode"] == "block_price"
 
 
 def test_self_contained_question_does_not_open_pricing_gate_from_topic_domain_alone() -> None:
@@ -136,6 +166,49 @@ def test_self_contained_question_does_not_open_pricing_gate_from_topic_domain_al
     pricing_policy = engine.update_state(state, "cara, queria saber se aquele seu sistema ta pronto")
 
     assert pricing_policy["price_response_mode"] == "not_requested"
+
+
+def test_flow_validation_is_approved_after_previous_approval_check_is_confirmed() -> None:
+    engine = CommercialPricingPolicyEngine()
+    state = _pricing_state(
+        lead_summary={
+            "known_context_count": 4,
+            "minimum_context_ready": True,
+            "business_context_ready_for_sizing": True,
+            "commercial_scope_ready": True,
+            "operation_model_known": True,
+            "channel_usage_known": True,
+            "niche_known": True,
+            "offer_known": True,
+            "pain_known": True,
+        },
+        diagnostic_hypotheses={
+            "contexto_simples": "autopeças com atendimento, orçamento e fechamento no WhatsApp",
+            "segmento": "autopeças",
+            "tipo_oferta": "varejo consultivo",
+            "modelo_operacao": "pedido e orçamento no WhatsApp",
+        },
+        response_policy={
+            "commercial_direct_question_detected": True,
+            "response_mode": "ask",
+            "question_variable": "exemplo_minimo_de_fluxo_aprovado",
+            "question_shape": "approval_check",
+        },
+    )
+    state.neural_state = {
+        "communicative_intent": "validate_fit",
+        "answer_scope": "case_dependent",
+        "topic_domain": "commercial_explicit",
+    }
+    state.add_user_turn("é mais ou menos isso mesmo")
+
+    pricing_policy = engine.update_state(state, "é mais ou menos isso mesmo")
+
+    assert state.diagnostic_hypotheses["flow_example_approved"] is True
+    assert pricing_policy["flow_example_approved"] is True
+    assert pricing_policy["flow_example_just_approved"] is True
+    assert pricing_policy["minimum_validation_satisfied"] is True
+    assert pricing_policy["price_response_mode"] == "range_ok"
 
 
 def test_alternate_blueprint_changes_validation_without_core_rewrite() -> None:
@@ -196,6 +269,7 @@ def test_range_is_released_after_minimum_validation() -> None:
             "channel_usage_known": True,
             "niche_known": True,
             "offer_known": True,
+            "pain_known": True,
         },
         diagnostic_hypotheses={
             "contexto_simples": "loja de sofá com atendimento, orçamento e fechamento no WhatsApp",
@@ -214,6 +288,92 @@ def test_range_is_released_after_minimum_validation() -> None:
     assert pricing_policy["price_response_mode"] == "range_ok"
 
 
+def test_flow_validation_is_approved_after_short_confirmation_even_if_semantic_read_keeps_price_context() -> None:
+    engine = CommercialPricingPolicyEngine()
+    state = _pricing_state(
+        lead_summary={
+            "known_context_count": 4,
+            "minimum_context_ready": True,
+            "business_context_ready_for_sizing": True,
+            "commercial_scope_ready": True,
+            "operation_model_known": True,
+            "channel_usage_known": True,
+            "niche_known": True,
+            "offer_known": True,
+            "pain_known": True,
+            "impact_known": True,
+        },
+        diagnostic_hypotheses={
+            "contexto_simples": "loja com atendimento e vendas no WhatsApp",
+            "segmento": "varejo",
+            "tipo_oferta": "varejo consultivo",
+            "modelo_operacao": "vendas no WhatsApp",
+        },
+        response_policy={
+            "commercial_direct_question_detected": True,
+            "response_mode": "ask",
+            "question_variable": "exemplo_minimo_de_fluxo_aprovado",
+            "question_shape": "approval_check",
+        },
+    )
+    state.neural_state = {
+        "communicative_intent": "price_check",
+        "answer_scope": "commercial_dependent",
+        "topic_domain": "commercial_explicit",
+    }
+    state.add_user_turn("é bem isso mesmo")
+
+    pricing_policy = engine.update_state(state, "é bem isso mesmo")
+
+    assert state.diagnostic_hypotheses["flow_example_approved"] is True
+    assert pricing_policy["flow_example_approved"] is True
+    assert pricing_policy["flow_example_just_approved"] is True
+    assert pricing_policy["minimum_validation_satisfied"] is True
+    assert pricing_policy["price_response_mode"] == "range_ok"
+
+
+def test_flow_validation_is_approved_after_short_non_interrogative_implementation_confirmation() -> None:
+    engine = CommercialPricingPolicyEngine()
+    state = _pricing_state(
+        lead_summary={
+            "known_context_count": 4,
+            "minimum_context_ready": True,
+            "business_context_ready_for_sizing": True,
+            "commercial_scope_ready": True,
+            "operation_model_known": True,
+            "channel_usage_known": True,
+            "niche_known": True,
+            "offer_known": True,
+            "pain_known": True,
+            "impact_known": True,
+        },
+        diagnostic_hypotheses={
+            "contexto_simples": "loja com atendimento e vendas no WhatsApp",
+            "segmento": "varejo",
+            "tipo_oferta": "varejo consultivo",
+            "modelo_operacao": "vendas no WhatsApp",
+        },
+        response_policy={
+            "commercial_direct_question_detected": True,
+            "response_mode": "ask",
+            "question_variable": "exemplo_minimo_de_fluxo_aprovado",
+            "question_shape": "approval_check",
+        },
+    )
+    state.neural_state = {
+        "communicative_intent": "implementation",
+        "answer_scope": "commercial_dependent",
+        "topic_domain": "commercial_explicit",
+    }
+    state.add_user_turn("isso")
+
+    pricing_policy = engine.update_state(state, "isso")
+
+    assert pricing_policy["flow_example_approved"] is True
+    assert pricing_policy["flow_example_just_approved"] is True
+    assert pricing_policy["price_response_mode"] == "range_ok"
+
+
 def test_precise_price_stays_locked_until_scope_is_richer() -> None:
     engine = CommercialPricingPolicyEngine()
     state = _pricing_state(
@@ -226,6 +386,7 @@ def test_precise_price_stays_locked_until_scope_is_richer() -> None:
             "channel_usage_known": True,
             "niche_known": True,
             "offer_known": True,
+            "pain_known": True,
         },
         diagnostic_hypotheses={
             "contexto_simples": "loja de sofá com atendimento e orçamento no WhatsApp",
@@ -247,11 +408,19 @@ def test_prompt_debug_carries_semantic_pricing_gate_contract() -> None:
 
     result = service.respond("quanto custa isso ai?")
     instructions = result.markdown_debug["prompt"]["instructions"]
+    user_input = result.markdown_debug["prompt"]["user_input"]
 
     assert "se precisar perguntar antes de falar valor, peça só o recorte concreto que falta" in instructions
     assert "ponto que precisa ficar claro:" in instructions
     assert "question_anchor=" not in instructions
     assert "inject_policy_anchor" not in instructions
+    assert "Se citar valores, preserve exatamente o formato BRL do brief" not in user_input
+    assert "Neste turno, não cite preço, faixa ou condição comercial antes da pergunta necessária." in user_input
+    assert "CONTRATO DE HUMANIZAÇÃO" in instructions
+    assert "Pergunta boa parece curiosidade real, não formulário." in instructions
+    assert "faça uma pergunta natural, uma só" in instructions
+    assert "se precisar dar contexto, faça isso em meia frase" in instructions
+    assert "antes da pergunta, faça uma ponte curta mostrando por que vale responder agora" not in instructions
 
 
 def test_enforcer_accepts_single_price_followup_question_without_rewriting() -> None:
@@ -274,6 +443,31 @@ def test_enforcer_accepts_single_price_followup_question_without_rewriting() -> 
     assert "R$ 1.500" in decision.response
 
 
+def test_enforcer_flags_explicit_price_when_pricing_is_blocked() -> None:
+    service = _new_service()
+    service.state.stage_id = "etapa_03_contextualizacao_permissao"
+    service.state.response_policy = {
+        "response_mode": "ask",
+        "question_budget": 1,
+        "must_ask": True,
+        "question_variable": "nicho_ou_segmento",
+        "question_shape": "open_context",
+        "question_constraints": ("single_question", "avoid_menu", "avoid_taxonomy"),
+        "social_opening_only": False,
+    }
+    service.state.pricing_policy = {
+        "price_response_mode": "block_price",
+    }
+
+    decision = service._enforce_final_response_policy_with_trace(
+        "Fica entre R$ 1.500 e R$ 2.600 na maioria dos casos. Que negócio é o seu?"
+    )
+
+    assert decision.reason == "needs_repair_blocked_price_leak"
+    assert decision.needs_repair is True
+    assert decision.violation_type == "blocked_price_leak"
+
+
 def test_enforcer_accepts_single_natural_question_with_short_preamble() -> None:
     service = _new_service()
     service.state.stage_id = "etapa_04_diagnostico_situacional"
@@ -293,6 +487,58 @@ def test_enforcer_accepts_single_natural_question_with_short_preamble() -> None:
 
     assert decision.reason == "none"
     assert decision.needs_repair is False
+
+
+def test_enforcer_ignores_embedded_example_question_marks_and_keeps_real_question() -> None:
+    service = _new_service()
+    service.state.stage_id = "etapa_03_contextualizacao_permissao"
+    service.state.response_policy = {
+        "response_mode": "ask",
+        "question_budget": 1,
+        "must_ask": True,
+        "question_variable": "exemplo_minimo_de_fluxo_aprovado",
+        "question_shape": "approval_check",
+        "question_constraints": ("single_question", "avoid_menu", "avoid_taxonomy"),
+        "social_opening_only": False,
+    }
+
+    decision = service._enforce_final_response_policy_with_trace(
+        "Faz sentido. Quando entra muita gente ao mesmo tempo, vira aquela chuva de “tem esse?”, "
+        "“qual o preço?”, “me manda foto” o dia todo. Hoje a pessoa te chama e você responde tudo na mão mesmo?"
+    )
+
+    assert decision.reason == "none"
+    assert decision.needs_repair is False
+    assert decision.response.endswith("?")
+
+
+def test_enforcer_flags_long_repetition_against_previous_assistant_reply() -> None:
+    service = _new_service()
+    service.state.stage_id = "etapa_03_contextualizacao_permissao"
+    service.state.last_assistant_message = (
+        "Sou eu sim. É um sistema pra organizar o WhatsApp da empresa de um jeito bem prático: "
+        "o cliente já entra, vê opções em botões, pode olhar os produtos com foto e preço, "
+        "escolher ali mesmo e até pagar por PIX, enquanto vocês acompanham tudo num painel."
+    )
+    service.state.response_policy = {
+        "response_mode": "explain",
+        "question_budget": 0,
+        "must_ask": False,
+        "social_opening_only": False,
+    }
+    service.state.pricing_policy = {
+        "price_response_mode": "not_requested",
+    }
+
+    decision = service._enforce_final_response_policy_with_trace(
+        "Tá sim, já tá pronto pra usar. Na prática, ele pega o WhatsApp da empresa e organiza o atendimento: "
+        "o cliente entra, escolhe por botões, vê produto com foto e preço, pode pagar por ali mesmo, "
+        "e vocês acompanham tudo num painel."
+    )
+
+    assert decision.reason == "needs_repair_repetitive_response"
+    assert decision.needs_repair is True
+    assert decision.violation_type == "repetition"
 
 
 def test_enforcer_flags_missing_required_question_instead_of_injecting_text() -> None:
@@ -404,6 +650,26 @@ def test_approval_check_prompt_translates_internal_contract_without_literal_labe
         "price_response_mode": "block_price",
         "question_will_change_what": "confiança para sair do piso e abrir faixa",
     }
+    state.offer_context = {
+        "capability_snapshot_ready": True,
+        "capability_negotiation_ready": True,
+        "require_characteristic_translation": True,
+        "require_operational_gain_translation": True,
+        "function_characteristics": [
+            {
+                "function_name": "Qualificação",
+                "characteristic": "organiza a entrada e a triagem do atendimento",
+                "product": "SAGA",
+            },
+            {
+                "function_name": "Confirmação de Pedido",
+                "characteristic": "fecha o pedido com os dados críticos confirmados",
+                "product": "SAGA",
+            },
+        ],
+        "flow_validation_pending": True,
+        "flow_model_style": "complete_saga_flow",
+    }
     service.state = state
 
     intent = service.turn_director.build_intent(state=service.state, arsenal_hits=[])
@@ -415,11 +681,30 @@ def test_approval_check_prompt_translates_internal_contract_without_literal_labe
         arsenal_hits=[],
     )
 
-    assert "confirme um recorte concreto do caso, sem pedir o processo inteiro" in instructions
-    assert "ponto que precisa ficar claro: um recorte real de como isso acontece hoje" in instructions
+    assert "proponha um fluxo exemplo completo do SAGA e confirme se é esse tipo de fluxo que faria sentido" in instructions
+    assert "ponto que precisa ficar claro: se esse fluxo completo faria sentido no caso dele" in instructions
+    assert "antes de avançar para valor, proponha um exemplo completo do fluxo do SAGA para esse caso" in instructions
+    assert "esse fluxo deve mostrar entrada, organização inicial, avanço útil e desfecho claro" in instructions
+    assert "depois confirme em uma pergunta curta se é esse tipo de fluxo que faria sentido aí" in instructions
     assert "prefira português brasileiro natural, sem gíria marcada nem caricatura" in instructions
-    assert "valide uma cena mínima antes de avançar" not in instructions
     assert "ponto que precisa ficar claro: exemplo mínimo de fluxo validado" not in instructions
+
+
+def test_product_identity_and_inventory_grounding_reach_prompt_without_writing_the_response() -> None:
+    service = _new_service()
+    result = service.respond("queria entender melhor esse sistema para WhatsApp")
+
+    offer_context = result.markdown_debug["offer_context"]
+    inventory_hits = result.markdown_debug["retrieval"]["inventory_hits"]
+    instructions = result.markdown_debug["prompt"]["instructions"]
+
+    assert offer_context["product_knowledge_ready"] is True
+    assert offer_context["product_name"] == "SAGA"
+    assert offer_context["product_essence"]
+    assert inventory_hits
+    assert "explique o produto de forma concreta, simples e sem virar apresentação" in instructions
+    assert "use 1 ou 2 ações concretas do que ele faz:" in instructions
+    assert "o cliente compra de verdade:" not in instructions
 
 
 def test_repair_prefers_rewritten_response_when_it_improves_output(monkeypatch) -> None:

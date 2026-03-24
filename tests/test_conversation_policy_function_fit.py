@@ -234,6 +234,7 @@ def test_self_contained_question_answers_without_forcing_context_qualification()
         "transition_reason": "a conversa já saiu da abertura lateral",
         "communicative_intent": "clarify",
         "answer_scope": "self_contained",
+        "self_contained_goal": "availability_check",
     }
     state.counterparty_model = {
         "question_priority": "clarity_question",
@@ -250,3 +251,43 @@ def test_self_contained_question_answers_without_forcing_context_qualification()
     assert policy["must_ask"] is False
     assert policy["answer_now_instead_of_asking"] is True
     assert policy["question_variable"] == ""
+    assert policy["explain_scope"] == "reply_only"
+    assert policy["explanation_style_hint"] == "responda só se está pronto e pare"
+
+
+def test_case_dependent_product_question_explains_before_opening_discovery() -> None:
+    engine = ConversationPolicyEngine(MockLLMClient())
+    state = ConversationState(stage_id="etapa_03_contextualizacao_permissao")
+    state.offer_sales_architecture = _default_blueprint()
+    state.lead_summary = {
+        "known_context_count": 1,
+        "minimum_context_ready": False,
+        "commercial_scope_ready": False,
+        "pain_known": False,
+        "impact_known": False,
+        "next_question_focus": "context",
+    }
+    state.neural_state = {
+        "topic_domain": "work_curiosity",
+        "transition_permission": "allow_context",
+        "transition_reason": "o cliente ainda está entendendo o que a solução faz",
+        "communicative_intent": "clarify",
+        "answer_scope": "case_dependent",
+    }
+    state.counterparty_model = {
+        "question_priority": "clarity_question",
+    }
+    state.pricing_policy = {
+        "price_response_mode": "not_requested",
+    }
+
+    policy = engine.reconcile_state(state)
+
+    assert policy["response_mode"] == "explain"
+    assert policy["question_goal"] == "none"
+    assert policy["question_budget"] == 0
+    assert policy["must_ask"] is False
+    assert policy["answer_now_instead_of_asking"] is True
+    assert policy["response_tone_hint"] == "explique com clareza concreta antes de abrir discovery"
+    assert "o que o produto é" in policy["explanation_style_hint"]
+    assert policy["explain_scope"] == "product_identity_full"

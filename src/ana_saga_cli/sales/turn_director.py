@@ -25,6 +25,10 @@ from ana_saga_cli.prompting.text_utils import (
     first_nonempty,
     list_values,
 )
+from ana_saga_cli.sales.capability_contract import (
+    read_primary_capability,
+    read_secondary_capability,
+)
 
 
 class TurnDirector:
@@ -62,8 +66,12 @@ class TurnDirector:
         if clean_text(pricing_policy.get("journey_mode", "")) == "consultative_screening":
             return "consultivo_franco"
         if mode == "ask":
-            if clean_text(response_policy.get("question_goal", "")) in {"fit", "pricing"}:
-                return "consultivo_diagnostico"
+            if clean_text(response_policy.get("question_shape", "")) == "approval_check":
+                return "consultivo_curto"
+            if clean_text(response_policy.get("question_goal", "")) == "pricing":
+                return "honesto_consultivo"
+            if clean_text(response_policy.get("question_goal", "")) == "fit":
+                return "consultivo_franco"
             return "consultivo_curto"
         if clean_text(surface_guidance.get("brevity_mode", "")) == "short":
             return "enxuto_contextual"
@@ -85,14 +93,20 @@ class TurnDirector:
         if mode == "pricing_answer" and clean_text(pricing_policy.get("price_response_mode", "")) == "floor_only":
             return "answer_first"
         if mode == "pricing_answer":
-            return "contrast_simple_vs_complete"
+            return "answer_first"
+        if clean_text(response_policy.get("question_shape", "")) == "approval_check":
+            return "mini_scenario"
+        if mode == "ask" and clean_text(response_policy.get("question_goal", "")) == "pricing":
+            return "answer_first"
         if mode == "explain" and bool(response_policy.get("answer_now_instead_of_asking", False)):
+            return "answer_first"
+        if mode == "explain" and clean_text(response_policy.get("explain_scope", "")) in {"reply_only", "product_identity_short"}:
             return "answer_first"
         if (
             bool(response_policy.get("commercial_direct_question_detected", False))
             and mode == "ask"
         ):
-            return "anchor_then_invite"
+            return "answer_first"
         mapping = {
             "answer_first": "answer_first",
             "context_first": "mini_scenario",
@@ -233,21 +247,23 @@ class TurnDirector:
     def _resolve_hero_support(
         active_pain: dict[str, Any],
         surface_guidance: dict[str, Any],
+        offer_context: dict[str, Any],
+        offer_sales_architecture: dict[str, Any],
         arsenal_hits: list[ArsenalEntry],
         simple_context: bool,
     ) -> tuple[str, str]:
         if simple_context:
             return "", ""
         hero = first_nonempty(
-            surface_guidance.get("hero_saga_function"),
-            surface_guidance.get("primary_saga_function"),
+            offer_context.get("hero_function"),
+            read_primary_capability(surface_guidance, offer_sales_architecture),
             active_pain.get("hero_function"),
             active_pain.get("funcao_saga_que_ajuda"),
             arsenal_hits[0].function_name if arsenal_hits else "",
         )
         support = first_nonempty(
-            surface_guidance.get("support_saga_function"),
-            surface_guidance.get("secondary_saga_function"),
+            offer_context.get("support_function"),
+            read_secondary_capability(surface_guidance, offer_sales_architecture),
             active_pain.get("support_function"),
             arsenal_hits[1].function_name if len(arsenal_hits) > 1 else "",
         )
@@ -265,6 +281,8 @@ class TurnDirector:
         response_policy = state.response_policy or {}
         surface_guidance = state.surface_guidance or {}
         pricing_policy = state.pricing_policy or {}
+        offer_context = state.offer_context or {}
+        offer_sales_architecture = state.offer_sales_architecture or {}
         lead_summary = state.lead_summary or {}
         diagnostic_hypotheses = state.diagnostic_hypotheses or {}
         mapped_pains = mapped_pains_from_hypotheses(diagnostic_hypotheses)
@@ -280,6 +298,11 @@ class TurnDirector:
         opening_shape = self._resolve_opening_shape(response_policy, surface_guidance, pricing_policy)
         pricing_posture = self._resolve_pricing_posture(pricing_policy, response_policy)
         q_fields = self._resolve_question_fields(response_policy)
+        if (
+            clean_text(q_fields["question_shape"]) == "approval_check"
+            and bool(offer_context.get("flow_validation_pending", False))
+        ):
+            opening_shape = "mini_scenario"
         question_label = resolve_question_label(
             state,
             q_fields["question_variable"],
@@ -288,7 +311,14 @@ class TurnDirector:
         client_context = self._resolve_client_context(lead_summary, diagnostic_hypotheses)
         main_pain = self._resolve_main_pain(active_pain, surface_guidance)
         operational_scene = self._resolve_operational_scene(active_pain, surface_guidance)
-        hero, support = self._resolve_hero_support(active_pain, surface_guidance, arsenal_hits, simple_context)
+        hero, support = self._resolve_hero_support(
+            active_pain,
+            surface_guidance,
+            offer_context,
+            offer_sales_architecture,
+            arsenal_hits,
+            simple_context,
+        )
 
         # Anti-patterns from response_policy
         anti: list[str] = []
@@ -311,6 +341,7 @@ class TurnDirector:
             pricing_change_hint=clean_text(pricing_policy.get("question_will_change_what", "")),
             style_posture=style_posture,
             opening_shape=opening_shape,
+            explain_scope=clean_text(response_policy.get("explain_scope", "")),
             anti_patterns=tuple(anti),
             client_context=client_context,
             main_pain=main_pain,

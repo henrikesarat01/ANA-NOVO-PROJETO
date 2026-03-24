@@ -27,6 +27,7 @@ class TurnIntent:
     pricing_change_hint: str = ""               # o que a resposta do cliente muda no preço
     style_posture: str = "contextual_objetivo"  # leve_disponivel | consultivo_curto | etc.
     opening_shape: str = "anchor_then_invite"   # saudacao_leve | answer_first | mini_scenario | etc.
+    explain_scope: str = ""                     # reply_only | product_identity_short | product_identity_full | ""
 
     # O QUE NÃO fazer
     anti_patterns: tuple[str, ...] = ()         # ("menu_question", "taxonomic_list", ...)
