@@ -27,6 +27,7 @@ _load_dotenv()
 class AppConfig:
     provider: str = os.getenv("ANA_PROVIDER", "mock").strip().lower()
     model: str = os.getenv("ANA_MODEL", "gpt-5.4").strip()
+    prompt_mode: str = os.getenv("ANA_PROMPT_MODE", "full").strip().lower()
     openai_api_key: str | None = os.getenv("OPENAI_API_KEY")
     cerebras_api_key: str | None = os.getenv("CEREBRAS_API_KEY")
     verbose: bool = os.getenv("ANA_VERBOSE", "false").strip().lower() == "true"
@@ -37,3 +38,19 @@ class AppConfig:
     max_arsenal_hits: int = 6
     product_name: str = "SAGA"
     system_name: str = "ANA"
+
+    @property
+    def speech_only_mode(self) -> bool:
+        return self.prompt_mode in {"speech_only", "speech_only_raw"}
+
+    @property
+    def speech_only_raw_mode(self) -> bool:
+        return self.prompt_mode == "speech_only_raw"
+
+    @property
+    def stage_framework_raw_mode(self) -> bool:
+        return self.prompt_mode == "speech_stage_framework_raw"
+
+    @property
+    def raw_response_mode(self) -> bool:
+        return self.prompt_mode in {"speech_only_raw", "speech_stage_framework_raw"}

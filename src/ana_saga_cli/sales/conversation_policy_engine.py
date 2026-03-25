@@ -210,8 +210,19 @@ class ConversationPolicyEngine:
             "response_tone_hint": "",
             "explanation_style_hint": "",
             "explain_scope": "",
+            "protect_internal_build_details": False,
         }
         return policy
+
+    def _implementation_detail_guard_active(self, state: ConversationState) -> bool:
+        architecture = state.offer_sales_architecture or {}
+        explanation_strategy = architecture.get("explanation_strategy", {}) if isinstance(architecture.get("explanation_strategy", {}), dict) else {}
+        if not bool(explanation_strategy.get("implementation_details_only_after_fit", False)):
+            return False
+        if state.stage_id in _FIT_STAGES:
+            return False
+        opening_state = get_opening_semantic_state(state)
+        return _clean_text(opening_state.get("topic_domain", "")) == "work_curiosity"
 
     def _social_opening_policy(self, state: ConversationState, policy: dict[str, Any]) -> dict[str, Any]:
         opening_state = get_opening_semantic_state(state)
@@ -245,6 +256,7 @@ class ConversationPolicyEngine:
     def _self_contained_answer_policy(self, state: ConversationState, policy: dict[str, Any]) -> dict[str, Any]:
         neural_state = state.neural_state or {}
         transition_reason = _clean_text(neural_state.get("transition_reason", ""))
+        protect_build_details = self._implementation_detail_guard_active(state)
         policy.update(
             {
                 "response_mode": "explain",
@@ -269,14 +281,19 @@ class ConversationPolicyEngine:
                 "response_tone_hint": "direto, presente e sem puxar trilho comercial",
                 "explanation_style_hint": "responda o ponto do cliente antes de aprofundar o caso",
                 "explain_scope": "reply_only",
+                "protect_internal_build_details": protect_build_details,
             }
         )
         self_contained_goal = _clean_text(neural_state.get("self_contained_goal", ""))
         if self_contained_goal == "offer_explanation":
             policy.update(
                 {
-                    "response_tone_hint": "explique curto, concreto e sem apresentação",
-                    "explanation_style_hint": "explique em poucas linhas o que é e como aparece na rotina",
+                    "response_tone_hint": "situe com leveza e não transforme isso em apresentação",
+                    "explanation_style_hint": (
+                        "deixe a oferta ganhar forma pelo que a pessoa vê, faz, recebe ou resolve ali; prefira uma cena plausível ao inventário de função e pare antes de virar apresentação"
+                        if not protect_build_details
+                        else "deixe o efeito prático aparecer pelo que a pessoa percebe ali, sem abrir bastidor; prefira cena viva a lista e não detalhe construção, arquitetura, stack, componentes internos ou fluxo técnico"
+                    ),
                     "explain_scope": "product_identity_short",
                 }
             )
@@ -314,7 +331,7 @@ class ConversationPolicyEngine:
             return False
 
         communicative_intent = _clean_text(neural_state.get("communicative_intent", ""))
-        if communicative_intent not in {"explore", "clarify", "validate_fit", "compare", "implementation"}:
+        if communicative_intent not in {"explore", "clarify", "validate_fit", "compare"}:
             return False
 
         transition_permission = _clean_text(neural_state.get("transition_permission", ""))
@@ -326,6 +343,7 @@ class ConversationPolicyEngine:
     def _offer_explanation_policy(self, state: ConversationState, policy: dict[str, Any]) -> dict[str, Any]:
         neural_state = state.neural_state or {}
         transition_reason = _clean_text(neural_state.get("transition_reason", ""))
+        protect_build_details = self._implementation_detail_guard_active(state)
         policy.update(
             {
                 "response_mode": "explain",
@@ -347,9 +365,18 @@ class ConversationPolicyEngine:
                 "ask_reason": transition_reason,
                 "question_context_hint": "",
                 "question_will_change_what": "",
-                "response_tone_hint": "explique com clareza concreta antes de abrir discovery",
-                "explanation_style_hint": "diga o que o produto é, o que ele faz na rotina e o que muda na prática, sem abstracao vazia",
-                "explain_scope": "product_identity_full",
+                "response_tone_hint": (
+                    "responda como quem situa, não como quem apresenta"
+                    if not protect_build_details
+                    else "responda em alto nível, sem abrir bastidor técnico"
+                ),
+                "explanation_style_hint": (
+                    "torne a oferta visível pelo que muda na frente da pessoa; prefira uma cena plausível do caso dela a lista de função, módulo ou categoria"
+                    if not protect_build_details
+                    else "mostre o efeito prático em alto nível pelo que a pessoa percebe; prefira cena plausível a lista e não detalhe construção, arquitetura, stack, componentes internos, integrações ou fluxo técnico"
+                ),
+                "explain_scope": "product_identity_short" if protect_build_details else "product_identity_full",
+                "protect_internal_build_details": protect_build_details,
             }
         )
         return policy

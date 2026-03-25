@@ -288,6 +288,9 @@ def test_case_dependent_product_question_explains_before_opening_discovery() -> 
     assert policy["question_budget"] == 0
     assert policy["must_ask"] is False
     assert policy["answer_now_instead_of_asking"] is True
-    assert policy["response_tone_hint"] == "explique com clareza concreta antes de abrir discovery"
-    assert "o que o produto é" in policy["explanation_style_hint"]
-    assert policy["explain_scope"] == "product_identity_full"
+    assert policy["protect_internal_build_details"] is True
+    assert policy["response_tone_hint"] == "responda em alto nível, sem abrir bastidor técnico"
+    assert "efeito prático" in policy["explanation_style_hint"]
+    assert "cena plausível" in policy["explanation_style_hint"]
+    assert "não detalhe construção" in policy["explanation_style_hint"]
+    assert policy["explain_scope"] == "product_identity_short"

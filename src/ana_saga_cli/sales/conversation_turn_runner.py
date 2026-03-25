@@ -6,16 +6,17 @@ from typing import Any
 
 from ana_saga_cli.domain.stage_ids import STAGE_ORDER
 from ana_saga_cli.knowledge.loader import (
-    load_humanization_framework,
     load_product_identity,
     load_product_inventory,
 )
+from ana_saga_cli.prompting.sections.guardrails import build_humanization_section
 from ana_saga_cli.prompting.sections.philosophy import build_turn_philosophy_section
 from ana_saga_cli.knowledge.retriever import InventoryRetriever
 from ana_saga_cli.sales.capability_contract import (
     read_primary_capability,
     read_secondary_capability,
 )
+from ana_saga_cli.sales.response_enforcer import EnforcementDecision
 
 
 def _clean_text(value: object) -> str:
@@ -113,7 +114,7 @@ class ConversationTurnRunner:
         return changed
 
     def _repair_instructions(self) -> str:
-        humanization = load_humanization_framework()
+        humanization = build_humanization_section()
         intent = self.service.turn_director.build_intent(
             state=self.service.state,
             arsenal_hits=[],
@@ -139,7 +140,7 @@ Se a nova resposta estiver parecida demais com a fala anterior da ANA, responda 
 Nunca use rótulo interno, nome de variável ou linguagem de bastidor.
 """
         if humanization:
-            return f"{base}\n{philosophy}\n\nCONTRATO DE HUMANIZAÇÃO\n{humanization}"
+            return f"{base}\n{philosophy}\n\n{humanization}"
         return f"{base}\n{philosophy}"
 
     def _repair_input(self, raw_response: str, violation_type: str) -> str:
@@ -176,6 +177,18 @@ Nunca use rótulo interno, nome de variável ou linguagem de bastidor.
         return "\n".join(lines)
 
     def _repair_response_if_needed(self, raw_response: str, decision: Any) -> Any:
+        if bool(getattr(self.service.config, "speech_only_raw_mode", False)):
+            self._last_repair_debug = {
+                "attempted": False,
+                "enabled": False,
+                "standby": True,
+                "trigger_reason": "bypassed_raw_speech_mode",
+                "trigger_violation_type": "",
+                "original_response": raw_response,
+                "used_repaired_response": False,
+                "final_response_after_repair": raw_response,
+            }
+            return decision
         if not bool(getattr(self.service.config, "repair_enabled", False)):
             self._last_repair_debug = {
                 "attempted": False,
@@ -495,6 +508,56 @@ Nunca use rótulo interno, nome de variável ou linguagem de bastidor.
 
     def _run_turn_decision_phase(self, start: _TurnStart) -> dict[str, Any]:
         service = self.service
+        if bool(getattr(service.config, "raw_response_mode", False)):
+            pricing_before = deepcopy(service.state.pricing_policy)
+            policy_before = deepcopy(service.state.response_policy)
+            service.state.pricing_policy = {}
+            service.state.response_policy = {}
+            stage = service.stages[service.state.stage_id]
+            stage_decision = _StageProgressDecision(
+                next_stage_id=service.state.stage_id,
+                source="speech_only_raw",
+                confidence=1.0,
+                reason="raw_speech_mode_bypass",
+            )
+            service._add_trace(
+                start.debug_trace,
+                "pipeline.turn_decision",
+                raw_mode=True,
+                pricing_policy_bypassed=True,
+                response_policy_bypassed=True,
+                response_mode="-",
+                question_goal="-",
+                question_type="-",
+                question_variable="-",
+                question_shape="-",
+                question_budget=0,
+                must_ask=False,
+                price_response_mode="-",
+                validation_missing=[],
+                readiness_stage="-",
+                adaptive_enabled=False,
+                adaptive_selected_variable="-",
+                adaptive_selection_reason="bypassed_raw_speech_mode",
+                adaptive_question_style="-",
+                adaptive_dynamic_known=[],
+                adaptive_dynamic_missing=[],
+                next_stage=stage_decision.next_stage_id,
+                stage_reason=stage_decision.reason,
+            )
+            service._add_trace(
+                start.debug_trace,
+                "pipeline.turn_decision.delta",
+                raw_mode=True,
+                pricing_changed=self._changed_keys(pricing_before, service.state.pricing_policy),
+                policy_changed=self._changed_keys(policy_before, service.state.response_policy),
+            )
+            return {
+                "pricing_policy": service.state.pricing_policy,
+                "response_policy": service.state.response_policy,
+                "stage_decision": stage_decision,
+                "stage": stage,
+            }
         pricing_before = deepcopy(service.state.pricing_policy)
         policy_before = deepcopy(service.state.response_policy)
         pricing_policy = service.commercial_pricing_policy.update_state(service.state, start.user_message)
@@ -585,6 +648,45 @@ Nunca use rótulo interno, nome de variável ou linguagem de bastidor.
 
     def _run_capability_pricing_phase(self, start: _TurnStart) -> dict[str, Any]:
         service = self.service
+        if bool(getattr(service.config, "raw_response_mode", False)):
+            service.state.surface_guidance = {}
+            service.state.offer_context = {}
+            service._add_trace(
+                start.debug_trace,
+                "pipeline.capability_pricing",
+                raw_mode=True,
+                bypassed=True,
+                hits=[],
+                count=0,
+                hero_function="-",
+                support_function="-",
+                selected_capabilities=[],
+                inventory_hits=[],
+                product_grounding_ready=False,
+                flow_validation_status="bypassed_raw_speech_mode",
+                flow_validation_pending=False,
+                opening="-",
+                brevity="-",
+            )
+            service._add_trace(
+                start.debug_trace,
+                "pipeline.capability_pricing.delta",
+                raw_mode=True,
+                bypassed=True,
+                allow_grounding=False,
+                query=start.user_message,
+                product_slug="-",
+                product_identity_loaded=False,
+                inventory_facts_loaded=0,
+                surface_changed=[],
+            )
+            return {
+                "arsenal_hits": [],
+                "surface_guidance": {},
+                "offer_context": {},
+                "inventory_hits": [],
+                "inventory_query": start.user_message,
+            }
         query = self._build_capability_query(start.user_message)
         product_identity, inventory_facts = self._load_product_knowledge()
         inventory_hits = InventoryRetriever(inventory_facts).top_facts(query, limit=6) if inventory_facts else []
@@ -657,11 +759,18 @@ Nunca use rótulo interno, nome de variável ou linguagem de bastidor.
             start.debug_trace,
             "pipeline.prompt",
             stage=decision["stage"].stage_id,
+            prompt_mode=service.config.prompt_mode,
+            speech_only_mode=service.config.speech_only_mode,
+            speech_only_raw_mode=service.config.speech_only_raw_mode,
+            stage_framework_raw_mode=service.config.stage_framework_raw_mode,
             response_mode=str((service.state.response_policy or {}).get("response_mode", "-")),
             philosophy_mode=self._extract_prompt_philosophy_mode(instructions),
             framework_name=self._extract_prompt_framework_name(instructions),
             philosophy_lines=self._count_prompt_section_lines(instructions, "FILOSOFIA DO TURNO"),
-            adaptive_pricing_philosophy_lines=self._count_prompt_matching_lines(instructions, "FILOSOFIA DO TURNO", "filosofia adaptativa"),
+            adaptive_pricing_philosophy_lines=(
+                self._count_prompt_matching_lines(instructions, "FILOSOFIA DO TURNO", "filosofia adaptativa")
+                + self._count_prompt_matching_lines(instructions, "FILOSOFIA DO TURNO", "fio adaptativo")
+            ),
             stage_personality_lines=self._count_prompt_section_lines(instructions, "PERSONALIDADE DO ESTÁGIO"),
             stage_contract_lines=self._count_prompt_matching_lines(instructions, "PERSONALIDADE DO ESTÁGIO", "contrato real deste estágio"),
             humanization_lines=self._count_prompt_section_lines(instructions, "CONTRATO DE HUMANIZAÇÃO"),
@@ -773,8 +882,26 @@ Nunca use rótulo interno, nome de variável ou linguagem de bastidor.
                 instructions=prompt["instructions"],
                 user_input=prompt["prompt_input"],
             )
-        enforcement_decision = service._enforce_final_response_policy_with_trace(raw_response)
-        enforcement_decision = self._repair_response_if_needed(raw_response, enforcement_decision)
+        if bool(getattr(service.config, "raw_response_mode", False)):
+            enforcement_decision = EnforcementDecision(
+                response=_clean_text(raw_response),
+                reason="bypassed_raw_speech_mode",
+                needs_repair=False,
+                violation_type="",
+            )
+            self._last_repair_debug = {
+                "attempted": False,
+                "enabled": False,
+                "standby": True,
+                "trigger_reason": "bypassed_raw_speech_mode",
+                "trigger_violation_type": "",
+                "original_response": raw_response,
+                "used_repaired_response": False,
+                "final_response_after_repair": _clean_text(raw_response),
+            }
+        else:
+            enforcement_decision = service._enforce_final_response_policy_with_trace(raw_response)
+            enforcement_decision = self._repair_response_if_needed(raw_response, enforcement_decision)
         final_response = enforcement_decision.response
         if self._last_repair_debug.get("attempted", False):
             service._add_trace(
@@ -816,6 +943,7 @@ Nunca use rótulo interno, nome de variável ou linguagem de bastidor.
             raw_preview=raw_response,
             policy_enforced=final_response != raw_response,
             enforcement_applied=enforcement_decision.reason,
+            enforcement_bypassed=bool(getattr(service.config, "raw_response_mode", False)),
             needs_repair=enforcement_decision.needs_repair,
             violation_type=enforcement_decision.violation_type,
             final_preview=final_response,

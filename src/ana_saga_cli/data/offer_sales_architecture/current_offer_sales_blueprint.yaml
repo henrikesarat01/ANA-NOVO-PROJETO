@@ -1,33 +1,37 @@
 offer_name: SAGA
 knowledge_product_slug: saga
-offer_type: software_whatsapp_automation
-offer_summary: software que organiza atendimento, triagem, jornada comercial e operação no WhatsApp
+offer_type: sistema_whatsapp
+offer_summary: sistema para vendas, atendimento e acompanhamento no WhatsApp
+
 primary_sale_motion: consultiva
 conversation_entry_strategy: contextual_then_dor
-first_question_goal: entender_tipo_de_operacao_e_uso_atual
+first_question_goal: nicho_ou_segmento_produto_que_o_cliente_vende
+
 early_allowed_moves:
   - explicacao_curta_do_que_e
   - pergunta_de_contexto_do_negocio
-  - pergunta_de_uso_atual
-  - pergunta_de_dor_operacional
+
 early_forbidden_moves:
-  - clareza_abstrata_sem_contexto
-  - pitch_tecnico_longo
-  - detalhe_de_implantacao_cedo
-  - preco_completo_cedo
+  - preco_sem_saber_o_que_o_cliente_vende
+  - detalhe_tecnico_longo_cedo
+  - formulario_de_qualificacao
+
 explanation_strategy:
   explain_what_it_is_early: true
   technical_pitch_early: curto
   implementation_details_only_after_fit: true
   prefer_practical_examples: true
-trust_strategy: mostrar aplicacao no caso real antes de tecnicismo ou promessa ampla
+
+trust_strategy: explicar de forma simples e ancorar rapido no caso real
 proof_strategy: exemplo_pratico_curto
+
 price_strategy:
-  floor_allowed_early: true
+  floor_allowed_early: false
   full_range_allowed_only_after_context: true
   implantation_details_only_after_fit: true
   precise_quote_only_after_scope: true
-  proof_before_price: true
+  proof_before_price: false
+
 pricing_validation:
   require_minimum_validation_before_price: true
   allow_price_before_minimum_validation: false
@@ -37,74 +41,37 @@ pricing_validation:
   explanation_style_before_question: breve_contextual
   avoid_dry_questioning: true
   avoid_question_stack: true
+
   minimum_required_variables:
     - nicho_ou_segmento_produto_que_o_cliente_vende
-    - exemplo_minimo_de_fluxo_aprovado
+
   fixed_required_variables:
     - nicho_ou_segmento_produto_que_o_cliente_vende
-    - exemplo_minimo_de_fluxo_aprovado
-  adaptive_dynamic_variables:
-    - como_as_vendas_acontecem_hoje
-    - como_o_cliente_compra_hoje
-  minimum_dynamic_signals_before_price: 2
-  dynamic_checkpoints_are_mandatory: true
-  confidence_modulates_question_style_not_requirement: true
-  optional_but_relevant_variables:
-    - como_as_vendas_acontecem_hoje
-    - como_o_cliente_compra_hoje
-    - quantidade_de_fluxos
-    - necessidade_de_integracao
-    - fechamento_no_whatsapp_ou_triagem
+
+  adaptive_dynamic_variables: []
+  minimum_dynamic_signals_before_price: 0
+  dynamic_checkpoints_are_mandatory: false
+  confidence_modulates_question_style_not_requirement: false
+
+  optional_but_relevant_variables: []
+
   variables_that_change_price:
     - nicho_ou_segmento_produto_que_o_cliente_vende
-    - como_as_vendas_acontecem_hoje
-    - como_o_cliente_compra_hoje
-    - exemplo_minimo_de_fluxo_aprovado
-    - complexidade_do_fluxo
-    - integracao
-    - quantidade_de_jornadas
+
   preferred_question_sequence:
     - nicho_ou_segmento_produto_que_o_cliente_vende
-    - como_as_vendas_acontecem_hoje
-    - como_o_cliente_compra_hoje
-    - exemplo_minimo_de_fluxo_aprovado
-    - fator_estrutural_de_complexidade
+
   adaptive_inference:
-    enabled: true
-    infer_from_niche_before_asking: true
-    choose_next_question_from_case_not_fixed_sequence: true
-    allow_flow_validation_after_dynamic_minimum: true
+    enabled: false
+    infer_from_niche_before_asking: false
+    choose_next_question_from_case_not_fixed_sequence: false
+    allow_flow_validation_after_dynamic_minimum: false
     log_detailed_reasoning: true
-    filosofia_de_inferencia_do_fluxo: >
-      Depois de entender o que o cliente vende, não trate a conversa como coleta de
-      campos. Imagine como essa venda provavelmente acontece na vida real: como a
-      pessoa chega, como entende a oferta, como escolhe, onde pede ajuda e o que
-      precisa acontecer para a compra sair. A partir disso, aproxime-se da menor
-      dúvida que ainda muda materialmente o desenho do fluxo. Não pergunte para
-      mapear tudo; pergunte só para reduzir a incerteza mais decisiva. Se o caso já
-      estiver claro, avance sem voltar para perguntas de base.
-    filosofia_de_selecao_da_proxima_pergunta: >
-      A próxima pergunta nunca deve nascer de uma sequência fixa. Ela deve nascer do
-      encontro entre o que esse negócio parece vender, a forma provável dessa jornada
-      e a parte da experiência que ainda está nebulosa. A boa pergunta não é a mais
-      completa; é a que mais ajuda a transformar um caso genérico em um fluxo
-      plausível. Se duas dúvidas forem possíveis, escolha a que mais muda o fluxo e
-      o valor. Se nenhuma mudar muito, não pergunte.
-    filosofia_de_validacao_antes_do_preco: >
-      Antes de preço, a ANA não precisa esgotar o diagnóstico. Ela precisa apenas
-      sair do abstrato e chegar a um fluxo mínimo crível para aquele negócio. Isso
-      acontece quando já está claro o que o cliente vende e quando a conversa permite
-      visualizar, com alguma nitidez, como a venda acontece ou pode acontecer. A
-      validação final não é burocracia: é a confirmação de que o fluxo proposto
-      conversa com a rotina real do cliente.
-    filosofia_de_pergunta_obrigatoria_com_forma_flexivel: >
-      Os pontos obrigatórios do pré-preço continuam existindo, mas a forma da
-      pergunta não deve ser fixa. A ANA não pula esses pontos só porque sente que
-      já entendeu; ela usa a leitura do caso para decidir como perguntar. Quando a
-      hipótese ainda está aberta, pergunta de forma exploratória. Quando já existe
-      uma hipótese forte, pergunta por confirmação curta, recorte ou mini-cena.
-      A consistência está nos pontos que precisam ser atravessados; a naturalidade
-      está no jeito de atravessá-los.
+    filosofia_de_inferencia_do_fluxo: ""
+    filosofia_de_selecao_da_proxima_pergunta: ""
+    filosofia_de_validacao_antes_do_preco: ""
+    filosofia_de_pergunta_obrigatoria_com_forma_flexivel: ""
+
   variable_definitions:
     nicho_ou_segmento_produto_que_o_cliente_vende:
       known_fields:
@@ -116,94 +83,44 @@ pricing_validation:
         - single_question
         - avoid_menu
         - avoid_taxonomy
-      reason: sair do abstrato e ancorar a conversa no tipo real de produto, nicho ou segmento
-      changes: leitura do caso, jornada provavel e filtro do fluxo
-    como_as_vendas_acontecem_hoje:
-      known_fields:
-        - operation_model_known
-        - customer_type_known
-      focus: como_as_vendas_acontecem_hoje
-      label: como as vendas acontecem hoje
-      shape: open_context
-      constraints:
-        - single_question
-        - avoid_menu
-        - avoid_taxonomy
-      reason: entender como a venda sai do interesse e vira conversa, pedido ou fechamento
-      changes: desenho provavel do fluxo e nivel de intervencao humana
-    como_o_cliente_compra_hoje:
-      known_fields:
-        - channel_usage_known
-      focus: como_o_cliente_compra_hoje
-      label: como o cliente compra hoje
-      shape: open_context
-      constraints:
-        - single_question
-        - avoid_menu
-        - avoid_taxonomy
-      reason: entender como o cliente avanca hoje ate escolher, pedir ou fechar
-      changes: papel do WhatsApp, autonomia do cliente e profundidade do fluxo
-    exemplo_minimo_de_fluxo_aprovado:
-      known_fields: []
-      focus: exemplo_minimo_de_fluxo_aprovado
-      label: confirmação do fluxo proposto
-      shape: approval_check
-      constraints:
-        - single_question
-        - avoid_menu
-        - avoid_taxonomy
-      reason: validar um fluxo exemplo completo do SAGA no caso real, como último passo antes de abrir valor
-      changes: segurança para abrir faixa com base no fluxo que realmente será implantado
+      reason: ancorar a conversa no produto, servico, nicho ou segmento real antes de qualquer valor
+      changes: base minima para entender aderencia e precificacao
+
   price_release_modes:
     floor_only_after_minimum_validation: true
     range_only_after_context: true
     precise_only_after_scope: true
+
 pricing_contract:
   floor_implantation: 1500
   floor_monthly: 500
   timeline_weeks: "3-4"
   monthly_billing_starts: após entrada em operação
   implementation_phases:
-    - descoberta operacional
-    - desenho do fluxo
+    - entendimento do caso
+    - desenho inicial
     - implantação inicial
   payment_terms:
     upfront_percent: 50
     delivery_percent: 50
   complexity_multipliers:
     simples: 1.0
-    media: 1.35
-    alta: 1.8
   readiness_stage_multipliers:
     A: 1.0
-    B: 1.2
-    C: 1.5
+
 capability_mapping:
-  require_contextual_function_mapping_before_value: true
-  require_characteristic_translation: true
-  require_operational_gain_translation: true
-  prefer_dual_function_frame: true
-  max_functions_in_negotiation_frame: 2
+  require_contextual_function_mapping_before_value: false
+  require_characteristic_translation: false
+  require_operational_gain_translation: false
+  prefer_dual_function_frame: false
+  max_functions_in_negotiation_frame: 1
+
 flow_validation:
-  require_minimal_flow_before_price: true
+  require_minimal_flow_before_price: false
   approval_variable: exemplo_minimo_de_fluxo_aprovado
-  require_capability_snapshot_before_flow_validation: true
-  flow_model_style: complete_saga_flow
-capability_runtime:
-  catalog_kind: capability_registry
-  primary_surface_keys:
-    - hero_capability
-    - primary_capability
-    - hero_saga_function
-    - primary_saga_function
-  secondary_surface_keys:
-    - support_capability
-    - secondary_capability
-    - support_saga_function
-    - secondary_saga_function
-  suggested_surface_keys:
-    - suggested_capability
-    - suggested_saga_function
+  require_capability_snapshot_before_flow_validation: false
+  flow_model_style: operational_minimum
+
 questioning_strategy:
   every_question_must_have_visible_reason: true
   reason_must_be_customer_facing: true
@@ -212,258 +129,46 @@ questioning_strategy:
   avoid_interrogatory_flow: true
   avoid_generic_qualification: true
   prefer_smallest_useful_question: true
-  infer_capability_paths_from_context: true
-  choose_questions_that_disambiguate_relevant_capabilities: true
-  avoid_questions_unlinked_to_real_capabilities: true
+  infer_capability_paths_from_context: false
+  choose_questions_that_disambiguate_relevant_capabilities: false
+  avoid_questions_unlinked_to_real_capabilities: false
+
 conversation_progression:
   - situar rapidamente o que e
-  - entender o negocio
-  - entender como o contato entra hoje
-  - entender uso atual do WhatsApp
-  - abrir dor ou trava operacional
-  - confirmar qual capacidade da solucao ataca a trava principal
-  - validar um exemplo minimo de fluxo no caso real
-  - conectar valor pratico
-  - aprofundar escopo
-  - abrir faixa mais completa so depois de contexto
+  - entender o que o cliente vende
+  - so depois abrir contexto adicional e valor
+
 success_signals:
-  - cliente entende aplicacao no proprio caso
-  - cliente consegue visualizar uso real
-  - cliente verbaliza dor ou gargalo
-  - cliente aceita aprofundar contexto
-  - cliente pede proximo passo com base no proprio processo
+  - cliente diz o que vende
+  - conversa sai do abstrato
+  - existe base minima para continuar
+
 objection_signals:
-  - pedido de preco completo cedo demais
-  - falta de clareza sobre aplicacao no caso real
-  - dificuldade de visualizar uso pratico
-  - tentativa de empurrar a conversa para detalhe tecnico cedo
+  - pedido de preco antes de contexto minimo
+  - cliente ainda abstrato sobre o proprio negocio
+
 moment_guidance:
   opening:
-    objective: situar rapidamente o que e e abrir contexto real
+    objective: situar rapidamente a oferta e descobrir o que o cliente vende
     preferred_move: explicacao_curta_e_contextualizacao
     question_style: pergunta_de_contexto_do_negocio
     avoid:
+      - preco_sem_contexto
       - pitch_tecnico_longo
-      - preco_completo_cedo
-  context:
-    objective: entender tipo de operação e uso atual
-    preferred_move: pergunta_de_uso_atual
-    question_style: pergunta_de_uso_atual
-    avoid:
-      - clareza_abstrata_sem_contexto
-      - detalhe_de_implantacao_cedo
-  pain:
-    objective: abrir trava operacional e peso do problema
-    preferred_move: pergunta_de_dor_operacional
-    question_style: pergunta_de_dor_operacional
-    avoid: []
-  value:
-    objective: conectar valor ao caso real antes de ampliar escopo
-    preferred_move: explicacao_curta_conectando_valor
-    question_style: pergunta_de_aprofundamento
-    avoid:
-      - preco_completo_cedo
-  pricing:
-    objective: abrir piso ou faixa conservadora sem detalhar tudo cedo
-    preferred_move: ancora_de_piso_ou_faixa_conservadora
-    question_style: pergunta_de_escopo_se_precisar
-    avoid:
-      - detalhe_de_implantacao_cedo
-      - pitch_tecnico_longo
+
 question_contracts:
-  niche_and_channel:
-    focus: niche_and_channel
-    label: segmento e entrada do canal
+  nicho_ou_segmento_produto_que_o_cliente_vende:
+    focus: nicho_ou_segmento_produto_que_o_cliente_vende
+    label: o que voce vende hoje
     shape: open_context
-    constraints: [single_question, avoid_menu, avoid_taxonomy]
-  niche_only:
-    focus: nicho_ou_segmento
-    label: segmento e atividade principal
-    shape: open_context
-    constraints: [single_question, avoid_menu, avoid_taxonomy]
-  offer_type:
-    focus: tipo_de_operacao
-    label: tipo de oferta
-    shape: open_context
-    constraints: [single_question, avoid_menu, avoid_taxonomy]
-  channel_usage:
-    focus: uso_atual_do_whatsapp
-    label: uso atual do canal
-    shape: open_context
-    constraints: [single_question, avoid_menu, avoid_taxonomy]
-  operation_fit:
-    focus: operation_fit
-    label: encaixe da solução na rotina
-    shape: fit_check
-    constraints: [single_question, avoid_menu, avoid_taxonomy]
-  customer_type:
-    focus: customer_type
-    label: perfil de quem procura
-    shape: open_context
-    constraints: [single_question, avoid_menu, avoid_taxonomy]
-  general_fit:
-    focus: general_fit
-    label: ponto de maior encaixe da solução
-    shape: fit_check
-    constraints: [single_question, avoid_menu, avoid_taxonomy]
-  capability_bridge:
-    focus: capability_bridge
-    label: capacidade real que conversa com o caso
-    shape: fit_check
-    constraints: [single_question, avoid_menu, avoid_taxonomy]
-  closing_process:
-    focus: closing_process
-    label: ponto em que o fechamento acontece
-    shape: open_context
-    constraints: [single_question, avoid_menu, avoid_taxonomy]
-  catalog_existence:
-    focus: catalog_existence
-    label: existência de catálogo estruturado
-    shape: open_context
-    constraints: [single_question, avoid_menu, avoid_taxonomy]
-  payment_in_channel:
-    focus: payment_in_channel
-    label: pagamento dentro do canal
-    shape: open_context
-    constraints: [single_question, avoid_menu, avoid_taxonomy]
-  order_confirmation:
-    focus: order_confirmation
-    label: confirmação antes de concluir
-    shape: open_context
-    constraints: [single_question, avoid_menu, avoid_taxonomy]
-  scheduling_automation:
-    focus: scheduling_automation
-    label: nível de automação do agendamento
-    shape: open_context
-    constraints: [single_question, avoid_menu, avoid_taxonomy]
-  handoff_point:
-    focus: handoff_point
-    label: ponto de handoff humano
-    shape: fit_check
-    constraints: [single_question, avoid_menu, avoid_taxonomy]
-  integration_need:
-    focus: integration_need
-    label: necessidade real de integração
-    shape: open_context
-    constraints: [single_question, avoid_menu, avoid_taxonomy]
-  team_size:
-    focus: team_size
-    label: pessoas e fluxo atual de atendimento
-    shape: open_context
-    constraints: [single_question, avoid_menu, avoid_taxonomy]
-  flow_count:
-    focus: quantidade_de_fluxos
-    label: quantidade de fluxos principais
-    shape: open_context
-    constraints: [single_question, avoid_menu, avoid_taxonomy]
-  service_next_step:
-    focus: service_next_step
-    label: próximo passo após a triagem
-    shape: open_context
-    constraints: [single_question, avoid_menu, avoid_taxonomy]
-  customer_help_point:
-    focus: customer_help_point
-    label: ponto em que ainda precisa de ajuda humana
-    shape: fit_check
-    constraints: [single_question, avoid_menu, avoid_taxonomy]
-  customer_autonomy:
-    focus: customer_autonomy
-    label: autonomia do cliente na jornada
-    shape: fit_check
-    constraints: [single_question, avoid_menu, avoid_taxonomy]
-  handoff_readiness:
-    focus: handoff_readiness
-    label: o que precisa estar pronto antes do handoff
-    shape: fit_check
-    constraints: [single_question, avoid_menu, avoid_taxonomy]
-  pain_general:
-    focus: principal_trava_operacional
-    label: principal trava da operação
-    shape: open_pain
-    constraints: [single_question, avoid_menu, avoid_taxonomy]
-  pain_service:
-    focus: principal_trava_operacional
-    label: principal atrito do serviço
-    shape: open_pain
-    constraints: [single_question, avoid_menu, avoid_taxonomy]
-  pain_catalog:
-    focus: principal_trava_operacional
-    label: principal atrito da jornada de escolha
-    shape: open_pain
-    constraints: [single_question, avoid_menu, avoid_taxonomy]
-  pain_handoff:
-    focus: principal_trava_operacional
-    label: principal atrito antes do handoff
-    shape: open_pain
-    constraints: [single_question, avoid_menu, avoid_taxonomy]
-  impact_weight:
-    focus: impact_weight
-    label: peso do impacto
-    shape: open_pain
-    constraints: [single_question, avoid_menu, avoid_taxonomy]
-  tension_source:
-    focus: tension_source
-    label: origem do embolo operacional
-    shape: open_pain
-    constraints: [single_question, avoid_menu, avoid_taxonomy]
-  daily_routine_fit:
-    focus: operation_fit
-    label: entrada da solução no dia a dia
-    shape: fit_check
-    constraints: [single_question, avoid_menu, avoid_taxonomy]
-  service_fit:
-    focus: operation_fit
-    label: encaixe da solução no serviço
-    shape: fit_check
-    constraints: [single_question, avoid_menu, avoid_taxonomy]
-  compatibility_check:
-    focus: compatibility_check
-    label: o que precisa bater para fazer sentido
-    shape: fit_check
-    constraints: [single_question, avoid_menu, avoid_taxonomy]
-  capability_priority:
-    focus: capability_priority
-    label: tipo de capacidade que resolve o gargalo
-    shape: fit_check
-    constraints: [single_question, avoid_menu, avoid_taxonomy]
-  trust_need:
-    focus: trust_need
-    label: segurança necessária para avaliar
-    shape: fit_check
-    constraints: [single_question, avoid_menu, avoid_taxonomy]
-  comparison_axis:
-    focus: comparison_axis
-    label: eixo principal de comparação
-    shape: fit_check
-    constraints: [single_question, avoid_menu, avoid_taxonomy]
-  clarity_priority:
-    focus: clarity_priority
-    label: prioridade de clareza
-    shape: fit_check
-    constraints: [single_question, avoid_menu, avoid_taxonomy]
-  proof_preference:
-    focus: proof_preference
-    label: preferência de prova prática
-    shape: fit_check
-    constraints: [single_question, avoid_menu, avoid_taxonomy]
-  proof_validation:
-    focus: exemplo_minimo_de_fluxo_aprovado
-    label: validação de exemplo mínimo de fluxo
-    shape: approval_check
-    constraints: [single_question, avoid_menu, avoid_taxonomy]
-  value_priority:
-    focus: value_priority
-    label: prioridade de valor
-    shape: fit_check
-    constraints: [single_question, avoid_menu, avoid_taxonomy]
-  pricing_context:
-    focus: pricing_context
-    label: contexto mínimo para situar preço
-    shape: fit_check
-    constraints: [single_question, avoid_menu, avoid_taxonomy]
+    constraints:
+      - single_question
+      - avoid_menu
+      - avoid_taxonomy
+    reason: sair do abstrato e entender o produto, servico, nicho ou segmento real do cliente
+
 runtime_hints:
+  knowledge_product_slug: saga
   planner_style_bias: consultivo_objetivo
-  mapper_activation_mode: hold_until_pain_or_impact
-  preferred_question_style: usage_question
   response_opening_bias: anchor_then_invite
-  confidence: 0.92
+  confidence: 0.0

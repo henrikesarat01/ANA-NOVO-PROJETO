@@ -221,26 +221,26 @@ class CommercialPricingPolicyEngine:
             if bool(lead_summary.get("operation_model_known", False) or lead_summary.get("customer_type_known", False)):
                 return (
                     "confirmatory",
-                    "já existe uma hipótese da rotina; entre por confirmação curta de como a venda anda hoje, sem checklist",
+                    "já existe uma hipótese da rotina; entre por confirmação curta de como a venda anda hoje, sem preâmbulo e sem checklist",
                 )
             return (
                 "exploratory",
-                "essa parte ainda está aberta; pergunte de forma concreta e simples como a venda acontece hoje",
+                "essa parte ainda está aberta; pergunte de forma concreta e simples como a venda acontece hoje, sem justificar demais a pergunta",
             )
         if selected_variable == "como_o_cliente_compra_hoje":
             if bool(lead_summary.get("channel_usage_known", False)):
                 return (
                     "confirmatory",
-                    "já existe uma hipótese do canal; confirme como o cliente avança hoje até escolher, pedir ou fechar",
+                    "já existe uma hipótese do canal; confirme como o cliente avança hoje até escolher, pedir ou fechar, sem rodeio",
                 )
             return (
                 "exploratory",
-                "pergunte de forma aberta como o cliente costuma avançar até comprar hoje",
+                "pergunte de forma aberta como o cliente costuma avançar até comprar hoje, sem justificar demais a pergunta",
             )
         if selected_variable == "nicho_ou_segmento_produto_que_o_cliente_vende":
             return (
                 "exploratory",
-                "ancore a conversa no que ele vende hoje, do jeito mais direto e humano possível",
+                "chegue direto no que ele vende hoje, do jeito mais humano possível e sem discurso de proteção",
             )
         if selected_variable == "exemplo_minimo_de_fluxo_aprovado":
             return (

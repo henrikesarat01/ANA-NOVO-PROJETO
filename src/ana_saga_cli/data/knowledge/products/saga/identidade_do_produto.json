@@ -2,15 +2,16 @@
   "arsenal_id": "BPCF-ARSENAL-SAGA",
   "identidade_do_produto": {
     "nome": "SAGA",
-    "categoria": "sistema de atendimento, venda e acompanhamento no WhatsApp",
-    "o_que_e": "o SAGA é um sistema que transforma o WhatsApp da empresa numa operação organizada — ele atende o cliente com menus, botões e catálogos, monta pedidos, cobra pagamento, e mostra pra empresa tudo que está acontecendo num painel de controle",
-    "o_que_o_cliente_compra_de_verdade": "parar de depender de gente fazendo tudo na mão no WhatsApp e ter um sistema que atende, vende, cobra e mostra onde está cada conversa",
+    "categoria": "sistema completo para fazer o WhatsApp da empresa funcionar sozinho",
+    "o_que_e": "o SAGA é um sistema completo que faz o WhatsApp da empresa funcionar sozinho, com atendimento montado sob medida pro negócio dela, menu de entrada com botões, catálogo visual em carrossel com foto e preço, lista de opções organizadas, formulário pra coletar dados do cliente, montagem de pedido automática, escolha de pagamento, geração de PIX na hora, confirmação automática quando o dinheiro cai, resumo do pedido antes de fechar, envio de foto, vídeo, áudio, documento, localização e contato, recuperação de quem desistiu por áudio de voz automático, acompanhamento de em qual etapa cada pessoa parou, qualificação do lead com pontuação e classificação, recomendação automática do produto certo pro perfil do cliente, agendamento de visita e reserva pelo WhatsApp, direcionamento pra atendente humano quando precisa, envio de mensagem em massa com filtro inteligente, nutrição automática de conteúdo ao longo do tempo, e um painel completo onde a empresa vê tudo em tempo real: quanto vendeu, quanto perdeu, quem sumiu, quem voltou, quem está em risco, qual produto vende mais, qual dá mais lucro, em que horário vende mais, de qual região vem mais pedido, quanto dinheiro ficou na mesa por abandono e como os clientes se comportam ao longo do tempo",
+    "o_que_o_cliente_compra_de_verdade": "um WhatsApp que consegue atender, vender, cobrar, recuperar, qualificar, agendar e mostrar tudo o que está acontecendo sem a empresa depender de alguém conduzindo tudo na mão o tempo inteiro",
     "o_que_nao_e": [
-      "não é só um chatbot que responde sim ou não",
-      "não é só disparo de mensagem em massa",
-      "não é só resposta automática solta sem contexto",
-      "não é um CRM genérico que não entende de WhatsApp",
-      "não é um sistema que substitui o humano — ele organiza o trabalho do humano"
+      "não é só um robô respondendo pergunta solta",
+      "não é só disparo ou resposta automática genérica",
+      "não é só um menu travado sem continuidade de jornada",
+      "não é só catálogo visual ou só cobrança isolada",
+      "não é só CRM, só funil, só painel ou só automação pontual",
+      "não é para tirar o humano da conversa, e sim para fazer o humano entrar na hora certa"
     ]
   },
   "arquitetura_do_produto": {
@@ -51,41 +52,33 @@
       "não ter ideia de quanto dinheiro perdeu ou deixou de ganhar por falta de acompanhamento"
     ],
     "o_que_o_produto_faz_concretamente": [
-      "mostra um menu de botões pro cliente escolher o que quer logo de cara",
-      "exibe os produtos ou serviços em carrossel deslizável com foto, nome, preço e botão",
-      "mostra o catálogo inteiro organizado por categoria",
-      "coleta nome, endereço, preferências e dados do cliente em formulário estruturado",
-      "monta o pedido automaticamente conforme o cliente vai escolhendo",
-      "oferece as formas de pagamento e gera o PIX na hora",
-      "verifica sozinho se o pagamento caiu e avisa cliente e empresa",
-      "mostra o resumo do pedido pro cliente confirmar antes de fechar",
-      "quando o cliente para no meio, manda um áudio de voz automático pra trazer ele de volta",
-      "rastreia em qual etapa cada pessoa parou e lista os telefones pra recuperação",
-      "pontua e classifica cada lead como quente, morno ou frio",
-      "sugere o produto ou serviço certo pro perfil de cada cliente",
-      "direciona pra um atendente humano quando o automático não resolve",
-      "mostra tudo num painel com números, gráficos, funil e quadro de acompanhamento"
+      "mostra opções logo de cara em botões e cards",
+      "exibe produto ou serviço com foto, nome, preço, variação e detalhe útil",
+      "deixa a pessoa avançar sozinha até o pedido",
+      "coleta os dados do pedido no próprio fluxo",
+      "gera o PIX na hora e confere o pagamento",
+      "avisa quando o pagamento entrou",
+      "retoma quem parou no meio da compra",
+      "mostra em que etapa cada conversa ficou",
+      "chama o humano quando a conversa pede alguém de verdade"
     ],
     "o_que_fica_visivel": [
-      "em que etapa cada conversa está (começou, viu produto, escolheu, pagou ou desistiu)",
-      "quem abandonou e em que momento exato parou",
+      "em que etapa cada conversa está",
+      "quem abandonou e em que ponto parou",
       "quem avançou e está perto de fechar",
-      "o que virou venda de verdade e quanto entrou de dinheiro",
-      "onde a operação trava (etapa que mais perde gente)",
-      "quais produtos ou serviços vendem mais e quais não saem",
-      "quais clientes estão sumindo e podem não voltar",
-      "quanto dinheiro a empresa está perdendo por abandono em cada etapa",
-      "a jornada completa de cada cliente do início ao fim"
+      "o que virou venda",
+      "quais produtos ou serviços puxam mais interesse",
+      "onde mais gente desiste"
     ]
   },
   "explicacao_humana": {
-    "cena_simples": "a empresa recebe dezenas ou centenas de mensagens por dia no WhatsApp e hoje uma pessoa fica respondendo tudo na mão — mesmas perguntas, mesmos preços, mesmas fotos, pedido por pedido",
-    "antes": "conversa espalhada sem controle, atendente repetindo as mesmas respostas, cliente esperando, pedido montado na base da conversa, pagamento cobrado no improviso, sem saber quem desistiu nem por quê, sem números nenhum sobre o que está funcionando ou não",
-    "depois": "o cliente abre o WhatsApp, vê um menu organizado, escolhe o que quer num carrossel com fotos, preenche os dados, paga pelo PIX que aparece na hora, recebe confirmação automática — e se desistir no meio, recebe um áudio puxando ele de volta. A empresa vê tudo isso num painel: quantos entraram, quantos compraram, quem parou onde, quanto faturou, qual produto vende mais",
-    "prova_simples": "o cliente entra no WhatsApp, escolhe o produto deslizando cards com foto e preço, paga pelo PIX que aparece ali mesmo, recebe confirmação na hora — e a empresa acompanha tudo num painel sem precisar perguntar nada pra ninguém"
+    "cena_simples": "a pessoa chama no WhatsApp para comprar, pedir orçamento, agendar ou tirar dúvida e, em vez de alguém conduzir tudo no improviso, o próprio WhatsApp já direciona, mostra opções, coleta o que falta, avança o pedido ou o agendamento, cobra quando precisa e chama um humano quando a conversa pede alguém de verdade",
+    "antes": "o contato entra solto, alguém responde tudo no braço, repete informação, procura foto, monta pedido no texto, cobra no improviso, esquece retorno e muita conversa morre sem ninguém enxergar direito onde travou",
+    "depois": "o cliente entra, toca no que quer, vê opções, preenche o que falta, avança no pedido, no pagamento, no agendamento ou na qualificação, e se parar no meio a empresa consegue retomar depois sem voltar do zero",
+    "prova_simples": "a pessoa entra no WhatsApp, escolhe por botão, lista ou card, vê produto ou serviço, segue o próximo passo e conclui o que precisa ali mesmo, enquanto a empresa enxerga o que andou, o que parou e onde vale entrar manualmente"
   },
   "promessa_central": {
-    "frase_curta": "o SAGA faz o WhatsApp da empresa deixar de ser improviso e virar operação",
-    "frase_comercial": "o SAGA transforma o WhatsApp em um canal organizado de atendimento, venda e acompanhamento — com catálogo visual, pagamento integrado, recuperação automática de desistentes e painel completo de controle"
+    "frase_curta": "o SAGA faz o WhatsApp parar de só responder e começar a vender de verdade",
+    "frase_comercial": "o SAGA transforma o WhatsApp em um lugar onde a pessoa consegue avançar compra, pagamento, agendamento, qualificação e atendimento, enquanto a empresa acompanha a jornada inteira e ajusta o que está travando"
   }
 }

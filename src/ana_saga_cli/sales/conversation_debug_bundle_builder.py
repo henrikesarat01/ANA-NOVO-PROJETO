@@ -79,6 +79,9 @@ class ConversationDebugBundleBuilder:
             "GUARDRAILS",
             "CONTRATO DE HUMANIZAÇÃO",
             "FILOSOFIA DO TURNO",
+            "FRAMEWORK DO ESTÁGIO",
+            "IDENTIDADE DO PRODUTO",
+            "FILOSOFIA DE EXPLICAÇÃO DO PRODUTO",
             "PERSONALIDADE DO ESTÁGIO",
             "ETAPA",
             "PLANO DO TURNO",
@@ -103,6 +106,9 @@ class ConversationDebugBundleBuilder:
             "GUARDRAILS",
             "CONTRATO DE HUMANIZAÇÃO",
             "FILOSOFIA DO TURNO",
+            "FRAMEWORK DO ESTÁGIO",
+            "IDENTIDADE DO PRODUTO",
+            "FILOSOFIA DE EXPLICAÇÃO DO PRODUTO",
             "PERSONALIDADE DO ESTÁGIO",
             "ETAPA",
             "PLANO DO TURNO",
@@ -115,13 +121,34 @@ class ConversationDebugBundleBuilder:
                 order.append(normalized)
         return order
 
+    def _extract_input_section_lines(self, prompt_input: str, header: str) -> list[str]:
+        target = header.strip().upper()
+        headers = {
+            "HISTORICO RECENTE",
+            "CONTEXTO FACTUAL",
+            "ANCORA DO PRODUTO",
+            "MENSAGEM ATUAL DO CLIENTE",
+            "TAREFA",
+        }
+        collected: list[str] = []
+        active = False
+        for raw_line in prompt_input.splitlines():
+            line = raw_line.rstrip()
+            normalized = _clean_text(line).upper()
+            if normalized == target:
+                active = True
+                continue
+            if active and normalized in headers:
+                break
+            if active and _clean_text(line):
+                collected.append(_clean_text(line))
+        return collected
+
     @staticmethod
     def _framework_lines(philosophy_lines: list[str]) -> list[str]:
         markers = (
             "- framework do estágio:",
-            "- o que esse framework é:",
-            "- breve explicação do framework:",
-            "- conceito filosófico completo:",
+            "- lente filosófica do estágio:",
         )
         return [line for line in philosophy_lines if any(line.lower().startswith(marker) for marker in markers)]
 
@@ -129,25 +156,33 @@ class ConversationDebugBundleBuilder:
     def _philosophy_core_lines(philosophy_lines: list[str]) -> list[str]:
         markers = (
             "- framework do estágio:",
-            "- o que esse framework é:",
-            "- breve explicação do framework:",
-            "- conceito filosófico completo:",
+            "- lente filosófica do estágio:",
         )
         return [line for line in philosophy_lines if not any(line.lower().startswith(marker) for marker in markers)]
 
     def _prompt_diagnostics(self, instructions: str, prompt_input: str) -> dict[str, Any]:
         philosophy_lines = self._extract_section_lines(instructions, "FILOSOFIA DO TURNO")
+        framework_section_lines = self._extract_section_lines(instructions, "FRAMEWORK DO ESTÁGIO")
+        product_identity_section_lines = self._extract_section_lines(instructions, "IDENTIDADE DO PRODUTO")
+        product_explanation_section_lines = self._extract_section_lines(instructions, "FILOSOFIA DE EXPLICAÇÃO DO PRODUTO")
         stage_personality_lines = self._extract_section_lines(instructions, "PERSONALIDADE DO ESTÁGIO")
         humanization_lines = self._extract_section_lines(instructions, "CONTRATO DE HUMANIZAÇÃO")
+        guardrails_lines = self._extract_section_lines(instructions, "GUARDRAILS")
         context_lines = self._extract_section_lines(instructions, "CONTEXTO")
         plan_lines = self._extract_section_lines(instructions, "PLANO DO TURNO")
-        framework_lines = self._framework_lines(philosophy_lines)
+        framework_lines = self._framework_lines(philosophy_lines) or framework_section_lines
         philosophy_core_lines = self._philosophy_core_lines(philosophy_lines)
+        history_input_lines = self._extract_input_section_lines(prompt_input, "HISTORICO RECENTE")
+        factual_context_input_lines = self._extract_input_section_lines(prompt_input, "CONTEXTO FACTUAL")
+        product_anchor_input_lines = self._extract_input_section_lines(prompt_input, "ANCORA DO PRODUTO")
         stage_contract_lines = [
             line for line in stage_personality_lines if line.lower().startswith("- contrato real deste estágio:") or line.lower().startswith("- no máximo") or "intenção principal" in line.lower() or "adapte o tamanho" in line.lower() or "não force próximo passo" in line.lower() or "evite linguagem corporativa" in line.lower() or "não verbalize raciocínio interno" in line.lower() or "prefira mensagem curta" in line.lower() or "se o negócio ainda estiver abstrato" in line.lower() or "não despeje feature" in line.lower() or "entenda o negócio antes" in line.lower() or "se a resposta vier ampla" in line.lower() or "mostre a cena primeiro" in line.lower() or "varie a forma de checar aderência" in line.lower()
         ]
         adaptive_pricing_philosophy_lines = [
-            line for line in philosophy_lines if "filosofia adaptativa" in line.lower()
+            line for line in philosophy_lines if "filosofia adaptativa" in line.lower() or "fio adaptativo" in line.lower()
+        ]
+        product_explanation_philosophy_lines = product_explanation_section_lines or [
+            line for line in philosophy_lines if "fio de explicação do produto:" in line.lower()
         ]
         philosophy_mode = ""
         framework_name = ""
@@ -157,11 +192,56 @@ class ConversationDebugBundleBuilder:
                 philosophy_mode = _clean_text(line.split(":", 1)[1] if ":" in line else line)
             if lowered.startswith("- framework do estágio:"):
                 framework_name = _clean_text(line.split(":", 1)[1] if ":" in line else line)
+        if not framework_name:
+            for line in framework_section_lines:
+                lowered = line.lower()
+                if lowered.startswith("- framework principal:"):
+                    framework_name = _clean_text(line.split(":", 1)[1] if ":" in line else line)
+                    break
         matching = lambda markers: [line for line in context_lines if any(marker in line.lower() for marker in markers)]
+        prompt_mode = getattr(self.service.config, "prompt_mode", "full")
+        speech_only_mode = bool(getattr(self.service.config, "speech_only_mode", False))
+        speech_only_raw_mode = bool(getattr(self.service.config, "speech_only_raw_mode", False))
+        stage_framework_raw_mode = bool(getattr(self.service.config, "stage_framework_raw_mode", False))
+        suppressed_sections = []
+        if speech_only_mode:
+            for section in ("FILOSOFIA DO TURNO", "PERSONALIDADE DO ESTÁGIO", "GUARDRAILS", "CONTEXTO"):
+                if section not in self._extract_section_order(instructions):
+                    suppressed_sections.append(section)
+        elif stage_framework_raw_mode:
+            for section in ("FILOSOFIA DO TURNO", "GUARDRAILS", "CONTEXTO"):
+                if section not in self._extract_section_order(instructions):
+                    suppressed_sections.append(section)
+        backend_bypass_flags: list[str] = []
+        if speech_only_raw_mode:
+            backend_bypass_flags = [
+                "turn_decision",
+                "capability_pricing",
+                "response_enforcer",
+                "repair",
+            ]
+        elif stage_framework_raw_mode:
+            backend_bypass_flags = [
+                "capability_pricing",
+                "response_enforcer",
+                "repair",
+            ]
         return {
+            "prompt_mode": prompt_mode,
+            "speech_only_mode": speech_only_mode,
+            "speech_only_raw_mode": speech_only_raw_mode,
+            "stage_framework_raw_mode": stage_framework_raw_mode,
             "instruction_chars": len(instructions),
             "input_chars": len(prompt_input),
             "prompt_order": self._extract_section_order(instructions),
+            "suppressed_sections": suppressed_sections,
+            "backend_bypass_flags": backend_bypass_flags,
+            "history_input_line_count": len(history_input_lines),
+            "history_input_lines": history_input_lines,
+            "factual_context_present": bool(factual_context_input_lines),
+            "factual_context_input_lines": factual_context_input_lines,
+            "product_anchor_present": bool(product_anchor_input_lines),
+            "product_anchor_input_lines": product_anchor_input_lines,
             "philosophy_mode": philosophy_mode,
             "framework_name": framework_name,
             "philosophy_line_count": len(philosophy_lines),
@@ -169,8 +249,12 @@ class ConversationDebugBundleBuilder:
             "framework_line_count": len(framework_lines),
             "framework_lines": framework_lines,
             "framework_excerpt": " ".join(framework_lines),
+            "product_identity_line_count": len(product_identity_section_lines),
+            "product_identity_lines": product_identity_section_lines,
             "adaptive_pricing_philosophy_line_count": len(adaptive_pricing_philosophy_lines),
             "adaptive_pricing_philosophy_lines": adaptive_pricing_philosophy_lines,
+            "product_explanation_philosophy_line_count": len(product_explanation_philosophy_lines),
+            "product_explanation_philosophy_lines": product_explanation_philosophy_lines,
             "stage_personality_line_count": len(stage_personality_lines),
             "stage_personality_lines": stage_personality_lines,
             "stage_personality_excerpt": " ".join(stage_personality_lines[:8]),
@@ -179,6 +263,8 @@ class ConversationDebugBundleBuilder:
             "humanization_line_count": len(humanization_lines),
             "humanization_lines": humanization_lines,
             "humanization_excerpt": " ".join(humanization_lines[:6]),
+            "guardrails_line_count": len(guardrails_lines),
+            "guardrails_lines": guardrails_lines,
             "philosophy_core_line_count": len(philosophy_core_lines),
             "philosophy_core_lines": philosophy_core_lines,
             "philosophy_excerpt": " ".join(philosophy_core_lines[:6]),
@@ -187,13 +273,13 @@ class ConversationDebugBundleBuilder:
             "context_lines": context_lines,
             "plan_lines": plan_lines,
             "product_grounding_lines": matching(
-                ["fato central do produto", "onde a rotina ainda depende de repetição manual", "escolha 1 ou 2 movimentos reais", "se ajudar, pense numa cena"]
+                ["se explicar, fique no efeito prático", "na validação final, fique num fluxo curto", "na comparação, traduza a diferença", "se sustentar valor, use uma única mudança prática"]
             ),
             "pricing_scaffold_lines": matching(
-                ["antes do valor, só falta", "se abrir piso", "última validação acabou", "não abra preço", "preserve BRL"]
+                ["se abrir piso", "última validação acabou", "preserve BRL", "responda o preço direto", "não volte para discovery"]
             ),
             "question_scaffold_lines": matching(
-                ["falta entender só", "lacuna real deste turno", "pergunte do jeito mais simples", "foco da pergunta"]
+                ["falta entender só", "fio adaptativo deste turno", "lente ativa do momento"]
             ),
             "repetition_guard_lines": matching(["não reuse o mesmo esqueleto", "responda só o que muda agora", "mude a formulação", "responda só o delta"]),
         }

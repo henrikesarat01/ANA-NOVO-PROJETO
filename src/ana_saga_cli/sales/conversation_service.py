@@ -45,7 +45,7 @@ class ConversationService:
         self.stages = load_stage_definitions()
         self.arsenal_entries = load_arsenal_entries()
         self.arsenal_retriever = ArsenalRetriever(self.arsenal_entries)
-        self.prompt_assembler = PromptAssembler()
+        self.prompt_assembler = PromptAssembler(config)
         self.turn_director = TurnDirector()
         self.llm = self._build_llm()
         self.lead_analyzer = LeadAnalyzer(llm=self.llm)

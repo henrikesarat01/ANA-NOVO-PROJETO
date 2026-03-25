@@ -88,16 +88,16 @@ def test_multiple_missing_variables_choose_smallest_decisive_one() -> None:
     pricing_policy = engine.update_state(state, "quanto custa isso ai?")
 
     assert "nicho_ou_segmento_produto_que_o_cliente_vende" in pricing_policy["validation_missing"]
-    assert "exemplo_minimo_de_fluxo_aprovado" in pricing_policy["validation_missing"]
+    assert pricing_policy["validation_missing"] == ["nicho_ou_segmento_produto_que_o_cliente_vende"]
     assert pricing_policy["minimum_pricing_question_variable"] == "nicho_ou_segmento_produto_que_o_cliente_vende"
     assert pricing_policy["minimum_pricing_question_focus"] == "nicho_ou_segmento_produto_que_o_cliente_vende"
     assert pricing_policy["minimum_pricing_question_label"] == "o que voce vende hoje"
-    assert pricing_policy["adaptive_inference_enabled"] is True
+    assert pricing_policy["adaptive_inference_enabled"] is False
     assert pricing_policy["adaptive_selected_variable"] == "nicho_ou_segmento_produto_que_o_cliente_vende"
-    assert pricing_policy["adaptive_selection_reason"] == "fixed_required_missing"
+    assert pricing_policy["adaptive_selection_reason"] == "fixed_sequence_contract"
 
 
-def test_known_niche_alone_keeps_operation_type_as_next_decisive_variable() -> None:
+def test_known_niche_alone_already_satisfies_minimum_validation_in_phase_one() -> None:
     engine = CommercialPricingPolicyEngine()
     state = _pricing_state(
         lead_summary={
@@ -117,16 +117,14 @@ def test_known_niche_alone_keeps_operation_type_as_next_decisive_variable() -> N
 
     pricing_policy = engine.update_state(state, "eu tenho uma loja de sofas aqui no centro")
 
-    assert pricing_policy["minimum_validation_satisfied"] is False
-    assert pricing_policy["price_response_mode"] == "block_price"
-    assert pricing_policy["validation_missing"][0] == "como_as_vendas_acontecem_hoje"
-    assert pricing_policy["minimum_pricing_question_variable"] == "como_as_vendas_acontecem_hoje"
-    assert pricing_policy["minimum_pricing_question_focus"] == "como_as_vendas_acontecem_hoje"
-    assert pricing_policy["minimum_pricing_question_label"] == "como as vendas acontecem hoje"
-    assert pricing_policy["adaptive_selection_reason"] == "dynamic_flow_anchor_missing"
+    assert pricing_policy["minimum_validation_satisfied"] is True
+    assert pricing_policy["price_response_mode"] == "range_ok"
+    assert pricing_policy["validation_missing"] == []
+    assert pricing_policy["minimum_pricing_question_variable"] == ""
+    assert pricing_policy["adaptive_selection_reason"] == "fixed_sequence_contract"
 
 
-def test_dynamic_checkpoint_does_not_close_only_from_inference_flags() -> None:
+def test_phase_one_blueprint_has_no_dynamic_checkpoint_pool() -> None:
     engine = CommercialPricingPolicyEngine()
     state = _pricing_state(
         lead_summary={
@@ -147,15 +145,12 @@ def test_dynamic_checkpoint_does_not_close_only_from_inference_flags() -> None:
     pricing_policy = engine.update_state(state, "quanto custa isso ai?")
 
     assert pricing_policy["adaptive_dynamic_known"] == []
-    assert pricing_policy["adaptive_dynamic_missing"] == [
-        "como_as_vendas_acontecem_hoje",
-        "como_o_cliente_compra_hoje",
-    ]
-    assert pricing_policy["minimum_pricing_question_variable"] == "como_as_vendas_acontecem_hoje"
-    assert pricing_policy["adaptive_question_style"] == "confirmatory"
+    assert pricing_policy["adaptive_dynamic_missing"] == []
+    assert pricing_policy["minimum_pricing_question_variable"] == ""
+    assert pricing_policy["adaptive_question_style"] == "exploratory"
 
 
-def test_second_dynamic_checkpoint_is_still_asked_before_flow_validation() -> None:
+def test_phase_one_blueprint_does_not_ask_second_dynamic_checkpoint() -> None:
     engine = CommercialPricingPolicyEngine()
     state = _pricing_state(
         lead_summary={
@@ -183,12 +178,12 @@ def test_second_dynamic_checkpoint_is_still_asked_before_flow_validation() -> No
 
     pricing_policy = engine.update_state(state, "hoje entra pedido pelo whatsapp e a gente vai fechando na conversa")
 
-    assert pricing_policy["adaptive_dynamic_known"] == ["como_as_vendas_acontecem_hoje"]
-    assert pricing_policy["minimum_pricing_question_variable"] == "como_o_cliente_compra_hoje"
-    assert pricing_policy["adaptive_selection_reason"] == "dynamic_customer_journey_missing"
+    assert pricing_policy["adaptive_dynamic_known"] == []
+    assert pricing_policy["minimum_pricing_question_variable"] == ""
+    assert pricing_policy["adaptive_selection_reason"] == "fixed_sequence_contract"
 
 
-def test_flow_validation_is_not_auto_approved_from_context_alone() -> None:
+def test_phase_one_blueprint_does_not_require_flow_validation_from_context_alone() -> None:
     engine = CommercialPricingPolicyEngine()
     state = _pricing_state(
         lead_summary={
@@ -212,14 +207,10 @@ def test_flow_validation_is_not_auto_approved_from_context_alone() -> None:
 
     pricing_policy = engine.update_state(state, "quanto custa isso ai?")
 
-    assert pricing_policy["minimum_validation_satisfied"] is False
-    assert pricing_policy["validation_missing"] == [
-        "como_as_vendas_acontecem_hoje",
-        "como_o_cliente_compra_hoje",
-        "exemplo_minimo_de_fluxo_aprovado",
-    ]
-    assert pricing_policy["minimum_pricing_question_variable"] == "como_as_vendas_acontecem_hoje"
-    assert pricing_policy["price_response_mode"] == "block_price"
+    assert pricing_policy["minimum_validation_satisfied"] is True
+    assert pricing_policy["validation_missing"] == []
+    assert pricing_policy["minimum_pricing_question_variable"] == ""
+    assert pricing_policy["price_response_mode"] == "range_ok"
 
 
 def test_self_contained_question_does_not_open_pricing_gate_from_topic_domain_alone() -> None:
@@ -606,6 +597,8 @@ def test_prompt_debug_carries_semantic_pricing_gate_contract() -> None:
     assert "ainda não há base suficiente para situar valor com honestidade" not in instructions
     assert "localize só a peça concreta que falta; não transforme isso em defesa, desculpa ou bordão" not in instructions
     assert "falta entender só:" in instructions
+    assert "sem discurso de proteção" in instructions
+    assert "no pricing gate, acolha em uma linha e vá direto ao ponto que falta, sem discurso de proteção" in instructions
     assert "o ponto que precisa ficar claro agora:" not in instructions
     assert "question_anchor=" not in instructions
     assert "inject_policy_anchor" not in instructions
@@ -614,22 +607,236 @@ def test_prompt_debug_carries_semantic_pricing_gate_contract() -> None:
     assert "CONTRATO DE HUMANIZAÇÃO" in instructions
     assert "FILOSOFIA DO TURNO" in instructions
     assert "framework do estágio:" in instructions
-    assert "breve explicação do framework:" in instructions
-    assert "conceito filosófico completo:" in instructions
+    assert "lente filosófica do estágio:" in instructions
     assert "PERSONALIDADE DO ESTÁGIO" in instructions
     assert "presença deste estágio:" in instructions
-    assert "contrato real deste estágio:" in instructions
     assert "Pergunta boa parece curiosidade real, não formulário." in instructions
-    assert "uma pergunta só, curta e concreta" in instructions
+    assert "PLANO DO TURNO" not in instructions
+    assert "ETAPA" not in instructions
     assert "antes da pergunta, faça uma ponte curta mostrando por que vale responder agora" not in instructions
-    assert "filosofia adaptativa de inferência do fluxo:" in instructions
-    assert "filosofia adaptativa de seleção da próxima pergunta:" in instructions
-    assert "filosofia adaptativa de pergunta obrigatória com forma flexível:" in instructions
-    assert "jeito desta pergunta:" in instructions
-    assert adaptive["enabled"] is True
+    assert "fio adaptativo deste turno:" not in instructions
+    assert "jeito desta pergunta:" not in instructions
+    assert "REFERÊNCIAS" not in instructions
+    assert adaptive["enabled"] is False
     assert adaptive["selected_variable"] == "nicho_ou_segmento_produto_que_o_cliente_vende"
-    assert adaptive["selection_reason"] == "fixed_required_missing"
+    assert adaptive["selection_reason"] == "fixed_sequence_contract"
     assert adaptive["question_style"] == "exploratory"
+
+
+def test_speech_only_prompt_mode_keeps_only_humanization_contract() -> None:
+    service = ConversationService(AppConfig(stage_debug=True, prompt_mode="speech_only"))
+
+    result = service.respond("quanto custa isso ai?")
+    instructions = result.markdown_debug["prompt"]["instructions"]
+    user_input = result.markdown_debug["prompt"]["user_input"]
+    forensic = result.markdown_debug["forensic"]["prompt_diagnostics"]
+
+    assert "CONTRATO DE HUMANIZAÇÃO" in instructions
+    assert "FILOSOFIA DO TURNO" not in instructions
+    assert "PERSONALIDADE DO ESTÁGIO" not in instructions
+    assert "GUARDRAILS" not in instructions
+    assert "CONTEXTO" not in instructions
+    assert "Neste turno, não cite preço, faixa ou condição comercial antes da pergunta necessária." not in user_input
+    assert forensic["prompt_mode"] == "speech_only"
+    assert forensic["speech_only_mode"] is True
+    assert forensic["prompt_order"] == ["CONTRATO DE HUMANIZAÇÃO"]
+    assert forensic["suppressed_sections"] == [
+        "FILOSOFIA DO TURNO",
+        "PERSONALIDADE DO ESTÁGIO",
+        "GUARDRAILS",
+        "CONTEXTO",
+    ]
+    assert forensic["humanization_line_count"] > 0
+    assert forensic["guardrails_line_count"] == 0
+    assert forensic["philosophy_line_count"] == 0
+
+
+def test_speech_only_raw_mode_bypasses_backend_surface_shaping() -> None:
+    service = ConversationService(AppConfig(stage_debug=True, prompt_mode="speech_only_raw"))
+
+    result = service.respond("quanto custa isso ai?")
+    instructions = result.markdown_debug["prompt"]["instructions"]
+    forensic = result.markdown_debug["forensic"]["prompt_diagnostics"]
+    trace = "\n".join(result.debug_trace)
+
+    assert "CONTRATO DE HUMANIZAÇÃO" in instructions
+    assert "FILOSOFIA DO TURNO" not in instructions
+    assert "PERSONALIDADE DO ESTÁGIO" not in instructions
+    assert "GUARDRAILS" not in instructions
+    assert "CONTEXTO" not in instructions
+    assert forensic["prompt_mode"] == "speech_only_raw"
+    assert forensic["speech_only_mode"] is True
+    assert forensic["speech_only_raw_mode"] is True
+    assert forensic["backend_bypass_flags"] == [
+        "turn_decision",
+        "capability_pricing",
+        "response_enforcer",
+        "repair",
+    ]
+    assert "raw_mode=true" in trace
+    assert "pricing_policy_bypassed=true" in trace
+    assert "response_policy_bypassed=true" in trace
+    assert "bypassed=true" in trace
+    assert "enforcement_bypassed=true" in trace
+
+
+def test_stage_framework_raw_mode_keeps_stage_and_framework_but_bypasses_surface_shaping() -> None:
+    service = ConversationService(AppConfig(stage_debug=True, prompt_mode="speech_stage_framework_raw"))
+
+    for index in range(12):
+        service.state.add_user_turn(f"cliente {index}")
+        service.state.add_assistant_turn(f"ana {index}")
+    service.state.lead_summary = {
+        "narrative_summary": "Cliente entende que a oferta tem relacao com WhatsApp e quer visualizar melhor como isso funciona.",
+        "evidence_summary": "Ele ouviu falar do sistema, perguntou como funciona e pediu para ver como ficaria.",
+        "impact_summary": "Ainda sem impacto operacional definido, mas com curiosidade clara sobre uso real.",
+        "known_context_count": 2,
+        "niche_known": False,
+        "offer_known": True,
+        "operation_model_known": False,
+        "channel_usage_known": True,
+        "customer_type_known": False,
+        "pain_known": False,
+        "impact_known": False,
+    }
+
+    result = service.respond("queria entender melhor esse sistema")
+    instructions = result.markdown_debug["prompt"]["instructions"]
+    user_input = result.markdown_debug["prompt"]["user_input"]
+    forensic = result.markdown_debug["forensic"]["prompt_diagnostics"]
+    trace = "\n".join(result.debug_trace)
+
+    assert "PERSONALIDADE DO ESTÁGIO" in instructions
+    assert "FRAMEWORK DO ESTÁGIO" in instructions
+    assert "IDENTIDADE DO PRODUTO" in instructions
+    assert "FILOSOFIA DE EXPLICAÇÃO DO PRODUTO" in instructions
+    assert "CONTRATO DE HUMANIZAÇÃO" in instructions
+    assert "GUARDRAILS" not in instructions
+    assert "CONTEXTO" not in instructions
+    assert "HISTORICO RECENTE" not in user_input
+    assert "CONTEXTO FACTUAL" not in user_input
+    assert "ANCORA DO PRODUTO" not in user_input
+    assert "MENSAGEM ATUAL DO CLIENTE" in user_input
+    assert forensic["prompt_mode"] == "speech_stage_framework_raw"
+    assert forensic["speech_only_mode"] is False
+    assert forensic["speech_only_raw_mode"] is False
+    assert forensic["stage_framework_raw_mode"] is True
+    assert forensic["backend_bypass_flags"] == [
+        "capability_pricing",
+        "response_enforcer",
+        "repair",
+    ]
+    assert forensic["prompt_order"] == [
+        "PERSONALIDADE DO ESTÁGIO",
+        "FRAMEWORK DO ESTÁGIO",
+        "IDENTIDADE DO PRODUTO",
+        "FILOSOFIA DE EXPLICAÇÃO DO PRODUTO",
+        "CONTRATO DE HUMANIZAÇÃO",
+    ]
+    assert forensic["suppressed_sections"] == ["FILOSOFIA DO TURNO", "GUARDRAILS", "CONTEXTO"]
+    assert forensic["stage_personality_line_count"] > 0
+    assert forensic["framework_line_count"] > 0
+    assert forensic["product_identity_line_count"] > 0
+    assert forensic["history_input_line_count"] == 0
+    assert forensic["factual_context_present"] is False
+    assert forensic["product_anchor_present"] is False
+    assert forensic["product_explanation_philosophy_line_count"] > 0
+    assert "bypassed=true" in trace
+    assert "enforcement_bypassed=true" in trace
+
+
+def test_pre_fit_work_curiosity_keeps_implementation_details_high_level_only() -> None:
+    service = _new_service()
+    state = ConversationState(stage_id="etapa_03_contextualizacao_permissao")
+    blueprint = _default_blueprint()
+    state.offer_sales_architecture = blueprint
+    state.lead_summary = {
+        "commercial_scope_ready": False,
+        "pain_known": False,
+        "impact_known": False,
+    }
+    state.neural_state = {
+        "topic_domain": "work_curiosity",
+        "transition_reason": "pediu explicação de como foi feito",
+        "answer_scope": "self_contained",
+        "self_contained_goal": "offer_explanation",
+        "communicative_intent": "clarify",
+    }
+
+    policy = service.conversation_policy_engine.reconcile_state(state)
+
+    assert policy["response_mode"] == "explain"
+    assert policy["protect_internal_build_details"] is True
+    assert policy["explain_scope"] == "product_identity_short"
+    assert policy["response_tone_hint"] == "situe com leveza e não transforme isso em apresentação"
+    assert "efeito prático" in policy["explanation_style_hint"]
+    assert "cena viva" in policy["explanation_style_hint"]
+    assert "não detalhe construção" in policy["explanation_style_hint"]
+
+
+def test_product_explanation_philosophy_stays_off_for_simple_ownership_check() -> None:
+    service = _new_service()
+    state = ConversationState(stage_id="etapa_02_conexao_inicial")
+    state.offer_sales_architecture = _default_blueprint()
+    state.lead_summary = {
+        "commercial_scope_ready": False,
+        "pain_known": False,
+        "impact_known": False,
+    }
+    state.neural_state = {
+        "topic_domain": "work_curiosity",
+        "transition_reason": "quer confirmar se o sistema e seu mesmo",
+        "answer_scope": "self_contained",
+        "self_contained_goal": "ownership_check",
+        "communicative_intent": "clarify",
+    }
+    state.response_policy = service.conversation_policy_engine.reconcile_state(state)
+
+    intent = service.turn_director.build_intent(state=state, arsenal_hits=[])
+    instructions, _ = service.prompt_assembler.build(
+        state=state,
+        intent=intent,
+        stage=service.stages[state.stage_id],
+        user_message="esse sistema e teu mesmo?",
+        arsenal_hits=[],
+    )
+
+    assert "fio de explicação do produto:" not in instructions
+
+
+def test_prompt_blocks_internal_build_details_for_pre_fit_technical_curiosity() -> None:
+    service = _new_service()
+    state = ConversationState(stage_id="etapa_03_contextualizacao_permissao")
+    state.offer_sales_architecture = _default_blueprint()
+    state.lead_summary = {
+        "commercial_scope_ready": False,
+        "pain_known": False,
+        "impact_known": False,
+    }
+    state.neural_state = {
+        "topic_domain": "work_curiosity",
+        "transition_reason": "pediu explicação de como foi feito",
+        "answer_scope": "self_contained",
+        "self_contained_goal": "offer_explanation",
+        "communicative_intent": "clarify",
+    }
+    state.response_policy = service.conversation_policy_engine.reconcile_state(state)
+
+    intent = service.turn_director.build_intent(state=state, arsenal_hits=[])
+    instructions, _ = service.prompt_assembler.build(
+        state=state,
+        intent=intent,
+        stage=service.stages[state.stage_id],
+        user_message="nao nao, quero saber como vc criou",
+        arsenal_hits=[],
+    )
+
+    assert "se perguntarem como foi feito, mantenha a resposta em alto nível" in instructions
+    assert "não abra bastidor de construção, arquitetura, stack, componentes internos, integrações ou fluxo técnico" in instructions
+    assert "não ofereça stack, fluxo técnico, peças internas ou detalhamento adicional por conta própria" in instructions
+    assert "se ele estiver só sondando, resolva em 1 ou 2 frases e pare" in instructions
+    assert "não use lista, bullets, contraste de marketing ou convite automático de apresentação" in instructions
+    assert "Prefira palavras comuns e evite vocabulário corporativo ou institucional." in instructions
 
 
 def test_enforcer_accepts_single_price_followup_question_without_rewriting() -> None:
@@ -912,10 +1119,9 @@ def test_approval_check_prompt_translates_internal_contract_without_literal_labe
         arsenal_hits=[],
     )
 
-    assert "valide por uma cena completa, não por descrição solta" in instructions
+    assert "FILOSOFIA DO TURNO" in instructions
     assert "falta entender só: se esse fluxo completo faria sentido no caso dele" in instructions
-    assert "na validação final, imagine um fluxo completo, curto e plausível" in instructions
-    assert "esse fluxo precisa sair do início e chegar a um desfecho claro" in instructions
+    assert "na validação final, fique num fluxo curto, plausível e sem demo" in instructions
     assert "lacuna real deste turno: exemplo mínimo de fluxo validado" not in instructions
 
 
@@ -931,9 +1137,8 @@ def test_product_identity_and_inventory_grounding_reach_prompt_without_writing_t
     assert offer_context["product_name"] == "SAGA"
     assert offer_context["product_essence"]
     assert inventory_hits
-    assert "se explicar o produto, explique pela rotina e escolha só o pedaço útil deste turno" in instructions
-    assert "não despeje interface, feature e funcionalidade em sequência" in instructions
-    assert "se precisar concretizar, escolha 1 ou 2 movimentos reais:" in instructions
+    assert "se explicar, mostre o que a pessoa vê, escolhe, pede ou resolve ali; não fique só no ganho interno" in instructions
+    assert "se precisar concretizar, escolha 1 ou 2 movimentos reais:" not in instructions
     assert "o cliente compra de verdade:" not in instructions
 
 

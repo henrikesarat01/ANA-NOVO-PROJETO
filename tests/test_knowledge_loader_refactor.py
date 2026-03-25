@@ -45,7 +45,7 @@ def test_knowledge_loader_reads_identity_inventory_and_arsenal_from_refactored_t
 
     assert identity["identidade_do_produto"]["nome"] == "SAGA"
     assert "WhatsApp" in identity["identidade_do_produto"]["categoria"]
-    assert "transforma o WhatsApp da empresa" in identity["identidade_do_produto"]["o_que_e"]
+    assert "faz o WhatsApp da empresa funcionar sozinho" in identity["identidade_do_produto"]["o_que_e"]
     assert identity["promessa_central"]["frase_curta"]
 
     assert any(fact.section == "mensagens" and fact.name == "formulário" for fact in inventory)

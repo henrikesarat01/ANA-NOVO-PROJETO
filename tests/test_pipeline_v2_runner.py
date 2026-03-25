@@ -82,18 +82,23 @@ def test_markdown_debug_exposes_forensic_turn_bundle() -> None:
     assert forensic["prompt_diagnostics"]["framework_name"]
     assert forensic["prompt_diagnostics"]["framework_line_count"] > 0
     assert forensic["prompt_diagnostics"]["framework_lines"]
-    assert forensic["prompt_diagnostics"]["adaptive_pricing_philosophy_line_count"] > 0
-    assert forensic["prompt_diagnostics"]["adaptive_pricing_philosophy_lines"]
+    assert forensic["prompt_diagnostics"]["adaptive_pricing_philosophy_line_count"] == 0
+    assert forensic["prompt_diagnostics"]["adaptive_pricing_philosophy_lines"] == []
     assert forensic["prompt_diagnostics"]["stage_personality_line_count"] > 0
     assert forensic["prompt_diagnostics"]["stage_personality_lines"]
-    assert forensic["prompt_diagnostics"]["stage_contract_line_count"] > 0
-    assert forensic["prompt_diagnostics"]["stage_contract_lines"]
+    assert forensic["prompt_diagnostics"]["stage_contract_line_count"] == 0
+    assert forensic["prompt_diagnostics"]["stage_contract_lines"] == []
     assert forensic["prompt_diagnostics"]["humanization_line_count"] > 0
     assert forensic["prompt_diagnostics"]["humanization_lines"]
+    assert forensic["prompt_diagnostics"]["guardrails_line_count"] > 0
+    assert forensic["prompt_diagnostics"]["guardrails_lines"]
+    assert forensic["prompt_diagnostics"]["speech_only_raw_mode"] is False
+    assert forensic["prompt_diagnostics"]["stage_framework_raw_mode"] is False
+    assert forensic["prompt_diagnostics"]["backend_bypass_flags"] == []
     assert forensic["prompt_diagnostics"]["philosophy_core_line_count"] > 0
     assert forensic["prompt_diagnostics"]["philosophy_core_lines"]
     assert "adaptive_pricing_diagnostics" in forensic
-    assert forensic["adaptive_pricing_diagnostics"]["enabled"] is True
+    assert forensic["adaptive_pricing_diagnostics"]["enabled"] is False
     assert forensic["adaptive_pricing_diagnostics"]["selected_variable"]
     assert forensic["adaptive_pricing_diagnostics"]["question_style"]
     assert "repair_diagnostics" in forensic
