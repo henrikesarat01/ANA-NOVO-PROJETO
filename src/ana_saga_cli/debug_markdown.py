@@ -29,12 +29,33 @@ def _normalize(value: Any) -> Any:
 
 
 class ConversationMarkdownLogger:
-    def __init__(self, root_dir: Path, config: AppConfig) -> None:
+    _AUXILIARY_LAYER_TO_FILE = {
+        "v2.descoberta_nicho": "descoberta_nicho",
+        "v2.desconstrucao_primeiros_principios": "desconstrucao_primeiros_principios",
+        "v2.validacao_preco_contexto": "validacao_preco_contexto",
+        "v2.exploracao_preco_contexto": "exploracao_preco_contexto",
+        "v2.contexto_uso": "contexto_uso",
+        "v2.storytelling": "storytelling",
+    }
+
+    def __init__(
+        self,
+        root_dir: Path,
+        config: AppConfig,
+        *,
+        file_path: Path | None = None,
+        reuse_existing: bool = False,
+    ) -> None:
         self.root_dir = root_dir
         self.config = config
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        self.file_path = self.root_dir / f"ana_debug_{timestamp}.md"
-        self._write_header()
+        if file_path is None:
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            self.file_path = self.root_dir / f"ana_debug_{timestamp}.md"
+            self._write_header()
+            return
+        self.file_path = file_path
+        if not (reuse_existing and self.file_path.exists()):
+            self._write_header()
 
     def _write_header(self) -> None:
         created_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -94,6 +115,120 @@ class ConversationMarkdownLogger:
         with self.file_path.open("a", encoding="utf-8") as handle:
             handle.write("\n".join(sections))
             handle.write("\n\n---\n\n")
+        self._append_auxiliary_turns(payload)
+
+    def append_system_event(self, title: str, lines: list[str], payload: Any | None = None) -> None:
+        sections = [
+            f"## {title}",
+            "",
+        ]
+        sections.extend(line for line in lines if _clean_text(line))
+        sections.append("")
+        if payload is not None:
+            sections.extend(
+                [
+                    "### Payload",
+                    "",
+                    "```json",
+                    _json_block(payload),
+                    "```",
+                    "",
+                ]
+            )
+        with self.file_path.open("a", encoding="utf-8") as handle:
+            handle.write("\n".join(sections))
+            handle.write("\n\n---\n\n")
+
+    def _append_auxiliary_turns(self, payload: dict[str, Any]) -> None:
+        turn = payload.get("turn", {}) if isinstance(payload.get("turn", {}), dict) else {}
+        turn_count = turn.get("turn_count", "?")
+        messages = payload.get("messages", {}) if isinstance(payload.get("messages", {}), dict) else {}
+        llm_calls = payload.get("llm_calls", []) if isinstance(payload.get("llm_calls", []), list) else []
+        forensic = payload.get("forensic", {}) if isinstance(payload.get("forensic", {}), dict) else {}
+        loaded_files = forensic.get("loaded_files", {}) if isinstance(forensic.get("loaded_files", {}), dict) else {}
+
+        for call in llm_calls:
+            if not isinstance(call, dict):
+                continue
+            layer = _clean_text(call.get("layer", ""))
+            helper_name = self._AUXILIARY_LAYER_TO_FILE.get(layer)
+            if not helper_name:
+                continue
+            file_path = self._auxiliary_file_path(helper_name)
+            if not file_path.exists():
+                self._write_auxiliary_header(file_path, helper_name)
+            prompt_path = self._auxiliary_prompt_path(helper_name, loaded_files)
+            sections = [
+                f"## Turn {turn_count}",
+                "",
+                f"- helper: {helper_name}",
+                f"- layer: {layer}",
+                f"- prompt_path: {prompt_path}",
+                f"- duration_ms: {call.get('duration_ms', 0)}",
+                f"- error: {_clean_text(call.get('error', '')) or '-'}",
+                "",
+                "### Client Message",
+                "",
+                str(messages.get("user", "") or ""),
+                "",
+                "### Input",
+                "",
+                "```text",
+                str(call.get("user_input", "") or ""),
+                "```",
+                "",
+                "### Output Used",
+                "",
+                "```json",
+                _json_block(call.get("output_used", "")),
+                "```",
+                "",
+                "### Raw Response",
+                "",
+                "```text",
+                str(call.get("raw_response", "") or ""),
+                "```",
+                "",
+                "### Parsed Output",
+                "",
+                "```json",
+                _json_block(call.get("parsed_output", {})),
+                "```",
+                "",
+                "### Instructions",
+                "",
+                "```text",
+                str(call.get("instructions", "") or ""),
+                "```",
+                "",
+            ]
+            with file_path.open("a", encoding="utf-8") as handle:
+                handle.write("\n".join(sections))
+                handle.write("\n\n---\n\n")
+
+    def _auxiliary_file_path(self, helper_name: str) -> Path:
+        return self.file_path.with_name(f"{self.file_path.stem}_{helper_name}.md")
+
+    def _write_auxiliary_header(self, file_path: Path, helper_name: str) -> None:
+        created_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        content = "\n".join(
+            [
+                f"# ANA Auxiliary Debug — {helper_name}",
+                "",
+                f"- created_at: {created_at}",
+                f"- provider: {self.config.provider}",
+                f"- model: {self.config.model}",
+                f"- source_debug_file: {self.file_path.name}",
+                "",
+                "---",
+                "",
+            ]
+        )
+        file_path.write_text(content, encoding="utf-8")
+
+    def _auxiliary_prompt_path(self, helper_name: str, loaded_files: dict[str, Any]) -> str:
+        key = f"{helper_name}_prompt_path"
+        return str(loaded_files.get(key, "") or "")
 
     def _render_decision_rationale(self, payload: dict[str, Any]) -> list[str]:
         turn = payload.get("turn", {}) if isinstance(payload.get("turn", {}), dict) else {}
