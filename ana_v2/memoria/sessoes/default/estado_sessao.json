@@ -1,8 +1,8 @@
 {
-  "contexto_comercial_informado": "Na funerária dele, o WhatsApp concentra praticamente todo o atendimento e boa parte da operação.",
-  "current_stage": "quebra_objecao",
+  "contexto_comercial_informado": "",
+  "current_stage": "abertura",
   "preco_ja_foi_dito_na_conversa": false,
-  "product_slug": "saga",
-  "turn_count": 12,
+  "product_slug": "",
+  "turn_count": 0,
   "ultima_referencia_de_preco": ""
 }

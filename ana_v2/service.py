@@ -633,6 +633,7 @@ class AnaV2ConversationService:
         self.state.spin_selling_preco_contexto = deepcopy(checkpoint.spin_selling_preco_contexto)
         self.state.contexto_uso_explicacao_produto = deepcopy(checkpoint.contexto_uso_explicacao_produto)
         self.state.storytelling_explicacao_produto = deepcopy(checkpoint.storytelling_explicacao_produto)
+        self.state.demo_produto = deepcopy(checkpoint.demo_produto)
         self.persistir_memoria_em_arquivos()
         state_after = self._fotografar_estado()
         return {
@@ -663,4 +664,5 @@ class AnaV2ConversationService:
             spin_selling_preco_contexto=deepcopy(self.state.spin_selling_preco_contexto),
             contexto_uso_explicacao_produto=deepcopy(self.state.contexto_uso_explicacao_produto),
             storytelling_explicacao_produto=deepcopy(self.state.storytelling_explicacao_produto),
+            demo_produto=deepcopy(self.state.demo_produto),
         )
