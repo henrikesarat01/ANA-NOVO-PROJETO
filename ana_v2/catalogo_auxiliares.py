@@ -52,6 +52,12 @@ CATALOGO_AUXILIARES: dict[str, dict[str, Any]] = {
         "precisa_de_contexto_comercial": True,
         "depende_de": ["descoberta_nicho", "desconstrucao_primeiros_principios"],
     },
+    "demo_produto": {
+        "path": "auxiliares/leituras_de_contexto/demo_produto/demo_produto.md",
+        "descricao": "Monta simulacao do produto aplicada ao cenario real do cliente: fluxo antes vs depois",
+        "precisa_de_contexto_comercial": True,
+        "depende_de": ["descoberta_nicho"],
+    },
 }
 
 # Mapeamento de nomes do catalogo → campos no EstadoConversaV2
@@ -62,6 +68,7 @@ _NOME_PARA_CAMPO_ESTADO: dict[str, str] = {
     "spin_selling": "spin_selling_preco_contexto",
     "contexto_uso": "contexto_uso_explicacao_produto",
     "storytelling": "storytelling_explicacao_produto",
+    "demo_produto": "demo_produto",
 }
 
 

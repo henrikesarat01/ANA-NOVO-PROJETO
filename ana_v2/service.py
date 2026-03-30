@@ -459,6 +459,14 @@ class AnaV2ConversationService:
             }
             return base
 
+        if nome == "demo_produto":
+            base["contexto_comercial_informado"] = contexto_comercial
+            base["produto"] = self.product.payload
+            base["descoberta_nicho"] = resultados_previos.get(
+                "descoberta_nicho", self.state.descoberta_nicho
+            )
+            return base
+
         if nome == "desconstrucao_primeiros_principios":
             base["contexto_comercial_informado"] = contexto_comercial
             base["descoberta_nicho"] = resultados_previos.get(

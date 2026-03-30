@@ -147,6 +147,7 @@ Se tiver `storytelling`, use como eixo narrativo.
 Se tiver `contexto_uso`, use como cenario de uso.
 Se tiver `spin_selling`, use como leitura de negociacao.
 Se tiver `validacao_preco_contexto`, use para decidir se ja da pra falar preco.
+Se tiver `demo_produto`, use como simulacao concreta do produto no cenario do cliente — fluxo real de antes vs depois que mostra onde cada funcao entra na operacao dele.
 
 ## Modos internos de raciocinio
 

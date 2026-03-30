@@ -27,6 +27,7 @@ class EstadoConversaV2:
     spin_selling_preco_contexto: dict[str, Any] = field(default_factory=dict)
     contexto_uso_explicacao_produto: dict[str, Any] = field(default_factory=dict)
     storytelling_explicacao_produto: dict[str, Any] = field(default_factory=dict)
+    demo_produto: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass(slots=True)
@@ -45,6 +46,7 @@ class CheckpointConversaV2:
     spin_selling_preco_contexto: dict[str, Any]
     contexto_uso_explicacao_produto: dict[str, Any]
     storytelling_explicacao_produto: dict[str, Any]
+    demo_produto: dict[str, Any]
 
 
 @dataclass(slots=True)

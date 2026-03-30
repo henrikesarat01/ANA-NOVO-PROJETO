@@ -1,8 +1,8 @@
 {
-  "contexto_comercial_informado": "Loja familiar de mercadoria do Paraguai, com atendimento diário no WhatsApp, operação enxuta e sensibilidade a investimento inicial alto.",
-  "current_stage": "preco_contexto",
-  "preco_ja_foi_dito_na_conversa": true,
+  "contexto_comercial_informado": "Na funerária dele, o WhatsApp concentra praticamente todo o atendimento e boa parte da operação.",
+  "current_stage": "quebra_objecao",
+  "preco_ja_foi_dito_na_conversa": false,
   "product_slug": "saga",
-  "turn_count": 13,
-  "ultima_referencia_de_preco": "Mas é isso mesmo, não é coisinha de 99 reais não."
+  "turn_count": 12,
+  "ultima_referencia_de_preco": ""
 }
