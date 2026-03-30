@@ -1,6 +1,8 @@
 {"role": "cliente", "content": "E AI MEU PARCEIRO"}
 {"role": "ANA", "content": "E aí meu parceiro 😄"}
-{"role": "cliente", "content": "TUDO CERTO ?"}
-{"role": "ANA", "content": "Tudo certo 😄"}
+{"role": "cliente", "content": "COMO CE TA ?"}
+{"role": "ANA", "content": "Tô bem demais 😄 e tu, firmeza?"}
+{"role": "cliente", "content": "OPA, TUDO NA BOA"}
+{"role": "ANA", "content": "Boa demais 😄"}
 {"role": "cliente", "content": "NAO TA INDO MAIS PRO FUT PQ ?"}
-{"role": "ANA", "content": "Como assim pro fut? Me fala qual parte que parou pra eu entender certinho"}
+{"role": "ANA", "content": "Provavelmente travou alguma regra ou mudou o caminho aí.\n\nQual FUT cê tá falando? Me manda o ponto certinho que eu te digo o porquê."}
