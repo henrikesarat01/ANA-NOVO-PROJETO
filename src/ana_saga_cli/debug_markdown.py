@@ -30,12 +30,16 @@ def _normalize(value: Any) -> Any:
 
 class ConversationMarkdownLogger:
     _AUXILIARY_LAYER_TO_FILE = {
+        "v2.cerebro_conversa": "cerebro_conversa",
+        "v2.flow_decision": "cerebro_conversa",
         "v2.descoberta_nicho": "descoberta_nicho",
         "v2.desconstrucao_primeiros_principios": "desconstrucao_primeiros_principios",
         "v2.validacao_preco_contexto": "validacao_preco_contexto",
         "v2.exploracao_preco_contexto": "exploracao_preco_contexto",
+        "v2.spin_selling": "spin_selling",
         "v2.contexto_uso": "contexto_uso",
         "v2.storytelling": "storytelling",
+        "v2.atualizar_memorias": "memoria",
     }
 
     def __init__(
@@ -227,6 +231,8 @@ class ConversationMarkdownLogger:
         file_path.write_text(content, encoding="utf-8")
 
     def _auxiliary_prompt_path(self, helper_name: str, loaded_files: dict[str, Any]) -> str:
+        if helper_name == "cerebro_conversa":
+            return str(loaded_files.get("cerebro_conversa_prompt_path", "") or loaded_files.get("decisor_etapas_prompt_path", "") or "")
         key = f"{helper_name}_prompt_path"
         return str(loaded_files.get(key, "") or "")
 
@@ -305,14 +311,29 @@ class ConversationMarkdownLogger:
         final_title = _clean_text(turn.get("final_stage_title", "-"))
         reason = _clean_text(stage_router.get("reason", ""))
         source = _clean_text(stage_router.get("source", ""))
+        necessidade_atual = _clean_text(stage_router.get("necessidade_atual", ""))
+        proximo_movimento = _clean_text(stage_router.get("proximo_movimento", ""))
+        o_que_entendi_neste_turno = _clean_text(stage_router.get("o_que_entendi_neste_turno", ""))
+        proximo_passo_logico = _clean_text(stage_router.get("proximo_passo_logico", ""))
+        proxima_etapa_esperada = _clean_text(stage_router.get("proxima_etapa_esperada", ""))
         if entry_stage and final_stage and entry_stage != final_stage:
             detail = f"A conversa avançou de {entry_stage} para {final_stage} ({final_title})"
         else:
             detail = f"A conversa permaneceu em {final_stage} ({final_title})"
         if source:
             detail = f"{detail}, com decisão do stage router via {source}"
+        if necessidade_atual:
+            detail = f"{detail}; necessidade atual={necessidade_atual}"
+        if proximo_movimento:
+            detail = f"{detail}; próximo movimento={proximo_movimento}"
+        if o_que_entendi_neste_turno:
+            detail = f"{detail}; leitura do turno={o_que_entendi_neste_turno}"
         if reason:
             detail = f"{detail}, porque {reason}"
+        if proximo_passo_logico:
+            detail = f"{detail}; próximo passo lógico={proximo_passo_logico}"
+        if proxima_etapa_esperada:
+            detail = f"{detail}; próxima etapa esperada={proxima_etapa_esperada}"
         return detail
 
     def _context_rationale(self, lead_summary: dict[str, Any], counterparty: dict[str, Any]) -> str:
@@ -402,6 +423,7 @@ class ConversationMarkdownLogger:
             ("Response Strategy", payload.get("response_strategy", {})),
             ("Stage Router", payload.get("stage_router", {})),
             ("Diagnostic Hypotheses", payload.get("diagnostic_hypotheses", {})),
+            ("Memory", payload.get("memory", {})),
             ("Retrieval", payload.get("retrieval", {})),
             ("Pricing", payload.get("pricing", {})),
             ("BPCF", payload.get("bpcf", {})),

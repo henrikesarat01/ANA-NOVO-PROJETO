@@ -21,17 +21,6 @@ Não trate referência vaga, comentário lateral ou menção social como context
 
 Se o cliente insistir em preço sem contexto suficiente, a conversa continua em `preco_contexto` até existir base mínima para falar valor. Não volte para `abertura` e não pule para explicação profunda só porque o cliente apertou por preço.
 
-Se a mensagem atual já trouxer contexto comercial suficiente, extraia isso no próprio JSON.
-
-`contexto_comercial_detectado` deve conter uma frase curta e limpa com o que já ficou claro sobre o que a pessoa vende, faz, oferece ou sobre a natureza básica do negócio.
-
-Só preencha `contexto_comercial_detectado` quando isso realmente estiver claro na mensagem atual.
-Se ainda estiver vago, devolva string vazia.
-
-`contexto_comercial_suficiente_no_turno` deve ser:
-- `true` quando a mensagem atual já deixou claro o que a pessoa vende ou o tipo básico do negócio
-- `false` quando ainda falta esse mínimo
-
 Retorne somente JSON válido, sem markdown e sem texto extra.
 
 Formato obrigatório:
@@ -40,8 +29,6 @@ Formato obrigatório:
 {
   "selected_stage": "<abertura|explicacao_produto|preco_contexto>",
   "reason": "<motivo curto>",
-  "confidence": <numero entre 0 e 1>,
-  "contexto_comercial_detectado": "<string vazia ou contexto curto detectado>",
-  "contexto_comercial_suficiente_no_turno": <true|false>
+  "confidence": <numero entre 0 e 1>
 }
 ```

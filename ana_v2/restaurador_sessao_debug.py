@@ -19,10 +19,13 @@ class TurnoDebug:
     final_stage: str
     client_message: str
     assistant_response: str
+    memoria_estavel: str
+    memoria_de_progressao: str
     business_context_line: str
     descoberta_nicho: dict
     desconstrucao_primeiros_principios: dict
     validacao_preco_contexto: dict
+    spin_selling_preco_contexto: dict
 
 
 @dataclass(slots=True)
@@ -36,10 +39,15 @@ class SessaoRestauradaDebug:
     turn_count: int
     current_stage: str
     history: list[MensagemConversa]
+    memoria_estavel: str
+    memoria_de_progressao: str
+    preco_ja_foi_dito_na_conversa: bool
+    ultima_referencia_de_preco: str
     contexto_comercial_informado: str
     descoberta_nicho: dict
     desconstrucao_primeiros_principios: dict
     validacao_preco_contexto: dict
+    spin_selling_preco_contexto: dict
     removed_turn_number: int | None
     removed_client_message: str
 
@@ -69,11 +77,24 @@ def restaurar_ultima_sessao_debug(root_dir: Path) -> SessaoRestauradaDebug | Non
         history.append(MensagemConversa(role="ANA", content=turn.assistant_response))
 
     current_stage = active_turns[-1].final_stage if active_turns else "abertura"
+    preco_ja_foi_dito_na_conversa = False
+    ultima_referencia_de_preco = ""
+    memoria_estavel = ""
+    memoria_de_progressao = ""
     contexto_comercial_informado = ""
     descoberta_nicho: dict = {}
     desconstrucao_primeiros_principios: dict = {}
     validacao_preco_contexto: dict = {}
+    spin_selling_preco_contexto: dict = {}
     for turn in active_turns:
+        referencia_preco = _extrair_referencia_de_preco(turn.assistant_response)
+        if referencia_preco:
+            preco_ja_foi_dito_na_conversa = True
+            ultima_referencia_de_preco = referencia_preco
+        if turn.memoria_estavel:
+            memoria_estavel = turn.memoria_estavel
+        if turn.memoria_de_progressao:
+            memoria_de_progressao = turn.memoria_de_progressao
         if turn.business_context_line:
             contexto_comercial_informado = turn.business_context_line
         if turn.descoberta_nicho:
@@ -82,15 +103,22 @@ def restaurar_ultima_sessao_debug(root_dir: Path) -> SessaoRestauradaDebug | Non
             desconstrucao_primeiros_principios = turn.desconstrucao_primeiros_principios
         if turn.validacao_preco_contexto:
             validacao_preco_contexto = turn.validacao_preco_contexto
+        if turn.spin_selling_preco_contexto:
+            spin_selling_preco_contexto = turn.spin_selling_preco_contexto
     return SessaoRestauradaDebug(
         file_path=debug_path,
         turn_count=len(active_turns),
         current_stage=current_stage,
         history=history,
+        memoria_estavel=memoria_estavel,
+        memoria_de_progressao=memoria_de_progressao,
+        preco_ja_foi_dito_na_conversa=preco_ja_foi_dito_na_conversa,
+        ultima_referencia_de_preco=ultima_referencia_de_preco,
         contexto_comercial_informado=contexto_comercial_informado,
         descoberta_nicho=descoberta_nicho,
         desconstrucao_primeiros_principios=desconstrucao_primeiros_principios,
         validacao_preco_contexto=validacao_preco_contexto,
+        spin_selling_preco_contexto=spin_selling_preco_contexto,
         removed_turn_number=removed_turn_number,
         removed_client_message=removed_client_message,
     )
@@ -138,6 +166,7 @@ def _parse_turn_section(title: str, raw_section: str) -> TurnoDebug:
     client_message = _extract_block(raw_section, "### Client Message", "### ANA Response")
     assistant_response = _extract_block(raw_section, "### ANA Response", "### Por Que o ANA Decidiu Isso")
     lead_summary = _extract_json_section(raw_section, "### Lead Summary")
+    memory = _extract_json_section(raw_section, "### Memory")
     retrieval = _extract_json_section(raw_section, "### Retrieval")
     return TurnoDebug(
         number=number,
@@ -146,6 +175,8 @@ def _parse_turn_section(title: str, raw_section: str) -> TurnoDebug:
         final_stage=final_stage,
         client_message=client_message,
         assistant_response=assistant_response,
+        memoria_estavel=str(memory.get("memoria_estavel", "") or ""),
+        memoria_de_progressao=str(memory.get("memoria_de_progressao", "") or ""),
         business_context_line=str(lead_summary.get("business_context_line", "") or ""),
         descoberta_nicho=retrieval.get("descoberta_nicho_result", {}) if isinstance(retrieval.get("descoberta_nicho_result", {}), dict) else {},
         desconstrucao_primeiros_principios=(
@@ -154,6 +185,11 @@ def _parse_turn_section(title: str, raw_section: str) -> TurnoDebug:
             else {}
         ),
         validacao_preco_contexto=retrieval.get("validacao_preco_contexto_result", {}) if isinstance(retrieval.get("validacao_preco_contexto_result", {}), dict) else {},
+        spin_selling_preco_contexto=(
+            retrieval.get("spin_selling_preco_contexto_result", {})
+            if isinstance(retrieval.get("spin_selling_preco_contexto_result", {}), dict)
+            else {}
+        ),
     )
 
 
@@ -238,3 +274,24 @@ def _extract_json_section(raw_section: str, heading: str) -> dict:
     except json.JSONDecodeError:
         return {}
     return payload if isinstance(payload, dict) else {}
+
+
+def _extrair_referencia_de_preco(text: str) -> str:
+    candidate = str(text or "").strip()
+    if not candidate:
+        return ""
+    sentences = [
+        chunk.strip()
+        for chunk in re.split(r"(?<=[.!?])\s+|\n+", candidate)
+        if str(chunk or "").strip()
+    ]
+    patterns = (
+        r"R\$\s*\d",
+        r"(?i)\b\d[\d\.\,]*\s*(?:reais|real)\b",
+        r"(?i)\b(?:mensalidade|mensal|implantacao|implantação|setup|m[eê]s|/m[eê]s)\b",
+        r"(?i)\b(?:a partir de|come[çc]a em|fica em|normalmente começa em|normalmente comeca em)\b",
+    )
+    for sentence in sentences:
+        if any(re.search(pattern, sentence) for pattern in patterns):
+            return sentence[:240]
+    return ""

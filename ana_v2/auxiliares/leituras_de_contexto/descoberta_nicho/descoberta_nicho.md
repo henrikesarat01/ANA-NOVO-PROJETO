@@ -2,7 +2,45 @@
 
 Este prompt não responde ao cliente. Ele só faz uma leitura interna.
 
-Quando receber o nicho, segmento, produto ou serviço que o cliente vende, olhe para o produto carregado e devolva as funções mais relevantes para esse cenário, em ordem de importância.
+Se o input trouxer `memoria_estavel`, use isso como evidência silenciosa adicional do que ja ficou claro sobre o negócio, nicho, segmento, produto ou serviço do cliente.
+Se o input trouxer `memoria_de_progressao`, use isso apenas para nao redescobrir como novidade algo que a conversa ja consolidou.
+
+## Bloco de Descontaminacao Lexical do Produto
+
+Se o input trouxer `descricao_curta`, `descricao_longa` ou `funcoes`, trate isso como base semantica de consulta, nao como molde textual.
+
+Trate o produto como fonte latente de sentido, nao como superficie textual reutilizavel.
+
+Proibicoes duras:
+- nao fazer parafrase semantica muito proxima
+- nao fazer eco lexical
+- nao fazer reempacotamento do wording
+- nao preservar os nucleos lexicais dominantes do material
+- nao manter a espinha lexical da redacao original
+- nao fazer transposicao estrutural da frase-base
+- nao preservar a ordem de apresentacao das ideias
+- nao preservar a estrutura sintatica dominante do material
+
+Procedimento obrigatorio:
+1. faca primeiro uma leitura semantica abstrata
+2. reduza o material a sentido latente, dinamica, implicacao e concretude
+3. so depois escreva
+4. escreva por relexicalizacao e mudanca de eixo perceptivo, nao por troca de sinonimo
+5. se a saida ainda soar como versao reescrita do input, ela esta errada
+
+Regras operacionais:
+- nao cite os nomes dos campos
+- nao copie a redacao original
+- nao reaproveite sequencias de palavras marcantes do produto
+- excecao estrutural: no campo `nome`, mantenha o nome real da funcao quando isso for necessario para identificar corretamente o item ranqueado
+
+Quando receber a mensagem atual e o historico recente da conversa, tente entender silenciosamente o que o cliente vende, oferece, opera ou qual e a natureza basica do negocio dele.
+
+Se isso estiver claro o suficiente, olhe para o produto carregado e devolva as funcoes mais relevantes para esse cenário, em ordem de importancia.
+
+Se ainda nao der para entender com seguranca minima o negocio do cliente, nao invente. Nesse caso, devolva:
+
+funcoes_ranqueadas: []
 
 O objetivo aqui não é vender. O objetivo é montar matéria-prima estratégica para a próxima camada.
 
@@ -15,7 +53,7 @@ Ranquee as funções levando em conta, nesta ordem:
 3. o quanto ela reduz perda financeira ou destrava ganho financeiro
 4. o quanto ela corta esforço manual repetitivo
 
-Se o nicho vier seco, use o que normalmente tende a pesar naquele tipo de venda, mas sem inventar detalhes muito específicos.
+Se o contexto do negocio vier seco, mas ainda assim reconhecivel, use o que normalmente tende a pesar naquele tipo de venda, mas sem inventar detalhes muito específicos.
 
 Para cada função relevante, devolva:
 - nome da função
@@ -53,6 +91,8 @@ funcoes_ranqueadas:
     perda_financeira_sem_a_solucao: <o que tende a continuar sendo perdido sem essa funcao>
 
 Regras:
+- leia a mensagem atual e o historico antes de concluir o nicho
+- nao invente nicho quando a conversa ainda estiver vaga
 - devolver somente funções do produto carregado
 - devolver em ordem de importância
 - incluir prioridade numérica

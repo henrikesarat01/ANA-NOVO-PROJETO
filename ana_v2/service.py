@@ -1,20 +1,24 @@
 from __future__ import annotations
 
-from typing import Any
-
-from concurrent.futures import ThreadPoolExecutor
 from copy import deepcopy
-import yaml
+import os
+import re
+from typing import Any
 
 from ana_saga_cli.config import AppConfig
 from ana_saga_cli.sales.conversation_trace_collector import ConversationTraceCollector
 
-from ana_v2.base_de_consulta import construir_base_de_consulta
-from ana_v2.catalogo_etapas import CAMINHOS_PROMPTS_ETAPAS
+from ana_v2.catalogo_auxiliares import (
+    CATALOGO_AUXILIARES,
+    campo_estado_para_auxiliar,
+    gerar_catalogo_para_prompt,
+    resolver_dependencias,
+)
 from ana_v2.construtor_debug_conversa import construir_debug_markdown
-from ana_v2.decisor_etapas import DecisorEtapas
+from ana_v2.decisor_etapas import CerebroConversa
 from ana_v2.fabrica_cliente_llm import criar_cliente_llm
-from ana_v2.loaders import ProductData, PromptData, load_product, load_prompt
+from ana_v2.loaders import ROOT_DIR, ProductData, load_product, load_prompt
+from ana_v2.memoria.armazenamento import MemoriaConversaStorage
 from ana_v2.modelos_conversa import (
     CheckpointConversaV2,
     EstadoConversaV2,
@@ -26,38 +30,23 @@ from ana_v2.modelos_conversa import (
 class AnaV2ConversationService:
     MAX_HISTORY_TURNS = 20
 
-    def __init__(self, config: AppConfig, product_slug: str = "saga") -> None:
+    def __init__(self, config: AppConfig, product_slug: str = "saga", session_id: str | None = None) -> None:
         self.config = config
         self.product: ProductData = load_product(product_slug)
-        self.decisor_etapas = DecisorEtapas()
-        self.prompt_descoberta_nicho = load_prompt(
-            "auxiliares/descoberta_nicho/descoberta_nicho.md",
-            prompt_id="descoberta_nicho",
-        )
-        self.prompt_desconstrucao_primeiros_principios = load_prompt(
-            "auxiliares/desconstrucao_primeiros_principios/desconstrucao_primeiros_principios.md",
-            prompt_id="desconstrucao_primeiros_principios",
-        )
-        self.prompt_validacao_preco_contexto = load_prompt(
-            "auxiliares/validacao_preco_contexto/validacao_preco_contexto.md",
-            prompt_id="validacao_preco_contexto",
-        )
-        self.prompt_contexto_uso = load_prompt(
-            "auxiliares/contexto_uso/contexto_uso.md",
-            prompt_id="contexto_uso",
-        )
-        self.prompt_storytelling = load_prompt(
-            "auxiliares/storytelling/storytelling.md",
-            prompt_id="storytelling",
-        )
-        self.stage_prompts: dict[str, PromptData] = {
-            stage_id: load_prompt(relative_path, prompt_id=stage_id)
-            for stage_id, relative_path in CAMINHOS_PROMPTS_ETAPAS.items()
-        }
+        self.session_id = self._normalize_session_id(session_id or os.getenv("ANA_SESSION_ID", "default"))
+        self.cerebro = CerebroConversa()
         self.llm = criar_cliente_llm(config)
         self.trace_collector = ConversationTraceCollector(self)
         self.state = EstadoConversaV2(product_slug=product_slug)
         self._checkpoints: list[CheckpointConversaV2] = []
+        self.memoria_storage = MemoriaConversaStorage(
+            ROOT_DIR / "memoria" / "sessoes",
+            session_id=self.session_id,
+        )
+
+    def _normalize_session_id(self, value: str) -> str:
+        cleaned = re.sub(r"[^a-zA-Z0-9_-]+", "_", str(value or "").strip()).strip("_")
+        return cleaned or "default"
 
     def _add_trace(self, debug_trace: list[str], step: str, **fields: object) -> None:
         self.trace_collector.add_trace(debug_trace, step, **fields)
@@ -78,95 +67,113 @@ class AnaV2ConversationService:
             product_slug=self.product.slug,
         )
 
-        stage_selection = self._select_stage(user_message, debug_trace)
-        selected_stage = stage_selection.get("selected_stage", "") or "abertura"
-        if selected_stage not in self.stage_prompts:
-            selected_stage = "abertura"
-
-        self._atualizar_contexto_comercial(stage_selection)
-        descoberta_nicho_meta = self._executar_descoberta_nicho_se_couber(
-            selected_stage=selected_stage,
-            stage_selection=stage_selection,
-            user_message=user_message,
-            turn_number=turn_number,
-            debug_trace=debug_trace,
-        )
-        desconstrucao_primeiros_principios_meta = self._executar_desconstrucao_primeiros_principios_se_couber(
-            selected_stage=selected_stage,
-            user_message=user_message,
-            turn_number=turn_number,
-            debug_trace=debug_trace,
-        )
-        validacao_preco_contexto_meta = self._executar_validacao_preco_contexto_se_couber(
-            selected_stage=selected_stage,
-            user_message=user_message,
-            turn_number=turn_number,
-            debug_trace=debug_trace,
-        )
-        contexto_uso_meta, storytelling_meta = self._executar_auxiliares_explicacao_produto_em_paralelo(
-            selected_stage=selected_stage,
-            user_message=user_message,
-            turn_number=turn_number,
-            debug_trace=debug_trace,
-        )
-
-        stage_prompt = self.stage_prompts[selected_stage]
-        prompt_input = self._montar_input_etapa(selected_stage, user_message, stage_selection)
         history_window = self._historico_recente()
-        prompt_meta = {
-            "stage_prompt_path": str(stage_prompt.path),
-            "stage_prompt_paths": [str(path) for path in stage_prompt.paths],
-            "decisor_etapas_prompt_path": stage_selection.get("prompt_path", ""),
-            "product_path": str(self.product.path),
-            "history_items": len(history_window),
-            "input_chars": len(prompt_input),
-            "product_included": True,
-            "includes_price_data": False,
-            "descoberta_nicho_prompt_path": descoberta_nicho_meta.get("prompt_path", ""),
-            "desconstrucao_primeiros_principios_prompt_path": desconstrucao_primeiros_principios_meta.get("prompt_path", ""),
-            "validacao_preco_contexto_prompt_path": validacao_preco_contexto_meta.get("prompt_path", ""),
-            "contexto_uso_prompt_path": contexto_uso_meta.get("prompt_path", ""),
-            "storytelling_prompt_path": storytelling_meta.get("prompt_path", ""),
+        catalogo_texto = gerar_catalogo_para_prompt()
+        regras_etapa = self._carregar_regras_etapa(self.state.current_stage)
+        cerebro_kwargs: dict[str, Any] = {
+            "llm": self.llm,
+            "current_stage": self.state.current_stage,
+            "user_message": user_message,
+            "history": history_window,
+            "product_payload": self.product.payload,
+            "memoria_estavel": self.state.memoria_estavel,
+            "memoria_de_progressao": self.state.memoria_de_progressao,
+            "preco_ja_foi_dito_na_conversa": self.state.preco_ja_foi_dito_na_conversa,
+            "ultima_referencia_de_preco": self.state.ultima_referencia_de_preco,
+            "contexto_comercial_informado": self.state.contexto_comercial_informado,
+            "catalogo_auxiliares": catalogo_texto,
+            "regras_etapa": regras_etapa,
         }
+
+        brain_result = self.cerebro.processar(**cerebro_kwargs)
+
         self._add_trace(
             debug_trace,
-            "v2.prompt.ready",
-            stage=selected_stage,
-            instruction_chars=len(stage_prompt.body),
-            input_chars=prompt_meta["input_chars"],
-            history_items=prompt_meta["history_items"],
-            product_included=prompt_meta["product_included"],
-            includes_price_data=prompt_meta["includes_price_data"],
+            "v2.cerebro.pass1",
+            selected_stage=brain_result.selected_stage,
+            auxiliares_de_apoio_sugeridos=",".join(brain_result.auxiliares_de_apoio_sugeridos),
+            confidence=brain_result.confidence,
+            reason=brain_result.reason,
         )
 
-        with self.llm.trace_context(
-            "v2.assistant_response",
-            turn=turn_number,
-            stage=selected_stage,
-            product_slug=self.product.slug,
-        ):
-            response = self.llm.generate(stage_prompt.body, prompt_input)
-        self.llm.annotate_last_call(
-            parsed_output={"response_text": response},
-            output_used=response,
-            consumed_by=["assistant_response", "markdown_debug"],
+        resultados_auxiliares = self._executar_auxiliares_solicitados(
+            auxiliares_solicitados=brain_result.auxiliares_de_apoio_sugeridos,
+            contexto_comercial=(
+                brain_result.contexto_comercial_informado_atualizado
+                or self.state.contexto_comercial_informado
+            ),
+            user_message=user_message,
+            turn_number=turn_number,
+            debug_trace=debug_trace,
         )
+
+        if resultados_auxiliares:
+            if brain_result.contexto_comercial_informado_atualizado:
+                cerebro_kwargs["contexto_comercial_informado"] = (
+                    brain_result.contexto_comercial_informado_atualizado
+                )
+            cerebro_kwargs["resultados_auxiliares"] = resultados_auxiliares
+            brain_result = self.cerebro.processar(**cerebro_kwargs)
+            self._add_trace(
+                debug_trace,
+                "v2.cerebro.pass2",
+                selected_stage=brain_result.selected_stage,
+                auxiliares_usados=",".join(resultados_auxiliares.keys()),
+                confidence=brain_result.confidence,
+            )
+
+        stage_selection = brain_result.as_dict()
+        selected_stage = brain_result.selected_stage
+        response = brain_result.resposta_ao_cliente
+        prompt_input = brain_result.prompt_input
+
         self._add_trace(
             debug_trace,
-            "v2.response.generated",
-            stage=selected_stage,
+            "v2.cerebro.result",
+            selected_stage=brain_result.selected_stage,
+            auxiliares_de_apoio_sugeridos=",".join(brain_result.auxiliares_de_apoio_sugeridos),
+            necessidade_atual=brain_result.necessidade_atual,
+            proximo_movimento=brain_result.proximo_movimento,
+            o_que_entendi_neste_turno=brain_result.o_que_entendi_neste_turno,
+            proximo_passo_logico=brain_result.proximo_passo_logico,
+            proxima_etapa_esperada=brain_result.proxima_etapa_esperada,
+            confidence=brain_result.confidence,
+            reason=brain_result.reason,
             response_chars=len(response),
-            preview=response[:180],
+        )
+
+        if brain_result.contexto_comercial_informado_atualizado:
+            self.state.contexto_comercial_informado = brain_result.contexto_comercial_informado_atualizado
+        if brain_result.memoria_estavel_atualizada:
+            self.state.memoria_estavel = self._normalizar_memoria_texto(
+                brain_result.memoria_estavel_atualizada
+            )
+        if brain_result.memoria_de_progressao_atualizada:
+            self.state.memoria_de_progressao = self._normalizar_memoria_texto(
+                brain_result.memoria_de_progressao_atualizada
+            )
+
+        self._add_trace(
+            debug_trace,
+            "v2.memoria.updated",
+            memoria_estavel_chars=len(self.state.memoria_estavel),
+            memoria_de_progressao_chars=len(self.state.memoria_de_progressao),
         )
 
         self.state.turn_count = turn_number
         self.state.current_stage = selected_stage
+        self._atualizar_estado_preco_na_conversa(
+            selected_stage=selected_stage,
+            response=response,
+            debug_trace=debug_trace,
+        )
         self.state.history.extend(
             [
                 MensagemConversa(role="cliente", content=user_message),
                 MensagemConversa(role="ANA", content=response),
             ]
         )
+        self.persistir_memoria_em_arquivos()
 
         state_after = self._fotografar_estado()
         self._add_trace(
@@ -178,15 +185,39 @@ class AnaV2ConversationService:
         )
 
         llm_calls = self.llm.consume_turn_debug_session()
+        prompt_meta = {
+            "stage_prompt_path": str(self.cerebro.prompt.path),
+            "stage_prompt_paths": [str(self.cerebro.prompt.path)],
+            "decisor_etapas_prompt_path": str(self.cerebro.prompt.path),
+            "cerebro_conversa_prompt_path": str(self.cerebro.prompt.path),
+            "product_path": str(self.product.path),
+            "history_items": len(history_window),
+            "input_chars": len(prompt_input),
+            "product_included": True,
+            "includes_price_data": bool(self.state.preco_ja_foi_dito_na_conversa),
+            "descoberta_nicho_prompt_path": "",
+            "desconstrucao_primeiros_principios_prompt_path": "",
+            "validacao_preco_contexto_prompt_path": "",
+            "spin_selling_prompt_path": "",
+            "contexto_uso_prompt_path": "",
+            "storytelling_prompt_path": "",
+            "memoria_prompt_path": str(self.cerebro.prompt.path),
+            "memoria_session_dir": str(self.memoria_storage.paths.session_dir),
+            "historico_path": str(self.memoria_storage.paths.historico_path),
+            "memoria_estavel_path": str(self.memoria_storage.paths.memoria_estavel_path),
+            "memoria_de_progressao_path": str(self.memoria_storage.paths.memoria_de_progressao_path),
+            "estado_sessao_path": str(self.memoria_storage.paths.estado_sessao_path),
+        }
+
         markdown_debug = construir_debug_markdown(
             produto=self.product,
-            prompt_etapa_final=stage_prompt,
+            prompt_etapa_final=self.cerebro.prompt,
             entry_stage=entry_stage,
             final_stage=selected_stage,
             user_message=user_message,
             response=response,
             stage_selection=stage_selection,
-            instructions=stage_prompt.body,
+            instructions=self.cerebro.prompt.body,
             prompt_input=prompt_input,
             prompt_meta=prompt_meta,
             debug_trace=debug_trace,
@@ -194,16 +225,29 @@ class AnaV2ConversationService:
             state_before=state_before,
             state_after=state_after,
             contexto_comercial_informado=self.state.contexto_comercial_informado,
-            descoberta_nicho=self.state.descoberta_nicho,
-            descoberta_nicho_meta=descoberta_nicho_meta,
-            desconstrucao_primeiros_principios=self.state.desconstrucao_primeiros_principios,
-            desconstrucao_primeiros_principios_meta=desconstrucao_primeiros_principios_meta,
-            validacao_preco_contexto=self.state.validacao_preco_contexto,
-            validacao_preco_contexto_meta=validacao_preco_contexto_meta,
-            contexto_uso_explicacao_produto=self.state.contexto_uso_explicacao_produto,
-            contexto_uso_explicacao_produto_meta=contexto_uso_meta,
-            storytelling_explicacao_produto=self.state.storytelling_explicacao_produto,
-            storytelling_explicacao_produto_meta=storytelling_meta,
+            descoberta_nicho={},
+            descoberta_nicho_meta={"executed": False, "prompt_path": "", "input_chars": 0, "ranked_functions_count": 0, "result": {}},
+            desconstrucao_primeiros_principios={},
+            desconstrucao_primeiros_principios_meta={"executed": False, "prompt_path": "", "input_chars": 0, "variavel_critica_id": "", "result": {}},
+            validacao_preco_contexto={},
+            validacao_preco_contexto_meta={"executed": False, "prompt_path": "", "input_chars": 0, "next_variable_id": "", "campos_considerados": [], "evidencias_utilizadas_count": 0, "result": {}},
+            spin_selling_preco_contexto={},
+            spin_selling_preco_contexto_meta={"executed": False, "prompt_path": "", "input_chars": 0, "texto": "", "result": {}},
+            contexto_uso_explicacao_produto={},
+            contexto_uso_explicacao_produto_meta={"executed": False, "prompt_path": "", "input_chars": 0, "texto": "", "result": {}},
+            storytelling_explicacao_produto={},
+            storytelling_explicacao_produto_meta={"executed": False, "prompt_path": "", "input_chars": 0, "texto": "", "result": {}},
+            memoria_estavel=self.state.memoria_estavel,
+            memoria_de_progressao=self.state.memoria_de_progressao,
+            memoria_meta={
+                "executed": True,
+                "prompt_path": str(self.cerebro.prompt.path),
+                "input_chars": len(prompt_input),
+                "result": {
+                    "memoria_estavel": self.state.memoria_estavel,
+                    "memoria_de_progressao": self.state.memoria_de_progressao,
+                },
+            },
         )
         return ResultadoRespostaV2(
             stage_id=selected_stage,
@@ -212,587 +256,311 @@ class AnaV2ConversationService:
             markdown_debug=markdown_debug,
         )
 
-    def _select_stage(self, user_message: str, debug_trace: list[str]) -> dict[str, Any]:
-        history = self._historico_recente()
-        decision = self.decisor_etapas.decidir(
-            llm=self.llm,
-            current_stage=self.state.current_stage,
-            user_message=user_message,
-            history=history,
-        )
-        parsed = decision.as_dict()
-        self._add_trace(
-            debug_trace,
-            "v2.flow_decision.result",
-            selected_stage=parsed.get("selected_stage", ""),
-            confidence=parsed.get("confidence", 0.0),
-            reason=parsed.get("reason", ""),
-        )
-        return parsed
+    # ------------------------------------------------------------------
+    # Processo de vendas — regras por etapa
+    # ------------------------------------------------------------------
 
-    def _atualizar_contexto_comercial(self, stage_selection: dict[str, Any]) -> None:
-        contexto_detectado = str(stage_selection.get("contexto_comercial_detectado", "") or "").strip()
-        contexto_suficiente = bool(stage_selection.get("contexto_comercial_suficiente_no_turno", False))
-        if contexto_suficiente and contexto_detectado:
-            self.state.contexto_comercial_informado = contexto_detectado
+    PROCESSO_VENDAS_MAP: dict[str, str] = {
+        "abertura": "processo_vendas/abertura/abertura.md",
+        "explicacao_produto": "processo_vendas/explicacao_produto/explicacao_produto.md",
+        "preco_contexto": "processo_vendas/preco_contexto/preco_contexto.md",
+        "quebra_objecao": "processo_vendas/quebra_objecao/quebra_objecao.md",
+    }
+
+    def _carregar_regras_etapa(self, stage: str) -> str:
+        relative = self.PROCESSO_VENDAS_MAP.get(stage, "")
+        if not relative:
+            return ""
+        path = ROOT_DIR / relative
+        if not path.exists():
+            return ""
+        return path.read_text(encoding="utf-8").strip()
 
     def _historico_recente(self, max_turns: int | None = None) -> list[dict[str, str]]:
         turns = max_turns or self.MAX_HISTORY_TURNS
-        max_messages = max(0, turns * 2)
-        selected = self.state.history[-max_messages:] if max_messages else []
-        return [
-            {"role": message.role, "content": message.content}
-            for message in selected
-        ]
+        limite_por_role = max(0, turns)
+        if limite_por_role == 0:
+            return []
 
-    def _fotografar_estado(self) -> dict[str, int | str]:
+        contadores = {"cliente": 0, "ANA": 0}
+        selected_reversed: list[MensagemConversa] = []
+        for message in reversed(self.state.history):
+            role = str(message.role or "")
+            if role not in contadores:
+                continue
+            if contadores[role] >= limite_por_role:
+                continue
+            selected_reversed.append(message)
+            contadores[role] += 1
+            if all(contador >= limite_por_role for contador in contadores.values()):
+                break
+
+        selected = list(reversed(selected_reversed))
+        return [{"role": message.role, "content": message.content} for message in selected]
+
+    def _fotografar_estado(self) -> dict[str, int | str | bool]:
         return {
             "turn_count": self.state.turn_count,
             "current_stage": self.state.current_stage,
             "history_messages": len(self.state.history),
+            "memoria_estavel_chars": len(self.state.memoria_estavel),
+            "memoria_estavel_preview": self._preview_texto(self.state.memoria_estavel),
+            "memoria_de_progressao_chars": len(self.state.memoria_de_progressao),
+            "memoria_de_progressao_preview": self._preview_texto(self.state.memoria_de_progressao),
+            "preco_ja_foi_dito_na_conversa": self.state.preco_ja_foi_dito_na_conversa,
+            "ultima_referencia_de_preco": self.state.ultima_referencia_de_preco,
             "contexto_comercial_informado": self.state.contexto_comercial_informado,
-            "ranked_functions_count": len(self.state.descoberta_nicho.get("funcoes_ranqueadas", [])),
-            "desconstrucao_variavel_critica": self._extrair_desconstrucao_variavel_critica_id(
-                self.state.desconstrucao_primeiros_principios
-            ),
-            "validacao_variavel_pendente": self._extrair_validacao_next_variable_id(
-                self.state.validacao_preco_contexto
-            ),
-            "validacao_contexto_suficiente": self._extrair_validacao_contexto_suficiente(
-                self.state.validacao_preco_contexto
-            ),
-            "contexto_uso_texto": self._extrair_contexto_uso_texto(
-                self.state.contexto_uso_explicacao_produto
-            ),
-            "storytelling_texto": self._extrair_storytelling_texto(
-                self.state.storytelling_explicacao_produto
-            ),
         }
 
-    def _montar_input_etapa(self, stage_id: str, user_message: str, stage_selection: dict[str, Any]) -> str:
-        historico_recente = self._historico_recente()
-        if stage_id == "explicacao_produto":
-            payload = {
-                "mensagem_do_cliente": user_message,
-                "contexto_comercial_informado": self.state.contexto_comercial_informado,
-                "historico_recente": historico_recente,
-                "descricao_curta": self.product.payload.get("descricao_curta", ""),
-                "descricao_longa": self.product.payload.get("descricao_longa", ""),
-                "funcoes": self.product.payload.get("funcoes", []),
-                "contexto_uso": self.state.contexto_uso_explicacao_produto,
-                "storytelling": self.state.storytelling_explicacao_produto,
-            }
-            return yaml.safe_dump(payload, allow_unicode=True, sort_keys=False)
-        base_de_consulta = construir_base_de_consulta(
-            produto=self.product,
-            stage_id=stage_id,
+    def _preview_texto(self, value: str, limit: int = 240) -> str:
+        compact = " ".join(str(value or "").split()).strip()
+        if len(compact) <= limit:
+            return compact
+        return compact[:limit].rstrip() + "..."
+
+    def persistir_memoria_em_arquivos(self) -> None:
+        self.memoria_storage.save(self.state)
+
+    def limpar_memoria_em_arquivos(self) -> None:
+        self.memoria_storage.clear()
+
+    def _normalizar_memoria_texto(self, value: Any) -> str:
+        text = str(value or "").strip()
+        if not text:
+            return ""
+        linhas = [linha.rstrip() for linha in text.splitlines()]
+        while linhas and not linhas[0].strip():
+            linhas.pop(0)
+        while linhas and not linhas[-1].strip():
+            linhas.pop()
+        return "\n".join(linhas).strip()
+
+    def _executar_auxiliares_solicitados(
+        self,
+        *,
+        auxiliares_solicitados: list[str],
+        contexto_comercial: str,
+        user_message: str,
+        turn_number: int,
+        debug_trace: list[str],
+    ) -> dict[str, Any]:
+        if not auxiliares_solicitados:
+            return {}
+
+        nomes_ordenados = resolver_dependencias(auxiliares_solicitados, contexto_comercial)
+        if not nomes_ordenados:
+            return {}
+
+        self._add_trace(
+            debug_trace,
+            "v2.auxiliares.resolving",
+            solicitados=",".join(auxiliares_solicitados),
+            ordenados=",".join(nomes_ordenados),
+        )
+
+        resultados: dict[str, Any] = {}
+        for nome in nomes_ordenados:
+            resultado = self._executar_auxiliar(
+                nome=nome,
+                user_message=user_message,
+                turn_number=turn_number,
+                resultados_previos=resultados,
+                contexto_comercial=contexto_comercial,
+                debug_trace=debug_trace,
+            )
+            if resultado:
+                resultados[nome] = resultado
+                campo = campo_estado_para_auxiliar(nome)
+                if campo and hasattr(self.state, campo):
+                    setattr(self.state, campo, deepcopy(resultado))
+        return resultados
+
+    def _executar_auxiliar(
+        self,
+        *,
+        nome: str,
+        user_message: str,
+        turn_number: int,
+        resultados_previos: dict[str, Any],
+        contexto_comercial: str,
+        debug_trace: list[str],
+    ) -> dict[str, Any] | None:
+        if nome not in CATALOGO_AUXILIARES:
+            return None
+
+        info = CATALOGO_AUXILIARES[nome]
+        prompt_data = load_prompt(info["path"], prompt_id=nome)
+
+        payload = self._montar_payload_auxiliar(
+            nome=nome,
             user_message=user_message,
-            contexto_comercial_informado=self.state.contexto_comercial_informado,
-            historico_recente=historico_recente,
-            stage_selection=stage_selection,
-            descoberta_nicho=self.state.descoberta_nicho,
-            desconstrucao_primeiros_principios=self.state.desconstrucao_primeiros_principios,
-            validacao_preco_contexto=self.state.validacao_preco_contexto,
+            resultados_previos=resultados_previos,
+            contexto_comercial=contexto_comercial,
         )
-        if stage_id == "preco_contexto":
-            payload = {
-                "mensagem_do_cliente": user_message,
-                "contexto_comercial_informado": self.state.contexto_comercial_informado,
-                "historico_recente": historico_recente,
-                "base_de_consulta": base_de_consulta,
-            }
-            return yaml.safe_dump(payload, allow_unicode=True, sort_keys=False)
-        if stage_id == "abertura":
-            payload = {
-                "mensagem_do_cliente": user_message,
-                "contexto_comercial_informado": self.state.contexto_comercial_informado,
-                "historico_recente": historico_recente,
-                "base_de_consulta": base_de_consulta,
-            }
-            return yaml.safe_dump(payload, allow_unicode=True, sort_keys=False)
-        return user_message
-
-    def _executar_descoberta_nicho_se_couber(
-        self,
-        *,
-        selected_stage: str,
-        stage_selection: dict[str, Any],
-        user_message: str,
-        turn_number: int,
-        debug_trace: list[str],
-    ) -> dict[str, Any]:
-        if selected_stage != "preco_contexto":
-            return {
-                "executed": False,
-                "prompt_path": str(self.prompt_descoberta_nicho.path),
-                "input_chars": 0,
-                "ranked_functions_count": len(self.state.descoberta_nicho.get("funcoes_ranqueadas", [])),
-                "result": deepcopy(self.state.descoberta_nicho),
-            }
-
-        contexto_detectado = str(stage_selection.get("contexto_comercial_detectado", "") or "").strip()
-        contexto_suficiente_no_turno = bool(stage_selection.get("contexto_comercial_suficiente_no_turno", False))
-        contexto_base = (
-            contexto_detectado
-            if contexto_suficiente_no_turno and contexto_detectado
-            else self.state.contexto_comercial_informado
-        )
-        precisa_reprocessar = bool(contexto_base) and (
-            not self.state.descoberta_nicho
-            or (contexto_detectado and contexto_detectado != self.state.contexto_comercial_informado)
-        )
-
-        if not contexto_base:
-            self.state.descoberta_nicho = {}
-            self._add_trace(
-                debug_trace,
-                "v2.descoberta_nicho.skipped",
-                selected_stage=selected_stage,
-                reason="contexto_comercial_ainda_nao_detectado_na_mensagem_atual",
-            )
-            return {
-                "executed": False,
-                "prompt_path": str(self.prompt_descoberta_nicho.path),
-                "input_chars": 0,
-                "ranked_functions_count": 0,
-                "result": {},
-            }
-
-        if not precisa_reprocessar:
-            self._add_trace(
-                debug_trace,
-                "v2.descoberta_nicho.skipped",
-                selected_stage=selected_stage,
-                reason="contexto_comercial_ja_disponivel_sem_mudanca",
-            )
-            return {
-                "executed": False,
-                "prompt_path": str(self.prompt_descoberta_nicho.path),
-                "input_chars": 0,
-                "ranked_functions_count": len(self.state.descoberta_nicho.get("funcoes_ranqueadas", [])),
-                "result": deepcopy(self.state.descoberta_nicho),
-            }
-
-        payload = {
-            "nicho_ou_segmento_produto_ou_servico_que_o_cliente_vende": contexto_base,
-            "produto": self.product.payload,
-        }
+        import yaml
         prompt_input = yaml.safe_dump(payload, allow_unicode=True, sort_keys=False)
+
         self._add_trace(
             debug_trace,
-            "v2.descoberta_nicho.start",
-            selected_stage=selected_stage,
+            f"v2.auxiliar.{nome}.start",
             input_chars=len(prompt_input),
-            contexto_extraido=contexto_base,
+            prompt_path=str(prompt_data.path),
         )
+
         with self.llm.trace_context(
-            "v2.descoberta_nicho",
+            f"v2.auxiliar.{nome}",
             turn=turn_number,
-            selected_stage=selected_stage,
             product_slug=self.product.slug,
         ):
-            raw = self.llm.generate(self.prompt_descoberta_nicho.body, prompt_input)
-        parsed = self._safe_yaml_dict(raw)
-        ranked_functions_count = len(parsed.get("funcoes_ranqueadas", []))
+            raw = self.llm.generate(prompt_data.body, prompt_input)
+
+        parsed = self._safe_yaml_or_json(raw)
         self.llm.annotate_last_call(
             parsed_output=parsed,
             output_used=parsed if parsed else raw,
-            consumed_by=["internal_lookup", "markdown_debug"],
+            consumed_by=[f"auxiliar_{nome}", "markdown_debug"],
         )
-        self.state.contexto_comercial_informado = contexto_base
-        self.state.descoberta_nicho = deepcopy(parsed)
+
         self._add_trace(
             debug_trace,
-            "v2.descoberta_nicho.generated",
-            ranked_functions_count=ranked_functions_count,
-            contexto_comercial_informado=contexto_base,
+            f"v2.auxiliar.{nome}.done",
+            output_keys=",".join(parsed.keys()) if parsed else "raw",
         )
-        return {
-            "executed": True,
-            "prompt_path": str(self.prompt_descoberta_nicho.path),
-            "input_chars": len(prompt_input),
-            "ranked_functions_count": ranked_functions_count,
-            "result": parsed,
-        }
+        return parsed if parsed else None
 
-    def _executar_desconstrucao_primeiros_principios_se_couber(
+    def _montar_payload_auxiliar(
         self,
         *,
-        selected_stage: str,
+        nome: str,
         user_message: str,
-        turn_number: int,
-        debug_trace: list[str],
+        resultados_previos: dict[str, Any],
+        contexto_comercial: str,
     ) -> dict[str, Any]:
-        if selected_stage != "preco_contexto":
-            return {
-                "executed": False,
-                "prompt_path": str(self.prompt_desconstrucao_primeiros_principios.path),
-                "input_chars": 0,
-                "variavel_critica_id": self._extrair_desconstrucao_variavel_critica_id(
-                    self.state.desconstrucao_primeiros_principios
-                ),
-                "result": deepcopy(self.state.desconstrucao_primeiros_principios),
-            }
-
-        if not self.state.descoberta_nicho:
-            self.state.desconstrucao_primeiros_principios = {}
-            self._add_trace(
-                debug_trace,
-                "v2.desconstrucao_primeiros_principios.skipped",
-                selected_stage=selected_stage,
-                reason="descoberta_nicho_ainda_nao_disponivel",
-            )
-            return {
-                "executed": False,
-                "prompt_path": str(self.prompt_desconstrucao_primeiros_principios.path),
-                "input_chars": 0,
-                "variavel_critica_id": "",
-                "result": {},
-            }
-
-        payload = {
-            "mensagem_atual_do_cliente": user_message,
-            "contexto_comercial_informado": self.state.contexto_comercial_informado,
-            "descoberta_nicho": self.state.descoberta_nicho,
-            "historico_recente": self._historico_recente(),
-            "ultima_resposta_da_ana": self.state.history[-1].content if self.state.history and self.state.history[-1].role == "ANA" else "",
-        }
-        prompt_input = yaml.safe_dump(payload, allow_unicode=True, sort_keys=False)
-        self._add_trace(
-            debug_trace,
-            "v2.desconstrucao_primeiros_principios.start",
-            selected_stage=selected_stage,
-            input_chars=len(prompt_input),
-        )
-        with self.llm.trace_context(
-            "v2.desconstrucao_primeiros_principios",
-            turn=turn_number,
-            selected_stage=selected_stage,
-            product_slug=self.product.slug,
-        ):
-            raw = self.llm.generate(self.prompt_desconstrucao_primeiros_principios.body, prompt_input)
-        parsed = self._safe_yaml_dict(raw)
-        variavel_critica = self._extrair_desconstrucao_variavel_critica_id(parsed)
-        uso_da_descoberta = parsed.get("uso_da_descoberta", {}) or {}
-        campos_considerados = uso_da_descoberta.get("campos_considerados", [])
-        evidencias_utilizadas = uso_da_descoberta.get("evidencias_utilizadas", [])
-        self.llm.annotate_last_call(
-            parsed_output=parsed,
-            output_used=parsed if parsed else raw,
-            consumed_by=["internal_first_principles", "markdown_debug"],
-        )
-        self.state.desconstrucao_primeiros_principios = deepcopy(parsed)
-        self._add_trace(
-            debug_trace,
-            "v2.desconstrucao_primeiros_principios.generated",
-            variavel_critica_id=variavel_critica,
-            recebeu_descoberta_nicho=bool(uso_da_descoberta.get("recebeu_descoberta_nicho", False)),
-            campos_considerados=",".join(str(field) for field in campos_considerados if field),
-            evidencias_utilizadas_count=len(evidencias_utilizadas) if isinstance(evidencias_utilizadas, list) else 0,
-        )
-        return {
-            "executed": True,
-            "prompt_path": str(self.prompt_desconstrucao_primeiros_principios.path),
-            "input_chars": len(prompt_input),
-            "variavel_critica_id": variavel_critica,
-            "campos_considerados": campos_considerados if isinstance(campos_considerados, list) else [],
-            "evidencias_utilizadas_count": len(evidencias_utilizadas) if isinstance(evidencias_utilizadas, list) else 0,
-            "result": parsed,
-        }
-
-    def _executar_validacao_preco_contexto_se_couber(
-        self,
-        *,
-        selected_stage: str,
-        user_message: str,
-        turn_number: int,
-        debug_trace: list[str],
-    ) -> dict[str, Any]:
-        if selected_stage != "preco_contexto":
-            return {
-                "executed": False,
-                "prompt_path": str(self.prompt_validacao_preco_contexto.path),
-                "input_chars": 0,
-                "next_variable_id": self._extrair_validacao_next_variable_id(
-                    self.state.validacao_preco_contexto
-                ),
-                "result": deepcopy(self.state.validacao_preco_contexto),
-            }
-
-        if not self.state.descoberta_nicho:
-            self.state.validacao_preco_contexto = {}
-            self._add_trace(
-                debug_trace,
-                "v2.validacao_preco_contexto.skipped",
-                selected_stage=selected_stage,
-                reason="descoberta_nicho_ainda_nao_disponivel",
-            )
-            return {
-                "executed": False,
-                "prompt_path": str(self.prompt_validacao_preco_contexto.path),
-                "input_chars": 0,
-                "next_variable_id": "",
-                "result": {},
-            }
-
-        if not self.state.desconstrucao_primeiros_principios:
-            self.state.validacao_preco_contexto = {}
-            self._add_trace(
-                debug_trace,
-                "v2.validacao_preco_contexto.skipped",
-                selected_stage=selected_stage,
-                reason="desconstrucao_primeiros_principios_ainda_nao_disponivel",
-            )
-            return {
-                "executed": False,
-                "prompt_path": str(self.prompt_validacao_preco_contexto.path),
-                "input_chars": 0,
-                "next_variable_id": "",
-                "result": {},
-            }
-
-        payload = {
-            "mensagem_atual_do_cliente": user_message,
-            "contexto_comercial_informado": self.state.contexto_comercial_informado,
-            "descoberta_nicho": self.state.descoberta_nicho,
-            "desconstrucao_primeiros_principios": self.state.desconstrucao_primeiros_principios,
-            "historico_recente": self._historico_recente(),
-            "ultima_resposta_da_ana": self.state.history[-1].content if self.state.history and self.state.history[-1].role == "ANA" else "",
-        }
-        prompt_input = yaml.safe_dump(payload, allow_unicode=True, sort_keys=False)
-        self._add_trace(
-            debug_trace,
-            "v2.validacao_preco_contexto.start",
-            selected_stage=selected_stage,
-            input_chars=len(prompt_input),
-        )
-        with self.llm.trace_context(
-            "v2.validacao_preco_contexto",
-            turn=turn_number,
-            selected_stage=selected_stage,
-            product_slug=self.product.slug,
-        ):
-            raw = self.llm.generate(self.prompt_validacao_preco_contexto.body, prompt_input)
-        parsed = self._safe_yaml_dict(raw)
-        next_variable = self._extrair_validacao_next_variable_id(parsed)
-        uso_da_base = parsed.get("uso_da_base", {}) or {}
-        uso_da_descoberta = parsed.get("uso_da_descoberta", {}) or {}
-        campos_considerados = uso_da_base.get("campos_da_descoberta", [])
-        if not isinstance(campos_considerados, list) or not campos_considerados:
-            campos_considerados = uso_da_descoberta.get("campos_considerados", [])
-        evidencias_utilizadas = uso_da_base.get("evidencias_utilizadas", [])
-        if not isinstance(evidencias_utilizadas, list) or not evidencias_utilizadas:
-            evidencias_utilizadas = uso_da_descoberta.get("evidencias_utilizadas", [])
-        self.llm.annotate_last_call(
-            parsed_output=parsed,
-            output_used=parsed if parsed else raw,
-            consumed_by=["internal_validation", "markdown_debug"],
-        )
-        self.state.validacao_preco_contexto = deepcopy(parsed)
-        self._add_trace(
-            debug_trace,
-            "v2.validacao_preco_contexto.generated",
-            next_variable_id=next_variable,
-            suficiente_para_avancar=self._extrair_validacao_contexto_suficiente(parsed),
-            recebeu_descoberta_nicho=bool(
-                uso_da_base.get("recebeu_descoberta_nicho", uso_da_descoberta.get("recebeu_descoberta_nicho", False))
-            ),
-            campos_considerados=",".join(str(field) for field in campos_considerados if field),
-            evidencias_utilizadas_count=len(evidencias_utilizadas) if isinstance(evidencias_utilizadas, list) else 0,
-        )
-        return {
-            "executed": True,
-            "prompt_path": str(self.prompt_validacao_preco_contexto.path),
-            "input_chars": len(prompt_input),
-            "next_variable_id": next_variable,
-            "campos_considerados": campos_considerados if isinstance(campos_considerados, list) else [],
-            "evidencias_utilizadas_count": len(evidencias_utilizadas) if isinstance(evidencias_utilizadas, list) else 0,
-            "result": parsed,
-        }
-
-    def _executar_auxiliares_explicacao_produto_em_paralelo(
-        self,
-        *,
-        selected_stage: str,
-        user_message: str,
-        turn_number: int,
-        debug_trace: list[str],
-    ) -> tuple[dict[str, Any], dict[str, Any]]:
-        if selected_stage != "explicacao_produto":
-            return (
-                {
-                    "executed": False,
-                    "prompt_path": str(self.prompt_contexto_uso.path),
-                    "input_chars": 0,
-                    "texto": self._extrair_contexto_uso_texto(
-                        self.state.contexto_uso_explicacao_produto
-                    ),
-                    "result": deepcopy(self.state.contexto_uso_explicacao_produto),
-                },
-                {
-                    "executed": False,
-                    "prompt_path": str(self.prompt_storytelling.path),
-                    "input_chars": 0,
-                    "texto": self._extrair_storytelling_texto(
-                        self.state.storytelling_explicacao_produto
-                    ),
-                    "result": deepcopy(self.state.storytelling_explicacao_produto),
-                },
-            )
-
-        payload = {
+        base: dict[str, Any] = {
             "mensagem_atual_do_cliente": user_message,
             "historico_recente": self._historico_recente(),
-            "produto": {
+            "memoria_estavel": self.state.memoria_estavel,
+            "memoria_de_progressao": self.state.memoria_de_progressao,
+        }
+
+        if nome == "descoberta_nicho":
+            return {
+                "nicho_ou_segmento_produto_ou_servico_que_o_cliente_vende": contexto_comercial,
+                "produto": self.product.payload,
+                "memoria_estavel": self.state.memoria_estavel,
+                "memoria_de_progressao": self.state.memoria_de_progressao,
+            }
+
+        if nome in ("contexto_uso", "storytelling", "tecnicas_feynman"):
+            base["produto"] = {
                 "descricao_curta": self.product.payload.get("descricao_curta", ""),
                 "descricao_longa": self.product.payload.get("descricao_longa", ""),
                 "funcoes": self.product.payload.get("funcoes", []),
-            },
-        }
-        self._add_trace(
-            debug_trace,
-            "v2.explicacao_auxiliares.parallel_start",
-            selected_stage=selected_stage,
-        )
-        with ThreadPoolExecutor(max_workers=2) as executor:
-            contexto_uso_future = executor.submit(
-                self._executar_prompt_auxiliar_independente,
-                layer="v2.contexto_uso",
-                prompt=self.prompt_contexto_uso,
-                payload=payload,
-                turn_number=turn_number,
-                selected_stage=selected_stage,
-                consumed_by="internal_usage_context",
+            }
+            return base
+
+        if nome == "desconstrucao_primeiros_principios":
+            base["contexto_comercial_informado"] = contexto_comercial
+            base["descoberta_nicho"] = resultados_previos.get(
+                "descoberta_nicho", self.state.descoberta_nicho
             )
-            storytelling_future = executor.submit(
-                self._executar_prompt_auxiliar_independente,
-                layer="v2.storytelling",
-                prompt=self.prompt_storytelling,
-                payload=payload,
-                turn_number=turn_number,
-                selected_stage=selected_stage,
-                consumed_by="internal_storytelling",
+            last_ana = [m for m in self.state.history if m.role == "ANA"]
+            base["ultima_resposta_da_ana"] = last_ana[-1].content if last_ana else ""
+            return base
+
+        if nome == "validacao_preco_contexto":
+            base["contexto_comercial_informado"] = contexto_comercial
+            base["descoberta_nicho"] = resultados_previos.get(
+                "descoberta_nicho", self.state.descoberta_nicho
             )
-            contexto_uso_run = contexto_uso_future.result()
-            storytelling_run = storytelling_future.result()
+            base["desconstrucao_primeiros_principios"] = resultados_previos.get(
+                "desconstrucao_primeiros_principios",
+                self.state.desconstrucao_primeiros_principios,
+            )
+            last_ana = [m for m in self.state.history if m.role == "ANA"]
+            base["ultima_resposta_da_ana"] = last_ana[-1].content if last_ana else ""
+            return base
 
-        self.state.contexto_uso_explicacao_produto = deepcopy(contexto_uso_run["parsed"])
-        self.state.storytelling_explicacao_produto = deepcopy(storytelling_run["parsed"])
-        self._merge_external_llm_calls(contexto_uso_run["llm_calls"])
-        self._merge_external_llm_calls(storytelling_run["llm_calls"])
+        if nome in ("spin_selling", "exploracao_preco_contexto", "preco_contexto"):
+            base["contexto_comercial_informado"] = contexto_comercial
+            base["produto"] = self.product.payload
+            return base
 
-        contexto_uso_texto = self._extrair_contexto_uso_texto(contexto_uso_run["parsed"])
-        storytelling_texto = self._extrair_storytelling_texto(storytelling_run["parsed"])
-        self._add_trace(debug_trace, "v2.contexto_uso.generated", texto=contexto_uso_texto)
-        self._add_trace(debug_trace, "v2.storytelling.generated", texto=storytelling_texto)
+        base["produto"] = self.product.payload
+        return base
 
-        return (
-            {
-                "executed": True,
-                "prompt_path": str(self.prompt_contexto_uso.path),
-                "input_chars": contexto_uso_run["input_chars"],
-                "texto": contexto_uso_texto,
-                "result": contexto_uso_run["parsed"],
-            },
-            {
-                "executed": True,
-                "prompt_path": str(self.prompt_storytelling.path),
-                "input_chars": storytelling_run["input_chars"],
-                "texto": storytelling_texto,
-                "result": storytelling_run["parsed"],
-            },
-        )
+    def _safe_yaml_or_json(self, raw: str) -> dict[str, Any]:
+        import json
+        import yaml
 
-    def _executar_prompt_auxiliar_independente(
-        self,
-        *,
-        layer: str,
-        prompt: PromptData,
-        payload: dict[str, Any],
-        turn_number: int,
-        selected_stage: str,
-        consumed_by: str,
-    ) -> dict[str, Any]:
-        llm = criar_cliente_llm(self.config)
-        llm.begin_turn_debug_session()
-        prompt_input = yaml.safe_dump(payload, allow_unicode=True, sort_keys=False)
-        with llm.trace_context(
-            layer,
-            turn=turn_number,
-            selected_stage=selected_stage,
-            product_slug=self.product.slug,
-        ):
-            raw = llm.generate(prompt.body, prompt_input)
-        parsed = self._safe_yaml_dict(raw)
-        llm.annotate_last_call(
-            parsed_output=parsed,
-            output_used=parsed if parsed else raw,
-            consumed_by=[consumed_by, "markdown_debug"],
-        )
-        return {
-            "parsed": parsed,
-            "input_chars": len(prompt_input),
-            "llm_calls": llm.consume_turn_debug_session(),
-        }
-
-    def _merge_external_llm_calls(self, llm_calls: list[dict[str, Any]]) -> None:
-        if not llm_calls:
-            return
-        self.llm._ensure_debug_state()
-        for call in llm_calls:
-            record = deepcopy(call)
-            self.llm._llm_call_counter += 1
-            record["call_id"] = self.llm._llm_call_counter
-            self.llm._turn_llm_calls.append(record)
-
-    def _safe_yaml_dict(self, raw: str) -> dict[str, Any]:
-        sanitized = self._strip_markdown_fences(raw)
+        text = self._strip_markdown_fences(str(raw or "").strip())
+        if not text:
+            return {}
         try:
-            payload = yaml.safe_load(sanitized) or {}
+            payload = json.loads(text)
+            return payload if isinstance(payload, dict) else {}
+        except (json.JSONDecodeError, ValueError):
+            pass
+        try:
+            payload = yaml.safe_load(text) or {}
+            return payload if isinstance(payload, dict) else {}
         except yaml.YAMLError:
             return {}
-        return payload if isinstance(payload, dict) else {}
 
-    def _strip_markdown_fences(self, raw: str) -> str:
-        text = str(raw or "").strip()
+    def _strip_markdown_fences(self, text: str) -> str:
         if not text:
             return text
-
-        if text.startswith("```"):
-            lines = text.splitlines()
-            while lines and lines[0].lstrip().startswith("```"):
-                lines.pop(0)
-            while lines and lines[-1].lstrip().startswith("```"):
-                lines.pop()
-            return "\n".join(lines).strip()
-
         lines = text.splitlines()
-        cleaned_lines: list[str] = []
+        cleaned: list[str] = []
         for line in lines:
             if line.lstrip().startswith("```"):
                 continue
-            cleaned_lines.append(line)
-        return "\n".join(cleaned_lines).strip()
+            cleaned.append(line)
+        return "\n".join(cleaned).strip()
 
-    def _extrair_desconstrucao_variavel_critica_id(self, payload: dict[str, Any]) -> str:
-        leitura_estrutural = payload.get("leitura_estrutural", {}) or {}
-        eixo_de_valor = leitura_estrutural.get("eixo_de_valor", {}) or {}
-        variavel_critica = eixo_de_valor.get("variavel_critica", {}) or {}
-        return str(variavel_critica.get("id", ""))
+    def _stage_de_valor_ou_objecao(self, stage_id: str) -> bool:
+        return stage_id in {"preco_contexto", "quebra_objecao"}
 
-    def _extrair_validacao_next_variable_id(self, payload: dict[str, Any]) -> str:
-        proxima_validacao = payload.get("proxima_validacao", {}) or {}
-        return str(proxima_validacao.get("id", ""))
+    def _atualizar_estado_preco_na_conversa(
+        self,
+        *,
+        selected_stage: str,
+        response: str,
+        debug_trace: list[str],
+    ) -> None:
+        if not self._stage_de_valor_ou_objecao(selected_stage):
+            return
+        referencia = self._extrair_referencia_de_preco(response)
+        if not referencia:
+            return
+        self.state.preco_ja_foi_dito_na_conversa = True
+        self.state.ultima_referencia_de_preco = referencia
+        self._add_trace(
+            debug_trace,
+            "v2.price_signal.updated",
+            preco_ja_foi_dito_na_conversa=True,
+            ultima_referencia_de_preco=referencia,
+        )
 
-    def _extrair_validacao_contexto_suficiente(self, payload: dict[str, Any]) -> bool:
-        decisao_de_avanco = payload.get("decisao_de_avanco", {}) or {}
-        return bool(decisao_de_avanco.get("contexto_suficiente", False))
-
-    def _extrair_contexto_uso_texto(self, payload: dict[str, Any]) -> str:
-        return str(payload.get("texto", ""))
-
-    def _extrair_storytelling_texto(self, payload: dict[str, Any]) -> str:
-        return str(payload.get("texto", ""))
+    def _extrair_referencia_de_preco(self, text: str) -> str:
+        candidate = str(text or "").strip()
+        if not candidate:
+            return ""
+        sentences = [
+            chunk.strip()
+            for chunk in re.split(r"(?<=[.!?])\s+|\n+", candidate)
+            if str(chunk or "").strip()
+        ]
+        patterns = (
+            r"R\$\s*\d",
+            r"(?i)\b\d[\d\.\,]*\s*(?:reais|real)\b",
+            r"(?i)\b(?:mensalidade|mensal|implantacao|implantação|setup|m[eê]s|/m[eê]s)\b",
+            r"(?i)\b(?:a partir de|come[çc]a em|fica em|normalmente começa em|normalmente comeca em)\b",
+        )
+        for sentence in sentences:
+            if any(re.search(pattern, sentence) for pattern in patterns):
+                return sentence[:240]
+        return ""
 
     def pode_voltar_ultimo_turno(self) -> bool:
         return bool(self._checkpoints)
@@ -803,10 +571,15 @@ class AnaV2ConversationService:
         current_stage: str,
         turn_count: int,
         history: list[MensagemConversa],
+        memoria_estavel: str = "",
+        memoria_de_progressao: str = "",
+        preco_ja_foi_dito_na_conversa: bool = False,
+        ultima_referencia_de_preco: str = "",
         contexto_comercial_informado: str = "",
         descoberta_nicho: dict[str, Any] | None = None,
         desconstrucao_primeiros_principios: dict[str, Any] | None = None,
         validacao_preco_contexto: dict[str, Any] | None = None,
+        spin_selling_preco_contexto: dict[str, Any] | None = None,
         contexto_uso_explicacao_produto: dict[str, Any] | None = None,
         storytelling_explicacao_produto: dict[str, Any] | None = None,
     ) -> None:
@@ -816,13 +589,19 @@ class AnaV2ConversationService:
             MensagemConversa(role=message.role, content=message.content)
             for message in history
         ]
-        self.state.contexto_comercial_informado = contexto_comercial_informado
+        self.state.memoria_estavel = str(memoria_estavel or "")
+        self.state.memoria_de_progressao = str(memoria_de_progressao or "")
+        self.state.preco_ja_foi_dito_na_conversa = bool(preco_ja_foi_dito_na_conversa)
+        self.state.ultima_referencia_de_preco = str(ultima_referencia_de_preco or "")
+        self.state.contexto_comercial_informado = str(contexto_comercial_informado or "")
         self.state.descoberta_nicho = deepcopy(descoberta_nicho or {})
         self.state.desconstrucao_primeiros_principios = deepcopy(desconstrucao_primeiros_principios or {})
         self.state.validacao_preco_contexto = deepcopy(validacao_preco_contexto or {})
+        self.state.spin_selling_preco_contexto = deepcopy(spin_selling_preco_contexto or {})
         self.state.contexto_uso_explicacao_produto = deepcopy(contexto_uso_explicacao_produto or {})
         self.state.storytelling_explicacao_produto = deepcopy(storytelling_explicacao_produto or {})
         self._checkpoints = []
+        self.persistir_memoria_em_arquivos()
 
     def voltar_ultimo_turno(self) -> dict[str, Any]:
         if not self._checkpoints:
@@ -835,12 +614,18 @@ class AnaV2ConversationService:
             MensagemConversa(role=message.role, content=message.content)
             for message in checkpoint.history
         ]
+        self.state.memoria_estavel = checkpoint.memoria_estavel
+        self.state.memoria_de_progressao = checkpoint.memoria_de_progressao
+        self.state.preco_ja_foi_dito_na_conversa = checkpoint.preco_ja_foi_dito_na_conversa
+        self.state.ultima_referencia_de_preco = checkpoint.ultima_referencia_de_preco
         self.state.contexto_comercial_informado = checkpoint.contexto_comercial_informado
         self.state.descoberta_nicho = deepcopy(checkpoint.descoberta_nicho)
         self.state.desconstrucao_primeiros_principios = deepcopy(checkpoint.desconstrucao_primeiros_principios)
         self.state.validacao_preco_contexto = deepcopy(checkpoint.validacao_preco_contexto)
+        self.state.spin_selling_preco_contexto = deepcopy(checkpoint.spin_selling_preco_contexto)
         self.state.contexto_uso_explicacao_produto = deepcopy(checkpoint.contexto_uso_explicacao_produto)
         self.state.storytelling_explicacao_produto = deepcopy(checkpoint.storytelling_explicacao_produto)
+        self.persistir_memoria_em_arquivos()
         state_after = self._fotografar_estado()
         return {
             "action": "undo_last_turn",
@@ -859,10 +644,15 @@ class AnaV2ConversationService:
                 MensagemConversa(role=message.role, content=message.content)
                 for message in self.state.history
             ],
+            memoria_estavel=self.state.memoria_estavel,
+            memoria_de_progressao=self.state.memoria_de_progressao,
+            preco_ja_foi_dito_na_conversa=self.state.preco_ja_foi_dito_na_conversa,
+            ultima_referencia_de_preco=self.state.ultima_referencia_de_preco,
             contexto_comercial_informado=self.state.contexto_comercial_informado,
             descoberta_nicho=deepcopy(self.state.descoberta_nicho),
             desconstrucao_primeiros_principios=deepcopy(self.state.desconstrucao_primeiros_principios),
             validacao_preco_contexto=deepcopy(self.state.validacao_preco_contexto),
+            spin_selling_preco_contexto=deepcopy(self.state.spin_selling_preco_contexto),
             contexto_uso_explicacao_produto=deepcopy(self.state.contexto_uso_explicacao_produto),
             storytelling_explicacao_produto=deepcopy(self.state.storytelling_explicacao_produto),
         )

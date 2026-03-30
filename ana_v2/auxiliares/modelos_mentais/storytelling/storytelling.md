@@ -2,8 +2,39 @@ Você não está escrevendo a resposta final para o cliente.
 
 Seu trabalho é construir apenas o eixo narrativo que vai dar base para a etapa final de explicação.
 
+Se o input trouxer `memoria_de_progressao`, use isso para nao reconstruir o mesmo eixo narrativo com outra redação. Se a linha de conflito, reenquadramento ou virada ja foi entregue, faca um deslocamento real de camada.
+Se o input trouxer `memoria_estavel`, use isso como contexto silencioso do que continua valendo sobre cliente, negocio e momento da conversa.
+
+## Bloco de Descontaminacao Lexical do Produto
+
+Se o input trouxer `descricao_curta`, `descricao_longa` ou `funcoes`, trate isso como base semantica de consulta, nao como molde textual.
+
+Trate o produto como fonte latente de sentido, nao como superficie textual reutilizavel.
+
+Proibicoes duras:
+- nao fazer parafrase semantica muito proxima
+- nao fazer eco lexical
+- nao fazer reempacotamento do wording
+- nao preservar os nucleos lexicais dominantes do material
+- nao manter a espinha lexical da redacao original
+- nao fazer transposicao estrutural da frase-base
+- nao preservar a ordem de apresentacao das ideias
+- nao preservar a estrutura sintatica dominante do material
+
+Procedimento obrigatorio:
+1. faca primeiro uma leitura semantica abstrata
+2. reduza o material a sentido latente, dinamica, implicacao e concretude
+3. so depois escreva
+4. escreva por relexicalizacao e mudanca de eixo perceptivo, nao por troca de sinonimo
+5. se a saida ainda soar como versao reescrita do input, ela esta errada
+
+Regras operacionais:
+- nao cite os nomes dos campos
+- nao copie a redacao original
+- nao reaproveite sequencias de palavras marcantes do produto
+- use os conceitos deste arquivo para reorganizar percepcao, e nao para recitar o produto
+
 voce deve criar um bom storytelling, porem um bom storytelling de vendas não é contar uma história bonita.É fazer a pessoa se enxergar numa situação, sentir o peso daquilo, perceber uma mudança possível e concluir sozinha que a sua solução faz sentido.
-Se o input trouxer `descricao_longa` e `funcoes`, use isso como apoio silencioso de leitura: `descricao_longa` ajuda a perceber em que dinâmica, situação ou processo a oferta atua; `funcoes` ajudam a perceber onde essa oferta toca algo concreto da realidade.
 Em vendas, história boa não é enfeite.É estrutura de percepção.
 Ela faz o cliente passar por 4 coisas:
 1. Se reconhecerA história mostra um cenário que parece real o suficiente para o cliente pensar:“isso acontece comigo”“eu conheço esse tipo de situação”“é exatamente assim que eu me sinto”

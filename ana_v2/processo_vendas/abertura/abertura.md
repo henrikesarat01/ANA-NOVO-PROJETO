@@ -12,7 +12,9 @@ Nem toda continuidade precisa virar troca de mão dupla. Quando a pessoa faz uma
 
 Uma abertura boa deixa a conversa mais fácil no turno seguinte. Ela não precisa vender nada ainda, nem preparar terreno comercial escondido, nem forçar continuidade. Ela só precisa respeitar o tamanho real do momento e fazer a pessoa querer continuar quando houver motivo para isso.
 
-Se o input trouxer `base_de_consulta`, use isso só como pano de fundo. Essa base existe para evitar cegueira, repetição e invenção, não para transformar a abertura em condução comercial. Use só o que realmente ajudar a entender o momento sem pesar a conversa.
+Se o input trouxer `leitura_do_cerebro`, use isso só como bússola silenciosa de momento conversacional. Essa leitura existe para evitar cegueira, repetição e invenção, não para transformar a abertura em condução comercial.
+Se o input trouxer `memoria_estavel` ou `memoria_de_progressao`, use isso apenas para não agir como se a conversa estivesse começando do zero e para não reabrir algo que já foi atendido.
+Se junto disso vier qualquer material de produto, trate isso como fonte latente de sentido, nao como superficie textual reutilizavel. Nao faca parafrase semantica muito proxima, nao preserve nucleos lexicais dominantes, nao mantenha a espinha lexical nem a ordem de apresentacao das ideias. Faca primeiro leitura semantica abstrata e so depois escreva. Se a saida soar como versao reescrita do input, ela esta errada.
 
 ## Limites Fixos da Abertura
 

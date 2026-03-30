@@ -30,6 +30,10 @@ def main() -> None:
             current_stage=sessao_restaurada.current_stage,
             turn_count=sessao_restaurada.turn_count,
             history=sessao_restaurada.history,
+            memoria_estavel=sessao_restaurada.memoria_estavel,
+            memoria_de_progressao=sessao_restaurada.memoria_de_progressao,
+            preco_ja_foi_dito_na_conversa=sessao_restaurada.preco_ja_foi_dito_na_conversa,
+            ultima_referencia_de_preco=sessao_restaurada.ultima_referencia_de_preco,
             contexto_comercial_informado=sessao_restaurada.contexto_comercial_informado,
             descoberta_nicho=sessao_restaurada.descoberta_nicho,
             desconstrucao_primeiros_principios=sessao_restaurada.desconstrucao_primeiros_principios,
@@ -58,6 +62,10 @@ def main() -> None:
                 "restored_stage": sessao_restaurada.current_stage,
                 "restored_turn_count": sessao_restaurada.turn_count,
                 "restored_history_messages": len(sessao_restaurada.history),
+                "restored_memoria_estavel": sessao_restaurada.memoria_estavel,
+                "restored_memoria_de_progressao": sessao_restaurada.memoria_de_progressao,
+                "restored_preco_ja_foi_dito_na_conversa": sessao_restaurada.preco_ja_foi_dito_na_conversa,
+                "restored_ultima_referencia_de_preco": sessao_restaurada.ultima_referencia_de_preco,
                 "restored_business_context_line": sessao_restaurada.contexto_comercial_informado,
                 "restored_ranked_functions_count": len(sessao_restaurada.descoberta_nicho.get("funcoes_ranqueadas", [])),
                 "restored_desconstrucao_variavel_critica": _extrair_desconstrucao_variavel_critica_id(
@@ -70,6 +78,7 @@ def main() -> None:
         )
     else:
         markdown_logger = ConversationMarkdownLogger(Path.cwd(), config)
+        service.limpar_memoria_em_arquivos()
 
     print("=" * 72)
     print("ANA V2 CLI")

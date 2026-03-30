@@ -37,8 +37,7 @@ def main() -> None:
     logger = ConversationMarkdownLogger(Path.cwd(), config)
 
     print(f"debug_md={logger.file_path}")
-    print(f"contexto_uso_md={logger.file_path.with_name(logger.file_path.stem + '_contexto_uso.md')}")
-    print(f"storytelling_md={logger.file_path.with_name(logger.file_path.stem + '_storytelling.md')}")
+    print(f"cerebro_conversa_md={logger.file_path.with_name(logger.file_path.stem + '_cerebro_conversa.md')}")
     print()
 
     for idx, message in enumerate(messages, start=1):
