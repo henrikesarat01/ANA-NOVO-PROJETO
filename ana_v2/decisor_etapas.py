@@ -79,6 +79,7 @@ class ResultadoCerebro:
     resposta_ao_cliente: str
     memoria_estavel_atualizada: str
     memoria_de_progressao_atualizada: str
+    modos_internos_usados: list[str]
     prompt_input: str
 
     def as_dict(self) -> dict[str, Any]:
@@ -101,6 +102,7 @@ class ResultadoCerebro:
             "resposta_ao_cliente": self.resposta_ao_cliente,
             "memoria_estavel_atualizada": self.memoria_estavel_atualizada,
             "memoria_de_progressao_atualizada": self.memoria_de_progressao_atualizada,
+            "modos_internos_usados": self.modos_internos_usados,
         }
 
 
@@ -166,6 +168,14 @@ class CerebroConversa:
                 if nome and nome not in auxiliares_de_apoio_sugeridos:
                     auxiliares_de_apoio_sugeridos.append(nome)
 
+        modos_raw = parsed.get("modos_internos_usados", [])
+        modos_internos_usados: list[str] = []
+        if isinstance(modos_raw, list):
+            for item in modos_raw:
+                nome = str(item or "").strip()
+                if nome and nome not in modos_internos_usados:
+                    modos_internos_usados.append(nome)
+
         confidence_raw = parsed.get("confidence", 0.0)
         try:
             confidence = float(confidence_raw)
@@ -199,6 +209,7 @@ class CerebroConversa:
             resposta_ao_cliente=_normalize_text(parsed.get("resposta_ao_cliente", "")),
             memoria_estavel_atualizada=_normalize_text(parsed.get("memoria_estavel_atualizada", "")),
             memoria_de_progressao_atualizada=_normalize_text(parsed.get("memoria_de_progressao_atualizada", "")),
+            modos_internos_usados=modos_internos_usados,
             prompt_input=prompt_input,
         )
         llm.annotate_last_call(
